@@ -14,6 +14,9 @@ namespace secJoin
 	{
 		bool mInsecurePrint = true, mInsecureMockSubroutines = false;
 
+		// statical security parameter.
+		u64 mStatSecParam = 40;
+
 		struct Offset
 		{
 			u64 mStart = 0, mSize = 0;
@@ -33,7 +36,7 @@ namespace secJoin
 		// number of rows). THe left column will have a
 		// zero appended as its LSB while the right gets
 		// a one appended.
-		static BinMatrix loadKeys(
+		BinMatrix loadKeys(
 			ColRef leftJoinCol,
 			ColRef rightJoinCol);
 

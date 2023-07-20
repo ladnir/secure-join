@@ -1,4 +1,5 @@
 #include "OmJoin.h"
+#include "libOTe/Tools/LinearCode.h"
 
 namespace secJoin
 {
@@ -12,22 +13,50 @@ namespace secJoin
         ColRef leftJoinCol,
         ColRef rightJoinCol)
     {
+        auto rows0 = leftJoinCol.mCol.mData.rows();
+        auto rows1 = rightJoinCol.mCol.mData.rows();
+        auto compressesSize = mStatSecParam + log2(rows0) + log2(rows1);
+        auto bits = leftJoinCol.mCol.getBitCount();
+
         if (leftJoinCol.mCol.getBitCount() != rightJoinCol.mCol.getBitCount())
             throw RTE_LOC;
 
-        auto bits = leftJoinCol.mCol.getBitCount();
-        BinMatrix keys(leftJoinCol.mCol.mData.numEntries() + rightJoinCol.mCol.mData.numEntries(), bits);
-        auto size0 = leftJoinCol.mCol.mData.size();
-        auto size1 = rightJoinCol.mCol.mData.size();
+        if (leftJoinCol.mCol.getBitCount() <= compressesSize)
+        {
 
-        u8* d0 = keys.data();
-        u8* d1 = keys.data() + size0;
-        u8* s0 = leftJoinCol.mCol.mData.data();
-        u8* s1 = rightJoinCol.mCol.mData.data();
-        memcpy(d0, s0, size0);
-        memcpy(d1, s1, size1);
+            auto size0 = leftJoinCol.mCol.mData.size();
+            auto size1 = rightJoinCol.mCol.mData.size();
+            BinMatrix keys(rows0 + rows1, bits);
 
-        return keys;
+            u8* d0 = keys.data();
+            u8* d1 = keys.data() + size0;
+            u8* s0 = leftJoinCol.mCol.mData.data();
+            u8* s1 = rightJoinCol.mCol.mData.data();
+            memcpy(d0, s0, size0);
+            memcpy(d1, s1, size1);
+            return keys;
+
+        }
+        else
+        {
+            oc::PRNG prng(oc::ZeroBlock);
+            oc::LinearCode code;
+            code.random(prng, bits, compressesSize);
+
+            BinMatrix keys(rows0 + rows1, bits);
+
+            for (u64 i = 0; i < rows0; ++i)
+                code.encode(
+                    leftJoinCol.mCol.mData.data(i),
+                    keys.data(i));
+
+            for (u64 i = 0, j = rows0; i < rows1; ++i, ++j)
+                code.encode(
+                    rightJoinCol.mCol.mData.data(i), 
+                    keys.data(j));
+
+            return keys;
+        }
     }
 
     // this circuit compares two inputs for equality with the exception that

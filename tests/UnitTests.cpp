@@ -97,7 +97,8 @@ namespace secJoin_Tests
             t.add("OmJoin_concatColumns_Test                     ", OmJoin_concatColumns_Test);
             t.add("OmJoin_getOutput_Test                         ", OmJoin_getOutput_Test);
             t.add("OmJoin_join_Test                              ", OmJoin_join_Test);
-            t.add("OmJoin_join_Test1                             ", OmJoin_join_Test1);
+            t.add("OmJoin_join_BigKey_Test                       ", OmJoin_join_BigKey_Test);
+            t.add("OmJoin_join_Reveal_Test                       ", OmJoin_join_Reveal_Test);
             t.add("OmJoin_join_round_Test                        ", OmJoin_join_round_Test);
             t.add("OmJoin_wrapper_test                           ", OmJoin_wrapper_test);
 
