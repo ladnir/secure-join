@@ -65,8 +65,15 @@ namespace secJoin
 			}
 		}
 
-		Perm operator*(const Perm& rhs) const { return compose(rhs); }
-		Perm compose(const Perm& rsh)const;
+		Perm operator*(const Perm& rhs) const { return composeSwap(rhs); }
+
+		// A.composeSwap(B) computes the permutation BoA
+		Perm composeSwap(const Perm& rsh)const;
+		
+		// A.compose(B) computes the permutation AoB
+		Perm compose(const Perm& rhs) const;
+
+		// return A^-1.
 		Perm inverse()const;
 
 
@@ -198,6 +205,16 @@ namespace secJoin
 					}
 				}
 			}
+		}
+
+		template <typename T>
+		oc::Matrix<u8> apply(const oc::Matrix<T>& src, bool inverse = false) const
+		{
+			oc::Matrix<u8> r(src.rows(), src.cols());
+			oc::MatrixView<const u8> ss(src.data(), src.rows(), src.cols());
+			oc::MatrixView<u8> rr(r.data(), src.rows(), src.cols());
+			apply<u8>(ss, rr, inverse);
+			return r;
 		}
 
 

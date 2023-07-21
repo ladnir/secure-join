@@ -29,7 +29,7 @@ void ComposedPerm_replicated_perm_test()
 
     Perm p0(n, prng);
     Perm p1(n, prng);
-    Perm pi = p0.compose(p1);
+    Perm pi = p0.composeSwap(p1);
     oc::Matrix<u8> t(n, rowSize),yExp(n, rowSize), yAct(n, rowSize);
 
     ComposedPerm perm1(p0, 0); 
@@ -103,7 +103,7 @@ void ComposedPerm_replicated_secure_perm_test()
 
     Perm p0(n, prng0);
     Perm p1(n, prng1);
-    Perm pi = p0.compose(p1);
+    Perm pi = p0.composeSwap(p1);
 
 
     ComposedPerm perm1(p0, 0); 

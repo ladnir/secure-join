@@ -145,7 +145,7 @@ namespace secJoin
     }
 
 
-    macoro::task<> AdditivePerm::compose(
+    macoro::task<> AdditivePerm::composeSwap(
         AdditivePerm& pi,
         AdditivePerm& dst,
         oc::PRNG& prng,

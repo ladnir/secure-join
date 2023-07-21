@@ -61,7 +61,7 @@ void AdditivePerm_xor_test()
     if(vecPerm1.mRho != vecPerm2.mRho)
         throw RTE_LOC;
     
-    auto pi = vecPerm1.mPi.mPerm.compose(vecPerm2.mPi.mPerm);
+    auto pi = vecPerm1.mPi.mPerm.composeSwap(vecPerm2.mPi.mPerm);
     Perm rhoExp = pi.apply(mPerm.mPerm);
     if(rhoExp != vecPerm1.mRho)
         throw RTE_LOC;
@@ -140,7 +140,7 @@ void AdditivePerm_add_test()
     //if (vecPerm1.mRho != vecPerm2.mRho)
     //    throw RTE_LOC;
 
-    //auto pi = vecPerm1.mPi.mPerm.compose(vecPerm2.mPi.mPerm);
+    //auto pi = vecPerm1.mPi.mPerm.composeSwap(vecPerm2.mPi.mPerm);
     //Perm rhoExp = pi.apply(mPerm.mPerm);
     //if (rhoExp != vecPerm1.mRho)
     //    throw RTE_LOC;

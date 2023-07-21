@@ -122,7 +122,7 @@ namespace secJoin
             MC_END();
         }
 
-        macoro::task<> compose(
+        macoro::task<> composeSwap(
             const ComposedPerm& in,
             ComposedPerm& out,
             coproto::Socket& chl,

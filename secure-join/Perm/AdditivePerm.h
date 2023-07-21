@@ -87,7 +87,7 @@ namespace secJoin
             return apply<u8>(in.mData, out.mData, prng, chl, ole, inv);
         }
 
-        macoro::task<> compose(
+        macoro::task<> composeSwap(
             AdditivePerm& pi,
             AdditivePerm& dst,
             oc::PRNG& prng,

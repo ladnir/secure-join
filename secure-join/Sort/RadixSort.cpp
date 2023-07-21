@@ -892,9 +892,9 @@ namespace secJoin
                 ret.emplace_back(genBitPerm(ssk));
                 std::cout << ret.back() << std::endl;
 
-                // compose the current partial sort with
+                // composeSwap the current partial sort with
                 // the permutation that sorts the next L bits
-                dst = ret.back().compose(dst);
+                dst = ret.back().composeSwap(dst);
 
                 auto kk2 = kk;
                 sk.resize(kk2.rows(), kk2.cols());
@@ -1003,9 +1003,9 @@ namespace secJoin
             MC_AWAIT(genBitPerm(mL, ssk, rho, gen, comm));
             setTimePoint("genBitPerm");
 
-            // compose the current partial sort with
+            // composeSwap the current partial sort with
             // the permutation that sorts the next L bits
-            MC_AWAIT(rho.compose(dst, sigma2, gen.mPrng, comm, gen));
+            MC_AWAIT(rho.composeSwap(dst, sigma2, gen.mPrng, comm, gen));
             setTimePoint("compose");
             std::swap(dst, sigma2);
             //dst.validate(comm);

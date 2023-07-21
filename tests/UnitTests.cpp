@@ -54,6 +54,7 @@ namespace secJoin_Tests
             t.add("DlpnPerm_setup_test                           ", DlpnPerm_setup_test);
             t.add("DlpnPerm_apply_test                           ", DlpnPerm_apply_test);
             t.add("DlpnPerm_sharedApply_test                     ", DlpnPerm_sharedApply_test);
+            t.add("DlpnPerm_prepro_test                          ", DlpnPerm_prepro_test);
 
             t.add("LocMC_eval_test                               ", LocMC_eval_test);
 
