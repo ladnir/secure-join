@@ -11,9 +11,10 @@ namespace secJoin
     class ComposedPerm
     {
     public:
-        u64 mPartyIdx=-1;
+        u64 mPartyIdx = -1;
         Perm mPerm;
-        DLpnPerm mDlpnPerm;
+        DLpnPermSender mSender;
+        DLpnPermReceiver mReceiver;
         bool mIsSecure = true;
 
         ComposedPerm() = default;
@@ -32,27 +33,35 @@ namespace secJoin
             , mPerm(n, prng)
         {}
 
-        void setupDlpnSender(oc::block& key, std::vector<oc::block>& rk)
+        void setKeyOts(
+            oc::block& key,
+            std::vector<oc::block>& rk,
+            std::vector<std::array<oc::block, 2>>& sk)
         {
-            mDlpnPerm.setupDlpnSender(key, rk);
+            mSender.setKeyOts(sk);
+            mReceiver.setKeyOts(key, rk);
         }
 
-        void setupDlpnReceiver(std::vector<std::array<oc::block, 2>>& sk)
+        macoro::task<> genKeyOts(OleGenerator& ole, coproto::Socket& chl)
         {
-            mDlpnPerm.setupDlpnReceiver(sk);
-        }
+            MC_BEGIN(macoro::task<>, this, &ole, &chl);
 
-        macoro::task<> setupDlpnSender(OleGenerator& ole)
-        {
-            MC_BEGIN(macoro::task<>, this, &ole);
-            MC_AWAIT(mDlpnPerm.setupDlpnSender(ole));
-            MC_END();
-        }
-
-        macoro::task<> setupDlpnReceiver(OleGenerator& ole)
-        {
-            MC_BEGIN(macoro::task<>, this, &ole);
-            MC_AWAIT(mDlpnPerm.setupDlpnReceiver(ole));
+            if ((int)ole.mRole)
+            {
+                MC_AWAIT(
+                    macoro::when_all_ready(
+                        mSender.genKeyOts(ole, chl),
+                        mReceiver.genKeyOts(ole, chl))
+                );
+            }
+            else
+            {
+                MC_AWAIT(
+                    macoro::when_all_ready(
+                        mReceiver.genKeyOts(ole, chl),
+                        mSender.genKeyOts(ole, chl))
+                );
+            }
             MC_END();
         }
 
@@ -65,6 +74,36 @@ namespace secJoin
         {
             mPartyIdx = partyIdx;
             mPerm.randomize(n, prng);
+        }
+
+        macoro::task<> preprocess(
+            u64 n,
+            u64 bytesPer,
+            coproto::Socket& chl,
+            OleGenerator& ole,
+            PRNG& prng)
+        {
+            MC_BEGIN(macoro::task<>, this, &ole, &chl, &prng, n, bytesPer,
+                chl2 = coproto::Socket{}
+            );
+            chl2 = chl.fork();
+            if ((int)ole.mRole)
+            {
+                MC_AWAIT(
+                    macoro::when_all_ready(
+                        mSender.preprocess(n, bytesPer, prng, chl, ole),
+                        mReceiver.preprocess(n, bytesPer, prng, chl2, ole))
+                );
+            }
+            else
+            {
+                MC_AWAIT(
+                    macoro::when_all_ready(
+                        mReceiver.preprocess(n, bytesPer, prng, chl, ole),
+                        mSender.preprocess(n, bytesPer, prng, chl2, ole))
+                );
+            }
+            MC_END();
         }
 
         template<typename T>
@@ -94,10 +133,10 @@ namespace secJoin
             soutperm.resize(in.rows(), in.cols());
             if ((inv ^ bool(mPartyIdx)) == true)
             {
-                if(mIsSecure)
+                if (mIsSecure)
                 {
-                    MC_AWAIT(mDlpnPerm.apply<T>(in, soutperm, prng, chl, ole));
-                    MC_AWAIT(mDlpnPerm.apply<T>(mPerm, soutperm, out, prng, chl, inv, ole));
+                    MC_AWAIT(mReceiver.apply<T>(in, soutperm, prng, chl, ole));
+                    MC_AWAIT(mSender.apply<T>(mPerm, soutperm, out, prng, chl, inv, ole));
                 }
                 else
                 {
@@ -107,10 +146,10 @@ namespace secJoin
             }
             else
             {
-                if(mIsSecure)
+                if (mIsSecure)
                 {
-                    MC_AWAIT(mDlpnPerm.apply<T>(mPerm, in, soutperm, prng, chl, inv, ole));
-                    MC_AWAIT(mDlpnPerm.apply<T>(soutperm, out, prng, chl, ole));
+                    MC_AWAIT(mSender.apply<T>(mPerm, in, soutperm, prng, chl, inv, ole));
+                    MC_AWAIT(mReceiver.apply<T>(soutperm, out, prng, chl, ole));
                 }
                 else
                 {
@@ -122,14 +161,6 @@ namespace secJoin
             MC_END();
         }
 
-        macoro::task<> composeSwap(
-            const ComposedPerm& in,
-            ComposedPerm& out,
-            coproto::Socket& chl,
-            OleGenerator& ole)
-        {
-            throw RTE_LOC;
-        }
     };
 
 }

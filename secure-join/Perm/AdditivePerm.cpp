@@ -17,25 +17,25 @@ namespace secJoin
         mIsSetup = false;
     }
 
-    void AdditivePerm::setupDlpnSender(oc::block& key, std::vector<oc::block>& rk)
-    {
-        mPi.setupDlpnSender(key, rk);
-    }
+    //void AdditivePerm::senderSetup(oc::block& key, std::vector<oc::block>& rk)
+    //{
+    //    mPi.senderSetup(key, rk);
+    //}
 
-    void AdditivePerm::setupDlpnReceiver(std::vector<std::array<oc::block, 2>>& sk)
-    {
-        mPi.setupDlpnReceiver(sk);
-    }
+    //void AdditivePerm::receiverSetup(std::vector<std::array<oc::block, 2>>& sk)
+    //{
+    //    mPi.receiverSetup(sk);
+    //}
 
-    macoro::task<> AdditivePerm::setupDlpnSender(OleGenerator& ole)
-    {
-        return (mPi.setupDlpnSender(ole));
-    }
+    //macoro::task<> AdditivePerm::senderSetup(OleGenerator& ole)
+    //{
+    //    return (mPi.senderSetup(ole));
+    //}
 
-    macoro::task<> AdditivePerm::setupDlpnReceiver(OleGenerator& ole)
-    {
-        return (mPi.setupDlpnReceiver(ole));
-    }
+    //macoro::task<> AdditivePerm::receiverSetup(OleGenerator& ole)
+    //{
+    //    return (mPi.receiverSetup(ole));
+    //}
 
     // generate the masking (replicated) permutation mPi
     // and then reveal mRhoPP = mPi(mShares).

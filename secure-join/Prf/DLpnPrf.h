@@ -99,11 +99,30 @@ namespace secJoin
 
         bool hasKeyOts() const {return mIsKeyOTsSet;}
 
-        macoro::task<> genKeyOts(OleGenerator& ole);
+        macoro::task<> genKeyOts(OleGenerator& ole, coproto::Socket& sock);
 
         void setKeyOts(span<oc::block> ots);
 
         void setKey(oc::block k);
+
+        oc::block getKey() const {
+            if (mIsKeySet == false)
+                throw RTE_LOC;
+            return mPrf.mKey;
+        }
+        std::vector<oc::block> getKeyOts() const
+        {
+
+            if (mIsKeyOTsSet == false)
+                throw RTE_LOC;
+            std::vector<oc::block> r(mKeyOTs.size());
+            for (u64 i = 0; i < r.size(); ++i)
+            {
+                r[i] = mKeyOTs[i].getSeed();
+            }
+            return r;
+        }
+
 
         coproto::task<> evaluate(
             span<oc::block> y,
@@ -118,7 +137,17 @@ namespace secJoin
             coproto::Socket& sock,
             Request<BinOle>& ole);
 
-
+        // re-randomize the OTs seeds with the tweak.
+        void tweakKeyOts(oc::block tweak)
+        {
+            if (!mKeyOTs.size())
+                throw RTE_LOC;
+            oc::AES aes(tweak);
+            for (u64 i = 0; i < mKeyOTs.size(); ++i)
+            {
+                mKeyOTs[i].SetSeed(aes.hashBlock(mKeyOTs[i].getSeed()));
+            }
+        }
     };
 
 
@@ -151,9 +180,23 @@ namespace secJoin
 
         bool hasKeyOts() const {return mIsKeyOTsSet;}
 
-        macoro::task<> genKeyOts(OleGenerator& ole);
+        macoro::task<> genKeyOts(OleGenerator& ole, coproto::Socket& sock);
 
         void setKeyOts(span<std::array<oc::block, 2>> ots);
+
+        std::vector<std::array<oc::block, 2>> getKeyOts() const
+        {
+
+            if (mIsKeyOTsSet == false)
+                throw RTE_LOC;
+            std::vector<std::array<oc::block, 2>> r(mKeyOTs.size());
+            for (u64 i = 0; i < r.size(); ++i)
+            {
+                r[i][0] = mKeyOTs[i][0].getSeed();
+                r[i][1] = mKeyOTs[i][1].getSeed();
+            }
+            return r;
+        }
 
         coproto::task<> evaluate(
             span<oc::block> x,
@@ -169,6 +212,18 @@ namespace secJoin
             coproto::Socket& sock,
             Request<BinOle>& ole);
 
+        // re-randomize the OTs seeds with the tweak.
+        void tweakKeyOts(oc::block tweak)
+        {
+            if (!mKeyOTs.size())
+                throw RTE_LOC;
+            oc::AES aes(tweak);
+            for (u64 i = 0; i < mKeyOTs.size(); ++i)
+            {
+                mKeyOTs[i][0].SetSeed(aes.hashBlock(mKeyOTs[i][0].getSeed()));
+                mKeyOTs[i][1].SetSeed(aes.hashBlock(mKeyOTs[i][1].getSeed()));
+            }
+        }
 
     };
 }

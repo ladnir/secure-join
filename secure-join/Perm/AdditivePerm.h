@@ -28,11 +28,13 @@ namespace secJoin
         AdditivePerm(span<u32> shares, PRNG& prng, u8 partyIdx);
         void init(u64 size);
 
-        void setupDlpnSender(oc::block& key, std::vector<oc::block>& rk);
-        void setupDlpnReceiver(std::vector<std::array<oc::block, 2>>& sk);
-
-        macoro::task<> setupDlpnSender(OleGenerator& ole);
-        macoro::task<> setupDlpnReceiver(OleGenerator& ole);
+        void setKeyOts(
+            oc::block& key,
+            std::vector<oc::block>& rk,
+            std::vector<std::array<oc::block, 2>>& sk)
+        {
+            mPi.setKeyOts(key, rk, sk);
+        }
 
         // generate the masking (replicated) permutation mPi
         // and then reveal mRhoPP = mPi(mShares).

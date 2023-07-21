@@ -3,25 +3,25 @@
 namespace secJoin
 {
 
-    void DLpnPerm::setupDlpnSender(oc::block& key, std::vector<oc::block>& rk)
+    void DLpnPermReceiver::setKeyOts(oc::block& key, std::vector<oc::block>& rk)
     {
         mSender.setKey(key);
         mSender.setKeyOts(rk);
     }
 
-    void DLpnPerm::setupDlpnReceiver(std::vector<std::array<oc::block, 2>>& sk)
+    void DLpnPermSender::setKeyOts(std::vector<std::array<oc::block, 2>>& sk)
     {
         mRecver.setKeyOts(sk);
     }
 
-    macoro::task<> DLpnPerm::setupDlpnSender(OleGenerator& ole)
+    macoro::task<> DLpnPermReceiver::genKeyOts(OleGenerator& ole, coproto::Socket&chl)
     {
-        return mSender.genKeyOts(ole);
+        return mSender.genKeyOts(ole,chl);
     }
 
-    macoro::task<> DLpnPerm::setupDlpnReceiver(OleGenerator& ole)
+    macoro::task<> DLpnPermSender::genKeyOts(OleGenerator& ole, coproto::Socket& chl)
     {
-        return mRecver.genKeyOts(ole);
+        return mRecver.genKeyOts(ole, chl);
     }
 
     void xorShare(oc::MatrixView<const u8> v1,
@@ -38,8 +38,7 @@ namespace secJoin
     }
 
     // generate the preprocessing when all inputs are unknown.
-    macoro::task<> DLpnPerm::preprocess(
-        bool permHolder,
+    macoro::task<> DLpnPermSender::preprocess(
         u64 totElements,
         u64 bytesPerRow,
         oc::PRNG& prng,
@@ -47,21 +46,26 @@ namespace secJoin
         OleGenerator& ole)
     {
         mHasPreprocess = true;
-        if (permHolder)
-        {
-            mPrePerm.randomize(totElements, prng);
-            return setup(mPrePerm, bytesPerRow, prng, chl, false, ole);
-        }
-        else
-        {
-            return setup(totElements, bytesPerRow, prng, chl, ole);
-        }
+        mPrePerm.randomize(totElements, prng);
+        return setup(mPrePerm, bytesPerRow, prng, chl, false, ole);
+    }
+
+    // generate the preprocessing when all inputs are unknown.
+    macoro::task<> DLpnPermReceiver::preprocess(
+        u64 totElements,
+        u64 bytesPerRow,
+        oc::PRNG& prng,
+        coproto::Socket& chl,
+        OleGenerator& ole)
+    {
+        mHasPreprocess = true;
+        return setup(totElements, bytesPerRow, prng, chl, ole);
     }
 
     // DLpn Receiver calls this setup
     // generate random mDelta such that
     // mDelta ^ mB = pi(mA)
-    macoro::task<> DLpnPerm::setup(
+    macoro::task<> DLpnPermSender::setup(
         const Perm& pi,
         u64 bytesPerRow,
         oc::PRNG& prng,
@@ -84,6 +88,9 @@ namespace secJoin
 
         key = prng.get();
         aes.setKey(key);
+
+        if(mRecver.hasKeyOts())
+            mRecver.tweakKeyOts(key);
         MC_AWAIT(chl.send(std::move(key)));
         // if(mRecver.hasKeyOts() == false)
         //     MC_AWAIT(mRecver.genKeyOts(ole));
@@ -122,7 +129,7 @@ namespace secJoin
     // DLpn Receiver calls this setup
     // generate random mA, mB such that
     // mDelta ^ mB = pi(mA)
-    macoro::task<> DLpnPerm::setup(
+    macoro::task<> DLpnPermReceiver::setup(
         u64 totElements,
         u64 bytesPerRow,
         oc::PRNG& prng,
@@ -153,6 +160,9 @@ namespace secJoin
 
 
         MC_AWAIT(chl.recv(key));
+
+        if (mSender.hasKeyOts())
+            mSender.tweakKeyOts(key);
         aes.setKey(key);
         aes.ecbEncBlocks(aesPlaintext, aesCipher);
 
@@ -179,7 +189,7 @@ namespace secJoin
         MC_END();
     }
 
-    macoro::task<> DLpnPerm::validateShares(coproto::Socket& sock)
+    macoro::task<> DLpnPermReceiver::validateShares(coproto::Socket& sock)
     {
         assert(hasSetup());
         MC_BEGIN(macoro::task<>, this, &sock);
@@ -190,7 +200,7 @@ namespace secJoin
         MC_END();
     }
 
-    macoro::task<> DLpnPerm::validateShares(coproto::Socket& sock, const Perm& p)
+    macoro::task<> DLpnPermSender::validateShares(coproto::Socket& sock, const Perm& p)
     {
         assert(hasSetup());
         MC_BEGIN(macoro::task<>, this, &sock, &p,
@@ -216,7 +226,7 @@ namespace secJoin
     }
 
     template <>
-    macoro::task<> DLpnPerm::apply<u8>(
+    macoro::task<> DLpnPermSender::apply<u8>(
         const Perm& pi,
         oc::MatrixView<u8> sout,
         oc::PRNG& prng,
@@ -239,10 +249,11 @@ namespace secJoin
             // delta = pi o pre^-1
             // they are going to update their correlation using delta
             // to translate it to a correlation of pi.
-            MC_AWAIT(validateShares(chl, mPrePerm));
-            delta = pi.inverse().compose(mPrePerm);
+            delta = invPerm ?
+                pi.compose(mPrePerm) :
+                pi.inverse().compose(mPrePerm)
+                ;
             MC_AWAIT(chl.send(std::move(delta.mPerm)));
-            MC_AWAIT(validateShares(chl, pi));
 
             mHasPreprocess = false;
         }
@@ -275,7 +286,7 @@ namespace secJoin
     // when it also has inputs
     // this will internally call setup for it
     template <>
-    macoro::task<> DLpnPerm::apply<u8>(
+    macoro::task<> DLpnPermSender::apply<u8>(
         const Perm& pi,
         oc::MatrixView<const u8> in,
         oc::MatrixView<u8> sout,
@@ -304,7 +315,7 @@ namespace secJoin
     // If DLPN sender only wants to call apply
     // this will internally call setup for it
     template <>
-    macoro::task<> DLpnPerm::apply<u8>(
+    macoro::task<> DLpnPermReceiver::apply<u8>(
         oc::MatrixView<const u8> input,
         oc::MatrixView<u8> sout,
         oc::PRNG& prng,
@@ -324,8 +335,6 @@ namespace secJoin
 
         if (mHasPreprocess)
         {
-            MC_AWAIT(validateShares(chl));
-
             // we current have the correlation 
             // 
             //          mDelta ^ mB  = pre(mA)
@@ -350,7 +359,6 @@ namespace secJoin
                 delta.apply<u8>(mA, AA);
                 std::swap(mA, AA);
             }
-            MC_AWAIT(validateShares(chl));
 
             mHasPreprocess = false;
         }

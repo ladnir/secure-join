@@ -702,9 +702,9 @@ namespace secJoin
 
 
 
-            macoro::task<> DLpnPrfSender::genKeyOts(OleGenerator& ole)
+            macoro::task<> DLpnPrfSender::genKeyOts(OleGenerator& ole, coproto::Socket& sock)
             {
-                MC_BEGIN(macoro::task<>, this, &ole,
+                MC_BEGIN(macoro::task<>, this, &ole, &sock,
                     totalSize = u64(),
 
                     ots = OtRecv(),
@@ -713,7 +713,7 @@ namespace secJoin
 
                 totalSize = 128;
 
-                MC_AWAIT_SET(req, ole.otRecvRequest(totalSize));
+                MC_AWAIT_SET(req, ole.otRecvRequest(totalSize, 0, sock.mId));
 
                 MC_AWAIT_SET(ots, req.get());
 
@@ -743,6 +743,8 @@ namespace secJoin
                 mPrf.setKey(k);
                 mIsKeySet = true;
             }
+
+
 
             void mod3BitDecompostion(oc::MatrixView<u16> u, oc::MatrixView<oc::block> u0, oc::MatrixView<oc::block> u1)
             {
@@ -838,7 +840,7 @@ namespace secJoin
                 );
 
                 if (!mIsKeyOTsSet)
-                    MC_AWAIT(genKeyOts(gen));
+                    MC_AWAIT(genKeyOts(gen, sock));
 
                 if (mDebug)
                 {
@@ -858,7 +860,7 @@ namespace secJoin
 
                 setTimePoint("DarkMatter.sender.begin");
 
-                MC_AWAIT_SET(ole, gen.binOleRequest(oc::roundUpTo(y.size(), 128) * m * 2));
+                MC_AWAIT_SET(ole, gen.binOleRequest(oc::roundUpTo(y.size(), 128) * m * 2, 0, sock.mId));
                 H2.resize(2 * mPrf.KeySize, oc::divCeil(y.size(), 128));
 
                 for (i = 0; i < mPrf.KeySize;)
@@ -901,14 +903,14 @@ namespace secJoin
                 MC_END();
             }
 
-            macoro::task<> DLpnPrfReceiver::genKeyOts(OleGenerator& ole)
+            macoro::task<> DLpnPrfReceiver::genKeyOts(OleGenerator& ole, coproto::Socket& sock)
             {
-                MC_BEGIN(macoro::task<>, this, &ole,
+                MC_BEGIN(macoro::task<>, this, &ole, &sock,
                     totalSize = u64(),
                     ots = OtSend(),
                     req = Request<OtSend>());
                 totalSize = 128;
-                MC_AWAIT_SET(req, ole.otSendRequest(totalSize));
+                MC_AWAIT_SET(req, ole.otSendRequest(totalSize, 0, sock.mId));
                 MC_AWAIT_SET(ots, req.get());
                 assert(ots.size() == totalSize);
                 setKeyOts(ots.mMsg);
@@ -952,7 +954,7 @@ namespace secJoin
                     v = oc::Matrix<oc::block>{}
                 );
                 if (!mIsKeyOTsSet)
-                    MC_AWAIT(genKeyOts(gen));
+                    MC_AWAIT(genKeyOts(gen, sock));
 
                 if (x.size() != y.size())
                     throw RTE_LOC;
@@ -971,7 +973,7 @@ namespace secJoin
                 setTimePoint("DarkMatter.recver.begin");
 
                 TODO("is the round up a good idea ? ");
-                MC_AWAIT_SET(ole, gen.binOleRequest(oc::roundUpTo(y.size(), 128) * m * 2));
+                MC_AWAIT_SET(ole, gen.binOleRequest(oc::roundUpTo(y.size(), 128) * m * 2, 0, sock.mId));
 
                 xt.resize(128, oc::divCeil(y.size(), 128));
                 for (u64 i = 0, k = 0; i < y.size(); ++k)

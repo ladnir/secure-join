@@ -1,4 +1,5 @@
 #include "OleGenerator.h"
+#include <unordered_map>
 
 #define LOG(X) log(X)
 
@@ -191,7 +192,7 @@ namespace secJoin
         MC_BEGIN(macoro::task<>, this,
             i = u64{},
             wid = u64{},
-            sid = oc::block{},
+            sid = SessionID{},
             chunk = CorRequest{},
             cmd = Command{},
             pushIdxs = std::vector<u64>{},
@@ -200,8 +201,8 @@ namespace secJoin
 
             baseSender = oc::SoftSpokenMalOtSender{},
             baseRecver = oc::SoftSpokenMalOtReceiver{},
-            sessions = std::map<oc::block, CorRequest>{},
-            completed = std::map<oc::block, CorRequest>{},
+            sessions = std::unordered_map<SessionID, CorRequest>{},
+            completed = std::unordered_map<SessionID, CorRequest>{},
             queue = std::list<CorRequest>{},
             idle = std::vector<u64>{},
             curReq = (CorRequest*)nullptr

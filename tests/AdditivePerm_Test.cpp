@@ -32,23 +32,19 @@ void AdditivePerm_xor_test()
     ole0.fakeInit(OleGenerator::Role::Sender);
     ole1.fakeInit(OleGenerator::Role::Receiver);
 
-    oc::block kk;
-    kk = prng.get();
-
     // Setuping up the OT Keys
-    std::vector<oc::block> rk(vecPerm1.mPi.mDlpnPerm.mSender.mPrf.KeySize);
-    std::vector<std::array<oc::block, 2>> sk(vecPerm1.mPi.mDlpnPerm.mSender.mPrf.KeySize);
-    for (u64 i = 0; i < vecPerm1.mPi.mDlpnPerm.mSender.mPrf.KeySize; ++i)
+    oc::block kk = prng.get();
+    std::vector<oc::block> rk(128);
+    std::vector<std::array<oc::block, 2>> sk(128);
+    for (u64 i = 0; i < 128; ++i)
     {
         sk[i][0] = oc::block(i, 0);
         sk[i][1] = oc::block(i, 1);
         rk[i] = oc::block(i, *oc::BitIterator((u8*)&kk, i));
     }
-    vecPerm2.setupDlpnSender(kk,rk);
-    vecPerm1.setupDlpnReceiver(sk);
+    vecPerm1.setKeyOts(kk, rk, sk);
+    vecPerm2.setKeyOts(kk, rk, sk);
 
-    vecPerm1.setupDlpnSender(kk,rk);
-    vecPerm2.setupDlpnReceiver(sk);
 
     auto proto0 = vecPerm1.setup(chls[0], ole0, prng);
     auto proto1 = vecPerm2.setup(chls[1], ole1, prng);

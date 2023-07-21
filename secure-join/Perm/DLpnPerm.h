@@ -7,23 +7,22 @@
 namespace secJoin
 {
 
-    class DLpnPerm
+    class DLpnPermSender
     {
     public:
         static constexpr auto mDebug = DLpnPrfSender::mDebug;
 
         DLpnPrfReceiver mRecver;
-        DLpnPrfSender mSender;
 
         bool mHasPreprocess = false;
         Perm mPrePerm;
-        oc::Matrix<u8> mA, mDelta, mB;
+        oc::Matrix<u8> mDelta;
 
-        DLpnPerm() = default;
-        DLpnPerm(const DLpnPerm&) = default;
-        DLpnPerm(DLpnPerm&&) noexcept = default;
-        DLpnPerm& operator=(const DLpnPerm&) = default;
-        DLpnPerm& operator=(DLpnPerm&&) noexcept = default;
+        DLpnPermSender() = default;
+        DLpnPermSender(const DLpnPermSender&) = default;
+        DLpnPermSender(DLpnPermSender&&) noexcept = default;
+        DLpnPermSender& operator=(const DLpnPermSender&) = default;
+        DLpnPermSender& operator=(DLpnPermSender&&) noexcept = default;
 
         // Sender apply: permute a remote x by our pi and get shares as output.
         template <typename T>
@@ -49,31 +48,16 @@ namespace secJoin
             OleGenerator& ole
         );
 
-        // Receiver apply: permute a secret shared input x by the other party's pi and get shares as output
-        template <typename T>
-        macoro::task<> apply(
-            oc::MatrixView<const T> in,
-            oc::MatrixView<T> sout,
-
-            oc::PRNG& prng,
-            coproto::Socket& chl,
-            OleGenerator& ole
-        );
+        void setKeyOts(std::vector<std::array<oc::block, 2>>& sk);
+        macoro::task<> genKeyOts(OleGenerator& ole, coproto::Socket& chl);
 
 
-
-        void setupDlpnSender(oc::block& key, std::vector<oc::block>& rk);
-        void setupDlpnReceiver(std::vector<std::array<oc::block, 2>>& sk);
-
-        macoro::task<> setupDlpnSender(OleGenerator& ole);
-        macoro::task<> setupDlpnReceiver(OleGenerator& ole);
-
-        bool hasSetup() const { return mA.size() + mDelta.size(); }
+        bool hasPreprocessing() const { return mHasPreprocess; }
+        bool hasSetup() const { return mDelta.size(); }
 
 
         // generate the preprocessing when all inputs are unknown.
         macoro::task<> preprocess(
-            bool permHolder,
             u64 totElements,
             u64 bytesPerRow,
             oc::PRNG& prng,
@@ -89,6 +73,54 @@ namespace secJoin
             bool invPerm,
             OleGenerator& ole);
 
+        macoro::task<> validateShares(coproto::Socket& sock, const Perm& p);
+
+    };
+
+
+    class DLpnPermReceiver
+    {
+    public:
+        static constexpr auto mDebug = DLpnPrfSender::mDebug;
+
+        DLpnPrfSender mSender;
+
+        bool mHasPreprocess = false;
+        oc::Matrix<u8> mA, mB;
+
+        DLpnPermReceiver() = default;
+        DLpnPermReceiver(const DLpnPermReceiver&) = default;
+        DLpnPermReceiver(DLpnPermReceiver&&) noexcept = default;
+        DLpnPermReceiver& operator=(const DLpnPermReceiver&) = default;
+        DLpnPermReceiver& operator=(DLpnPermReceiver&&) noexcept = default;
+
+        void setKeyOts(oc::block& key, std::vector<oc::block>& rk);
+        macoro::task<> genKeyOts(OleGenerator& ole, coproto::Socket& chl);
+
+
+        // Receiver apply: permute a secret shared input x by the other party's pi and get shares as output
+        template <typename T>
+        macoro::task<> apply(
+            oc::MatrixView<const T> in,
+            oc::MatrixView<T> sout,
+            oc::PRNG& prng,
+            coproto::Socket& chl,
+            OleGenerator& ole
+        );
+
+
+        bool hasPreprocessing() const { return mHasPreprocess; }
+        bool hasSetup() const { return mA.size(); }
+
+
+        // generate the preprocessing when all inputs are unknown.
+        macoro::task<> preprocess(
+            u64 totElements,
+            u64 bytesPerRow,
+            oc::PRNG& prng,
+            coproto::Socket& chl,
+            OleGenerator& ole);
+
         // generate the preprocessing when the other party hold pi.
         macoro::task<> setup(
             u64 totElements,
@@ -98,12 +130,11 @@ namespace secJoin
             OleGenerator& ole);
 
         macoro::task<> validateShares(coproto::Socket& sock);
-        macoro::task<> validateShares(coproto::Socket& sock, const Perm& p);
 
     };
 
     template <>
-    macoro::task<> DLpnPerm::apply<u8>(
+    macoro::task<> DLpnPermSender::apply<u8>(
         const Perm& pi,
         oc::MatrixView<u8> sout,
         oc::PRNG& prng,
@@ -112,7 +143,7 @@ namespace secJoin
         OleGenerator& ole);
 
     template <typename T>
-    macoro::task<> DLpnPerm::apply(
+    macoro::task<> DLpnPermSender::apply(
         const Perm& pi,
         oc::MatrixView<T> sout,
         oc::PRNG& prng,
@@ -126,7 +157,7 @@ namespace secJoin
 
     // Generic version of below method
     template <>
-    macoro::task<> DLpnPerm::apply<u8>(
+    macoro::task<> DLpnPermSender::apply<u8>(
         const Perm& pi,
         oc::MatrixView<const u8> in,
         oc::MatrixView<u8> sout,
@@ -137,7 +168,7 @@ namespace secJoin
 
     // Generic version of below method
     template <typename T>
-    macoro::task<> DLpnPerm::apply(
+    macoro::task<> DLpnPermSender::apply(
         const Perm& pi,
         oc::MatrixView<const T> in,
         oc::MatrixView<T> sout,
@@ -153,7 +184,7 @@ namespace secJoin
 
 
     template <>
-    macoro::task<> DLpnPerm::apply<u8>(
+    macoro::task<> DLpnPermReceiver::apply<u8>(
         oc::MatrixView<const u8> in,
         oc::MatrixView<u8> sout,
         oc::PRNG& prng,
@@ -163,7 +194,7 @@ namespace secJoin
 
     // Generic version of below method
     template <typename T>
-    macoro::task<> DLpnPerm::apply(
+    macoro::task<> DLpnPermReceiver::apply(
         oc::MatrixView<const T> in,
         oc::MatrixView<T> sout,
         oc::PRNG& prng,

@@ -109,24 +109,19 @@ void ComposedPerm_replicated_secure_perm_test()
     ComposedPerm perm1(p0, 0); 
     ComposedPerm perm2(p1, 1);
 
-    // DLpnPrf dm;
-    oc::block kk;
-    kk = prng0.get();
 
     // Setuping up the OT Keys
-    std::vector<oc::block> rk(perm2.mDlpnPerm.mSender.mPrf.KeySize);
-    std::vector<std::array<oc::block, 2>> sk(perm2.mDlpnPerm.mSender.mPrf.KeySize);
-    for (u64 i = 0; i < perm2.mDlpnPerm.mSender.mPrf.KeySize; ++i)
+    oc::block kk = prng0.get();
+    std::vector<oc::block> rk(128);
+    std::vector<std::array<oc::block, 2>> sk(128);
+    for (u64 i = 0; i < 128; ++i)
     {
         sk[i][0] = oc::block(i, 0);
         sk[i][1] = oc::block(i, 1);
         rk[i] = oc::block(i, *oc::BitIterator((u8*)&kk, i));
     }
-    perm2.setupDlpnSender(kk,rk);
-    perm1.setupDlpnReceiver(sk);
-
-    perm1.setupDlpnSender(kk,rk);
-    perm2.setupDlpnReceiver(sk);
+    perm2.setKeyOts(kk,rk, sk);
+    perm1.setKeyOts(kk, rk, sk);
 
     for(auto invPerm :  { false, true})
     {

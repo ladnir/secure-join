@@ -15,12 +15,11 @@
 #include "macoro/thread_pool.h"
 #include "macoro/channel_spsc.h"
 #include "macoro/manual_reset_event.h"
-#include <map>
 
 namespace secJoin
 {
     class OleGenerator;
-
+    using SessionID = coproto::SessionID;
     struct OtSend
     {
         OtSend() = default;
@@ -104,23 +103,23 @@ namespace secJoin
         {}
         CorRequest(const CorRequest&) = delete;
         CorRequest(CorRequest&&) = default;
-        CorRequest&operator=(CorRequest&&) =default;
+        CorRequest& operator=(CorRequest&&) = default;
 
-        CorRequest(oc::block sid, u64 n, u64 idx, macoro::variant<BinOleReq, OtRecvReq, OtSendReq, ArithTripleReq> op)
+        CorRequest(SessionID sid, u64 n, u64 idx, macoro::variant<BinOleReq, OtRecvReq, OtSendReq, ArithTripleReq> op)
             : mSessionID(sid)
             , mN(n)
             , mSequence(idx)
             , mOp(std::move(op))
         {}
 
-        oc::block mSessionID;
+        SessionID mSessionID;
         u64 mN = 0;
         u64 mSequence = -1;
         macoro::variant<BinOleReq, OtRecvReq, OtSendReq, ArithTripleReq> mOp;
 
         u64 sizeBytes()
         {
-            return 1 + sizeof(oc::block) + sizeof(u64) + sizeof(u64) + 1;
+            return 1 + sizeof(SessionID) + sizeof(u64) + sizeof(u64) + 1;
         }
 
         void toBytes(span<u8> bytes)
@@ -128,7 +127,7 @@ namespace secJoin
             if (bytes.size() < sizeBytes())
                 throw RTE_LOC;
             bytes[0] = mOp.index(); bytes = bytes.subspan(1);
-            memcpy(&bytes[0], &mSessionID, sizeof(oc::block)); bytes = bytes.subspan(sizeof(oc::block));
+            memcpy(&bytes[0], &mSessionID, sizeof(SessionID)); bytes = bytes.subspan(sizeof(SessionID));
             memcpy(&bytes[0], &mN, sizeof(u64)); bytes = bytes.subspan(sizeof(u64));
             memcpy(&bytes[0], &mSequence, sizeof(u64)); bytes = bytes.subspan(sizeof(u64));
             if (mOp.index() == 3)
@@ -144,7 +143,7 @@ namespace secJoin
                 throw RTE_LOC;
 
             auto idx = mOp.index(); bytes = bytes.subspan(1);
-            memcpy(&mSessionID, &bytes[0], sizeof(oc::block)); bytes = bytes.subspan(sizeof(oc::block));
+            memcpy(&mSessionID, &bytes[0], sizeof(SessionID)); bytes = bytes.subspan(sizeof(SessionID));
             memcpy(&mN, &bytes[0], sizeof(u64)); bytes = bytes.subspan(sizeof(u64));
             memcpy(&mSequence, &bytes[0], sizeof(u64)); bytes = bytes.subspan(sizeof(u64));
 
@@ -174,8 +173,8 @@ namespace secJoin
     {
         Request() = default;
         Request(const Request&) = delete;
-        Request(Request&& o)
-            : mSessionID(std::exchange(o.mSessionID, oc::ZeroBlock))
+        Request(Request&& o) noexcept
+            : mSessionID(std::exchange(o.mSessionID, SessionID::root()))
             , mSize(std::exchange(o.mSize, 0))
             , mIdx(std::exchange(o.mIdx, 0))
             , mCorrelations(std::move(o.mCorrelations))
@@ -184,7 +183,7 @@ namespace secJoin
             , mChl(std::move(o.mChl))
         {}
 
-        Request(oc::block sessionID, u64 size, u64 numChunks, std::vector<CorRequest>&& rem, OleGenerator* g, std::shared_ptr<macoro::mpsc::channel<std::pair<u64, T>>> chl)
+        Request(SessionID sessionID, u64 size, u64 numChunks, std::vector<CorRequest>&& rem, OleGenerator* g, std::shared_ptr<macoro::mpsc::channel<std::pair<u64, T>>> chl)
             : mSessionID(sessionID)
             , mSize(size)
             , mCorrelations(numChunks)
@@ -195,7 +194,7 @@ namespace secJoin
 
         Request& operator=(Request&& o)
         {
-            mSessionID = std::exchange(o.mSessionID, oc::ZeroBlock);
+            mSessionID = std::exchange(o.mSessionID, SessionID::root());
             mSize = std::exchange(o.mSize, 0);
             mIdx = std::exchange(o.mIdx, 0);
             mCorrelations = std::move(o.mCorrelations);
@@ -206,7 +205,7 @@ namespace secJoin
         }
 
         using value_type = T;
-        oc::block mSessionID = oc::ZeroBlock;
+        SessionID mSessionID = SessionID::root();
         u64 mSize = 0, mIdx = 0;
         std::vector<std::unique_ptr<T>> mCorrelations;
         std::vector<CorRequest> mRemReq;
@@ -307,7 +306,7 @@ namespace secJoin
         };
 
         bool mFakeGen = false;
-        oc::block mCurSessionID = oc::ZeroBlock;
+        SessionID mCurSessionID = SessionID::root();
         u64 mChunkSize = 0;
         u64 mNumConcurrent = 0;
         u64 mBaseSize = 0;
@@ -403,9 +402,9 @@ namespace secJoin
             }
         }
 
-        void fakeFill(u64 m, ArithTriple& ole, const ArithTriple&at)
+        void fakeFill(u64 m, ArithTriple& ole, const ArithTriple& at)
         {
-            oc::PRNG prng(oc::block(0,0));
+            oc::PRNG prng(oc::block(0, 0));
             ole.mBitCount = at.mBitCount;
             ole.mA.resize(m);
             ole.mB.resize(m);
@@ -436,15 +435,15 @@ namespace secJoin
             }
         }
 
-        oc::block nextSID()
+        SessionID nextSID()
         {
             auto s = mCurSessionID;
-            mCurSessionID += oc::block(2452345343234, 43253453452);
+            mCurSessionID = mCurSessionID.derive();
             return s;
         }
 
         template<typename Cor>
-        macoro::task<Request<Cor>> request(u64 numCorrelations, Cor&& cor, u64 reservoirSize = 0, oc::block sessionID = oc::ZeroBlock)
+        macoro::task<Request<Cor>> request(u64 numCorrelations, Cor&& cor, u64 reservoirSize, SessionID sessionID)
         {
 
             MC_BEGIN(macoro::task<Request<Cor>>, this, numCorrelations, reservoirSize, sessionID, cor = std::forward<Cor>(cor),
@@ -458,7 +457,7 @@ namespace secJoin
             if (reservoirSize == 0)
                 reservoirSize = numCorrelations;
 
-            if (sessionID == oc::ZeroBlock)
+            if (sessionID == SessionID::root())
             {
                 sessionID = nextSID();
             }
@@ -492,7 +491,7 @@ namespace secJoin
                     m = 1ull << oc::log2ceil(m);
 
                     req = CorRequest{
-                        sessionID ^ oc::block(i * 31212 ^ i,i),
+                        sessionID,
                         m,
                         i,
                         CorRequest::Req<Cor>{
@@ -501,6 +500,7 @@ namespace secJoin
                         }
                     };
                     ++i;
+                    sessionID = sessionID.derive();
 
                     if (n < reservoirSize)
                     {
@@ -529,19 +529,19 @@ namespace secJoin
             MC_END();
         }
 
-        macoro::task<Request<BinOle>> binOleRequest(u64 numCorrelations, u64 reservoirSize = 0, oc::block sessionID = oc::ZeroBlock)
+        macoro::task<Request<BinOle>> binOleRequest(u64 numCorrelations, u64 reservoirSize = 0, SessionID sessionID = SessionID::root())
         {
             return request<BinOle>(numCorrelations, BinOle{}, reservoirSize, sessionID);
         }
-        macoro::task<Request<OtRecv>> otRecvRequest(u64 numCorrelations, u64 reservoirSize = 0, oc::block sessionID = oc::ZeroBlock)
+        macoro::task<Request<OtRecv>> otRecvRequest(u64 numCorrelations, u64 reservoirSize = 0, SessionID sessionID = SessionID::root())
         {
             return request<OtRecv>(numCorrelations, OtRecv{}, reservoirSize, sessionID);
         }
-        macoro::task<Request<OtSend>> otSendRequest(u64 numCorrelations, u64 reservoirSize = 0, oc::block sessionID = oc::ZeroBlock)
+        macoro::task<Request<OtSend>> otSendRequest(u64 numCorrelations, u64 reservoirSize = 0, SessionID sessionID = SessionID::root())
         {
             return request<OtSend>(numCorrelations, OtSend{}, reservoirSize, sessionID);
         }
-        macoro::task<Request<ArithTriple>> arithTripleRequest(u64 numCorrelations, u64 bitCount, u64 reservoirSize = 0, oc::block sessionID = oc::ZeroBlock)
+        macoro::task<Request<ArithTriple>> arithTripleRequest(u64 numCorrelations, u64 bitCount, u64 reservoirSize = 0, SessionID sessionID = SessionID::root())
         {
             return request<ArithTriple>(numCorrelations, ArithTriple{ bitCount }, reservoirSize, sessionID);
         }
@@ -564,7 +564,7 @@ namespace secJoin
 
         MC_BEGIN(macoro::task<T>, this,
             t = std::pair<u64, T>{}
-            );
+        );
 
         if (mIdx >= mCorrelations.size())
             throw std::runtime_error("Out of correlations. " LOCATION);

@@ -19,7 +19,8 @@ void DlpnPerm_setup_test(const oc::CLP& cmd)
     oc::PRNG prng0(oc::ZeroBlock);
     oc::PRNG prng1(oc::OneBlock);
 
-    secJoin::DLpnPerm dlpnPerm1, dlpnPerm2;
+    secJoin::DLpnPermSender dlpnPerm1;
+    secJoin::DLpnPermReceiver dlpnPerm2;
 
     oc::Matrix<u8> x(n, rowSize),
         yExp(n, rowSize),
@@ -36,20 +37,19 @@ void DlpnPerm_setup_test(const oc::CLP& cmd)
     ole1.fakeInit(OleGenerator::Role::Receiver);
 
     // DLpnPrf dm;
-    oc::block kk;
-    kk = prng0.get();
+    oc::block kk = prng0.get();
 
     // Setuping up the OT Keys
-    std::vector<oc::block> rk(dlpnPerm2.mSender.mPrf.KeySize);
-    std::vector<std::array<oc::block, 2>> sk(dlpnPerm2.mSender.mPrf.KeySize);
-    for (u64 i = 0; i < dlpnPerm2.mSender.mPrf.KeySize; ++i)
+    std::vector<oc::block> rk(128);
+    std::vector<std::array<oc::block, 2>> sk(128);
+    for (u64 i = 0; i < 128; ++i)
     {
         sk[i][0] = oc::block(i, 0);
         sk[i][1] = oc::block(i, 1);
         rk[i] = oc::block(i, *oc::BitIterator((u8*)&kk, i));
     }
-    dlpnPerm2.setupDlpnSender(kk, rk);
-    dlpnPerm1.setupDlpnReceiver(sk);
+    dlpnPerm1.setKeyOts(sk);
+    dlpnPerm2.setKeyOts(kk, rk);
 
     auto sock = coproto::LocalAsyncSocket::makePair();
 
@@ -91,7 +91,11 @@ void DlpnPerm_apply_test(const oc::CLP& cmd)
     oc::PRNG prng0(oc::ZeroBlock);
     oc::PRNG prng1(oc::OneBlock);
 
-    secJoin::DLpnPerm dlpnPerm1, dlpnPerm2;
+
+
+    secJoin::DLpnPermSender dlpnPerm1;
+    secJoin::DLpnPermReceiver dlpnPerm2;
+
 
     oc::Matrix<u8> x(n, rowSize),
         yExp(n, rowSize),
@@ -108,8 +112,8 @@ void DlpnPerm_apply_test(const oc::CLP& cmd)
     ole1.fakeInit(OleGenerator::Role::Receiver);
 
     // auto res = coproto::sync_wait(coproto::when_all_ready(
-    //     dlpnPerm1.setupDlpnReceiver(ole0),
-    //     dlpnPerm2.setupDlpnSender(ole1)
+    //     dlpnPerm1.receiverSetup(ole0),
+    //     dlpnPerm2.senderSetup(ole1)
     // ));
     // std::get<0>(res).result();
     // std::get<1>(res).result();
@@ -154,7 +158,10 @@ void DlpnPerm_sharedApply_test(const oc::CLP& cmd)
     oc::PRNG prng0(oc::ZeroBlock);
     oc::PRNG prng1(oc::OneBlock);
 
-    secJoin::DLpnPerm dlpnPerm1, dlpnPerm2;
+
+    secJoin::DLpnPermSender dlpnPerm1;
+    secJoin::DLpnPermReceiver dlpnPerm2;
+
 
     oc::Matrix<u8> x(n, rowSize),
         yExp(n, rowSize),
@@ -170,9 +177,10 @@ void DlpnPerm_sharedApply_test(const oc::CLP& cmd)
     ole0.fakeInit(OleGenerator::Role::Sender);
     ole1.fakeInit(OleGenerator::Role::Receiver);
 
+    auto sock = coproto::LocalAsyncSocket::makePair();
     auto res = coproto::sync_wait(coproto::when_all_ready(
-        dlpnPerm1.setupDlpnReceiver(ole0),
-        dlpnPerm2.setupDlpnSender(ole1)
+        dlpnPerm1.genKeyOts(ole0, sock[0]),
+        dlpnPerm2.genKeyOts(ole1, sock[1])
     ));
 
     std::get<0>(res).result();
@@ -180,7 +188,6 @@ void DlpnPerm_sharedApply_test(const oc::CLP& cmd)
 
     std::array<oc::Matrix<u8>, 2> xShares = share(x, prng0);
 
-    auto sock = coproto::LocalAsyncSocket::makePair();
 
     for (auto invPerm : { false,true })
     {
@@ -222,7 +229,8 @@ void DlpnPerm_prepro_test(const oc::CLP& cmd)
     oc::PRNG prng0(oc::ZeroBlock);
     oc::PRNG prng1(oc::OneBlock);
 
-    secJoin::DLpnPerm dlpnPerm1, dlpnPerm2;
+    secJoin::DLpnPermSender dlpnPerm1;
+    secJoin::DLpnPermReceiver dlpnPerm2;
 
     oc::Matrix<u8> x(n, rowSize),
         yExp(n, rowSize),
@@ -238,9 +246,10 @@ void DlpnPerm_prepro_test(const oc::CLP& cmd)
     ole0.fakeInit(OleGenerator::Role::Sender);
     ole1.fakeInit(OleGenerator::Role::Receiver);
 
+    auto sock = coproto::LocalAsyncSocket::makePair();
     auto res = coproto::sync_wait(coproto::when_all_ready(
-        dlpnPerm1.setupDlpnReceiver(ole0),
-        dlpnPerm2.setupDlpnSender(ole1)
+        dlpnPerm1.genKeyOts(ole0, sock[0]),
+        dlpnPerm2.genKeyOts(ole1, sock[1])
     ));
 
     std::get<0>(res).result();
@@ -248,13 +257,12 @@ void DlpnPerm_prepro_test(const oc::CLP& cmd)
 
     std::array<oc::Matrix<u8>, 2> xShares = share(x, prng0);
 
-    auto sock = coproto::LocalAsyncSocket::makePair();
 
-    for (auto invPerm : { false/*,true */ })
+    for (auto invPerm : { false, true  })
     {
         auto res0 = coproto::sync_wait(coproto::when_all_ready(
-            dlpnPerm1.preprocess(true, n, rowSize, prng0, sock[0], ole1),
-            dlpnPerm2.preprocess(false, n, rowSize, prng1, sock[1], ole0)
+            dlpnPerm1.preprocess(n, rowSize, prng0, sock[0], ole1),
+            dlpnPerm2.preprocess(n, rowSize, prng1, sock[1], ole0)
         ));
         std::get<0>(res0).result();
         std::get<1>(res0).result();
@@ -297,11 +305,13 @@ void DlpnPerm_prepro_test(const oc::CLP& cmd)
             // 
             // where mA' = (pi^-1 o pre)(mA)
             //           = delta(mA)
-            auto delta = pi.inverse().compose(pre);
+            auto pii = invPerm ? pi.inverse() : pi;
+            auto delta = pii.inverse().compose(pre);
+
             auto AA = delta.apply<u8>(A);
             for (u64 i = 0; i < n; ++i)
                 for (u64 j = 0;j < A.cols(); ++j)
-                    if (preA(i, j) != AA(pi[i], j))
+                    if (preA(i, j) != AA(pii[i], j))
                         throw RTE_LOC;
 
         }
