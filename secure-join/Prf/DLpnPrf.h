@@ -60,6 +60,12 @@ namespace secJoin
 
         void compressH(const std::array<u16, KeySize>& hj, block256m3& uj);
 
+        void eval(span<oc::block> x,span<oc::block> y)
+        {
+            for (u64 i = 0; i < x.size(); ++i)
+                y[i] = eval(x[i]);
+        }
+
         oc::block eval(oc::block x);
 
         static oc::block compress(block256& w);

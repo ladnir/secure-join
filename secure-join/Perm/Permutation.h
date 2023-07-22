@@ -208,11 +208,11 @@ namespace secJoin
 		}
 
 		template <typename T>
-		oc::Matrix<u8> apply(const oc::Matrix<T>& src, bool inverse = false) const
+		oc::Matrix<T> apply(const oc::Matrix<T>& src, bool inverse = false) const
 		{
-			oc::Matrix<u8> r(src.rows(), src.cols());
-			oc::MatrixView<const u8> ss(src.data(), src.rows(), src.cols());
-			oc::MatrixView<u8> rr(r.data(), src.rows(), src.cols());
+			oc::Matrix<T> r(src.rows(), src.cols());
+			oc::MatrixView<const u8> ss((u8*)src.data(), src.rows(), src.cols() *sizeof(T));
+			oc::MatrixView<u8> rr((u8*)r.data(), src.rows(), src.cols() * sizeof(T));
 			apply<u8>(ss, rr, inverse);
 			return r;
 		}

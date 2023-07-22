@@ -106,6 +106,18 @@ namespace secJoin
             coproto::Socket& chl,
             OleGenerator& ole,
             bool inv);
+
+
+        macoro::task<> preprocess(
+            u64 n, 
+            u64 bytesPer, 
+            coproto::Socket& chl,
+            OleGenerator& ole,
+            oc::PRNG& prng)
+        {
+            return mPi.preprocess(n, bytesPer, chl, ole, prng);
+        }
+
     };
 
 
@@ -125,19 +137,6 @@ namespace secJoin
             prng, chl, ole, inv);
     }
 
-
-    // macoro::task<> AdditivePerm::apply(
-    //     BinMatrix& in,
-    //     BinMatrix& out,
-    //     oc::PRNG& prng,
-    //     coproto::Socket& chl,
-    //     OleGenerator& ole,
-    //     bool inv)
-    // {
-    //     MC_BEGIN(macoro::task<>, &in, &out, &prng, &chl, &ole, inv);
-
-    //     MC_END();
-    // }
 
     template <typename T>
     macoro::task<> AdditivePerm::apply(

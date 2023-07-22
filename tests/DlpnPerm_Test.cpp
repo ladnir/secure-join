@@ -22,13 +22,9 @@ void DlpnPerm_setup_test(const oc::CLP& cmd)
     secJoin::DLpnPermSender dlpnPerm1;
     secJoin::DLpnPermReceiver dlpnPerm2;
 
-    oc::Matrix<u8> x(n, rowSize),
-        yExp(n, rowSize),
-        aExp(n, rowSize),
-        sout1(n, rowSize),
-        sout2(n, rowSize);
+    oc::Matrix<oc::block> 
+        aExp(n, oc::divCeil(rowSize, 16));
 
-    prng0.get(x.data(), x.size());
     Perm pi(n, prng0);
 
     // Fake Setup
@@ -62,9 +58,9 @@ void DlpnPerm_setup_test(const oc::CLP& cmd)
             dlpnPerm2.setup(n, rowSize, prng1, sock[1], ole0)
         ));
 
-        oc::Matrix<oc::u8>  permPiA = reveal(dlpnPerm1.mDelta, dlpnPerm2.mB);
+        oc::Matrix<oc::block>  permPiA = reveal(dlpnPerm1.mDelta, dlpnPerm2.mB);
 
-        pi.apply<u8>(dlpnPerm2.mA, aExp, invPerm);
+        pi.apply<oc::block>(dlpnPerm2.mA, aExp, invPerm);
 
         if (eq(aExp, permPiA) == false)
         {
@@ -282,7 +278,7 @@ void DlpnPerm_prepro_test(const oc::CLP& cmd)
             //Perm pi(n, prng);
 
             // D + B = pre(A)
-            auto preA = pre.apply<u8>(A);
+            auto preA = pre.apply<oc::block>(A);
             for (u64 i = 0; i < n; ++i)
                 for (u64 j = 0;j < A.cols(); ++j)
                     if (preA(i, j) != A(pre[i], j))
@@ -308,7 +304,7 @@ void DlpnPerm_prepro_test(const oc::CLP& cmd)
             auto pii = invPerm ? pi.inverse() : pi;
             auto delta = pii.inverse().compose(pre);
 
-            auto AA = delta.apply<u8>(A);
+            auto AA = delta.apply<oc::block>(A);
             for (u64 i = 0; i < n; ++i)
                 for (u64 j = 0;j < A.cols(); ++j)
                     if (preA(i, j) != AA(pii[i], j))

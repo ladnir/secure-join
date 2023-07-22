@@ -3,4 +3,4 @@
 #include "secure-join/Perm/AdditivePerm.h"
 
 void AdditivePerm_xor_test();
-void AdditivePerm_add_test();
+void AdditivePerm_prepro_test();

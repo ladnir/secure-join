@@ -24,6 +24,22 @@ namespace secJoin
         return mRecver.genKeyOts(ole, chl);
     }
 
+
+    void xorShare(oc::MatrixView<const oc::block> v1_,
+        oc::MatrixView<const oc::u8> v2,
+        oc::MatrixView<oc::u8>& s)
+    {
+        // Checking the dimensions
+        //if (v1.rows() != v2.rows())
+        //    throw RTE_LOC;
+        //if (v1.cols() != v2.cols())
+        //    throw RTE_LOC;
+        oc::MatrixView<const u8> v1((u8*)v1_.data(), v1_.rows(), v1_.cols() * sizeof(oc::block));
+        for (oc::u64 i = 0; i < s.rows(); ++i)
+            for (oc::u64 j = 0; j < s.cols(); ++j)
+                s(i, j) = v1(i, j) ^ v2(i, j);
+    }
+
     void xorShare(oc::MatrixView<const u8> v1,
         oc::MatrixView<const oc::u8> v2,
         oc::MatrixView<oc::u8>& s)
@@ -74,9 +90,9 @@ namespace secJoin
         OleGenerator& ole)
     {
         MC_BEGIN(macoro::task<>, &pi, &chl, &prng, &ole, bytesPerRow, this, invPerm,
-            aesPlaintext = oc::Matrix<oc::block>(),
+            //aesPlaintext = oc::Matrix<oc::block>(),
             aesCipher = oc::Matrix<oc::block>(),
-            dlpnCipher = oc::Matrix<oc::block>(),
+            //dlpnCipher = oc::Matrix<oc::block>(),
             blocksPerRow = u64(),
             totElements = u64(),
             aes = oc::AES(),
@@ -96,9 +112,11 @@ namespace secJoin
         //     MC_AWAIT(mRecver.genKeyOts(ole));
 
         // Encryption starts here
-        aesPlaintext.resize(totElements, blocksPerRow);
+        //aesPlaintext.resize(totElements, blocksPerRow);
         aesCipher.resize(totElements, blocksPerRow);
-        dlpnCipher.resize(totElements, blocksPerRow);
+        //dlpnCipher.resize(totElements, blocksPerRow);
+
+        mDelta.resize(totElements, blocksPerRow);
         for (u64 i = 0; i < totElements; i++)
         {
             for (u64 j = 0; j < blocksPerRow; j++)
@@ -106,22 +124,21 @@ namespace secJoin
                 if (!invPerm)
                 {
                     auto srcIdx = pi[i] * blocksPerRow + j;
-                    aesPlaintext(i, j) = oc::block(0, srcIdx);
+                    aesCipher(i, j) = oc::block(0, srcIdx);
                 }
                 else
                 {
                     auto srcIdx = i * blocksPerRow + j;
-                    aesPlaintext(pi[i], j) = oc::block(0, srcIdx);
+                    aesCipher(pi[i], j) = oc::block(0, srcIdx);
                 }
             }
         }
-        aes.ecbEncBlocks(aesPlaintext, aesCipher);
+        aes.ecbEncBlocks(aesCipher, aesCipher);
 
-        MC_AWAIT(mRecver.evaluate(aesCipher, dlpnCipher, chl, prng, ole));
+        MC_AWAIT(mRecver.evaluate(aesCipher, mDelta, chl, prng, ole));
 
-        mDelta.resize(totElements, bytesPerRow);
-        for (u64 i = 0; i < totElements; i++)
-            memcpyMin(mDelta[i], dlpnCipher[i]);
+        //for (u64 i = 0; i < totElements; i++)
+        //    memcpyMin(mDelta[i], dlpnCipher[i]);
 
         MC_END();
     }
@@ -146,46 +163,67 @@ namespace secJoin
             aes = oc::AES(),
             key = oc::block());
 
-
         blocksPerRow = oc::divCeil(bytesPerRow, sizeof(oc::block));
-
-        // Calculating a from the ppt
-        aesPlaintext.resize(totElements, blocksPerRow);
-        aesCipher.resize(totElements, blocksPerRow);
-        dlpnCipher.resize(totElements, blocksPerRow);
-        preProsdlpnCipher.resize(totElements, blocksPerRow);
-
-        for (u64 i = 0; i < aesPlaintext.size(); i++)
-            aesPlaintext(i) = oc::block(0, i);
-
 
         MC_AWAIT(chl.recv(key));
 
         if (mSender.hasKeyOts())
             mSender.tweakKeyOts(key);
+
+        // B = (DLPN(k,AES(k', pi(0))), ..., (DLPN(k,AES(k', pi(n-1)))))
+        mB.resize(totElements, blocksPerRow);
+        MC_AWAIT(mSender.evaluate(mB, chl, prng, ole));
+
+        // A = (DLPN(k,AES(k', 0)), ..., (DLPN(k,AES(k', n-1))))
         aes.setKey(key);
-        aes.ecbEncBlocks(aesPlaintext, aesCipher);
 
-        MC_AWAIT(mSender.evaluate(dlpnCipher, chl, prng, ole));
+        mA.resize(totElements, blocksPerRow);
+        for (u64 i = 0; i < mA.size(); i++)
+            mA(i) = oc::block(0, i);
+        aes.ecbEncBlocks(mA, mA);
+        mSender.mPrf.eval(mA, mA);
 
-        for (u64 i = 0; i < aesCipher.rows(); i++)
-        {
-            for (u64 j = 0; j < aesCipher.cols(); j++)
-            {
-                preProsdlpnCipher(i, j) = mSender.mPrf.eval(aesCipher(i, j));
-            }
-        }
+        ////////////////////////////////////////
 
-        // Placing a in sout[0]
-        mA.resize(totElements, bytesPerRow);
-        for (u64 i = 0; i < totElements; i++)
-            memcpyMin(mA[i], preProsdlpnCipher[i]);
+        //blocksPerRow = oc::divCeil(bytesPerRow, sizeof(oc::block));
 
-        // Placing [y] in sout[1]
-        mB.resize(totElements, bytesPerRow);
+        //// Calculating a from the ppt
+        //aesPlaintext.resize(totElements, blocksPerRow);
+        //aesCipher.resize(totElements, blocksPerRow);
+        //dlpnCipher.resize(totElements, blocksPerRow);
+        //preProsdlpnCipher.resize(totElements, blocksPerRow);
 
-        for (u64 i = 0; i < totElements; i++)
-            memcpyMin(mB[i], dlpnCipher[i]);
+        //for (u64 i = 0; i < aesPlaintext.size(); i++)
+        //    aesPlaintext(i) = oc::block(0, i);
+
+
+        //MC_AWAIT(chl.recv(key));
+
+        //if (mSender.hasKeyOts())
+        //    mSender.tweakKeyOts(key);
+        //aes.setKey(key);
+        //aes.ecbEncBlocks(aesPlaintext, aesCipher);
+
+        //MC_AWAIT(mSender.evaluate(dlpnCipher, chl, prng, ole));
+
+        //for (u64 i = 0; i < aesCipher.rows(); i++)
+        //{
+        //    for (u64 j = 0; j < aesCipher.cols(); j++)
+        //    {
+        //        preProsdlpnCipher(i, j) = mSender.mPrf.eval(aesCipher(i, j));
+        //    }
+        //}
+
+        //// Placing a in sout[0]
+        //mA.resize(totElements, bytesPerRow);
+        //for (u64 i = 0; i < totElements; i++)
+        //    memcpyMin(mA[i], preProsdlpnCipher[i]);
+
+        //// Placing [y] in sout[1]
+        //mB.resize(totElements, bytesPerRow);
+
+        //for (u64 i = 0; i < totElements; i++)
+        //    memcpyMin(mB[i], dlpnCipher[i]);
         MC_END();
     }
 
@@ -204,8 +242,8 @@ namespace secJoin
     {
         assert(hasSetup());
         MC_BEGIN(macoro::task<>, this, &sock, &p,
-            A = oc::Matrix<u8>{},
-            B = oc::Matrix<u8>{}
+            A = oc::Matrix<oc::block>{},
+            B = oc::Matrix<oc::block>{}
             );
 
         A.resize(mDelta.rows(), mDelta.cols());
@@ -238,11 +276,19 @@ namespace secJoin
             xEncrypted = oc::Matrix<u8>(),
             xPermuted = oc::Matrix<u8>(),
             totElements = u64(),
+            bytesPerRow = u64(),
             delta = Perm{}
         );
+        totElements = pi.mPerm.size();
+        bytesPerRow = sout.cols();
 
         if (hasSetup() == false)
             MC_AWAIT(setup(pi, sout.cols(), prng, chl, invPerm, ole));
+
+        if (mDelta.rows() != totElements)
+            throw RTE_LOC;
+        if (mDelta.cols() * sizeof(oc::block) < bytesPerRow)
+            throw RTE_LOC;
 
         if (mHasPreprocess)
         {
@@ -258,7 +304,6 @@ namespace secJoin
             mHasPreprocess = false;
         }
 
-        totElements = pi.mPerm.size();
         xPermuted.resize(totElements, sout.cols());
         xEncrypted.resize(totElements, sout.cols());
 
@@ -333,6 +378,11 @@ namespace secJoin
         if (hasSetup() == false)
             MC_AWAIT(setup(totElements, bytesPerRow, prng, chl, ole));
 
+        if (mA.rows() != totElements)
+            throw RTE_LOC;
+        if (mA.cols() * sizeof(oc::block) < bytesPerRow)
+            throw RTE_LOC;
+
         if (mHasPreprocess)
         {
             // we current have the correlation 
@@ -355,8 +405,8 @@ namespace secJoin
             MC_AWAIT(chl.recv(delta.mPerm));
 
             {
-                oc::Matrix<u8> AA(mA.rows(), mA.cols());
-                delta.apply<u8>(mA, AA);
+                oc::Matrix<oc::block> AA(mA.rows(), mA.cols());
+                delta.apply<oc::block>(mA, AA);
                 std::swap(mA, AA);
             }
 
@@ -372,7 +422,7 @@ namespace secJoin
         MC_AWAIT(chl.send(std::move(xEncrypted)));
 
         for (u64 i = 0; i < totElements; ++i)
-            memcpy(sout[i], mB[i]);
+            memcpyMin(sout[i], mB[i]);
 
         mA.resize(0, 0);
         mB.resize(0, 0);

@@ -11,12 +11,16 @@ namespace secJoin
 
     using oc::Matrix;
     using oc::PRNG;
+    inline oc::Matrix<oc::block> reveal(oc::MatrixView<oc::block>x0, oc::MatrixView<oc::block>x1)
+    {
+        oc::Matrix<oc::block>ret(x0.rows(), x0.cols());
+        for (u64 i = 0; i < ret.size(); ++i)
+            ret(i) = x0(i) ^ x1(i);
+        return ret;
+    }
     inline oc::Matrix<oc::block> reveal(std::array<oc::Matrix<oc::block>, 2>& x)
     {
-        oc::Matrix<oc::block>ret(x[0].rows(), x[0].cols());
-        for (u64 i = 0; i < ret.size(); ++i)
-            ret(i) = x[0](i) ^ x[1](i);
-        return ret;
+        return reveal(x[0], x[1]);
     }
 
     template<typename T>
@@ -222,21 +226,10 @@ namespace secJoin
         return s;
     }
 
+    template<typename T>
     inline bool eq(
-        const oc::Matrix<oc::u8>& v1,
-        const oc::Matrix<oc::u8>& v2)
-    {
-        // Checking the dimensions
-        if (v1.rows() != v2.rows())
-            throw RTE_LOC;
-        if (v1.cols() != v2.cols())
-            throw RTE_LOC;
-
-        return std::equal(v1.begin(), v1.end(), v2.begin());
-    }
-    inline bool eq(
-        const oc::Matrix<oc::u32>& v1,
-        const oc::Matrix<oc::u32>& v2)
+        const oc::Matrix<T>& v1,
+        const oc::Matrix<T>& v2)
     {
         // Checking the dimensions
         if (v1.rows() != v2.rows())

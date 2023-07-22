@@ -60,10 +60,11 @@ namespace secJoin_Tests
 
             t.add("LowMCPerm_perm_test                           ", LowMCPerm_perm_test);
             t.add("LowMCPerm_secret_shared_input_perm_test       ", LowMCPerm_secret_shared_input_perm_test);
-            t.add("ComposedPerm_replicated_perm_test             ", ComposedPerm_replicated_perm_test);
-            t.add("ComposedPerm_replicated_secure_perm_test      ", ComposedPerm_replicated_secure_perm_test);
+            t.add("ComposedPerm_basic_test                       ", ComposedPerm_basic_test);
+            t.add("ComposedPerm_shared_test                      ", ComposedPerm_shared_test);
+            t.add("ComposedPerm_prepro_test                      ", ComposedPerm_prepro_test);
             t.add("AdditivePerm_xor_test                         ", AdditivePerm_xor_test);
-            t.add("AdditivePerm_add_test                         ", AdditivePerm_add_test);
+            t.add("AdditivePerm_prepro_test                      ", AdditivePerm_prepro_test);
 
             t.add("RadixSort_aggregateSum_test                   ", RadixSort_aggregateSum_test);
             t.add("RadixSort_oneHot_test                         ", RadixSort_oneHot_test);

@@ -16,7 +16,7 @@ namespace secJoin
 
         bool mHasPreprocess = false;
         Perm mPrePerm;
-        oc::Matrix<u8> mDelta;
+        oc::Matrix<oc::block> mDelta;
 
         DLpnPermSender() = default;
         DLpnPermSender(const DLpnPermSender&) = default;
@@ -86,7 +86,7 @@ namespace secJoin
         DLpnPrfSender mSender;
 
         bool mHasPreprocess = false;
-        oc::Matrix<u8> mA, mB;
+        oc::Matrix<oc::block> mA, mB;
 
         DLpnPermReceiver() = default;
         DLpnPermReceiver(const DLpnPermReceiver&) = default;
