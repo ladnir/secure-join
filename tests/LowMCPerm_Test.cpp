@@ -81,7 +81,7 @@ void LowMCPerm_perm_test(const oc::CLP& cmd)
     prng.get(x.data(), x.size());
     Perm pi(n,prng);
 
-    for(auto invPerm : {false,true})
+    for(auto invPerm : {PermOp::Regular,PermOp::Inverse})
     {
 
         pi.apply<u8>(x, yExp, invPerm);
@@ -91,7 +91,7 @@ void LowMCPerm_perm_test(const oc::CLP& cmd)
         sout[1].resize(n, rowSize);
 
         auto proto0 = m1.apply<u8>(x, sout[0], prng, chls[0], ole0);
-        auto proto1 = m2.apply<u8>(pi, sout[1], prng, chls[1], invPerm, ole1);
+        auto proto1 = m2.apply<u8>(pi, invPerm, sout[1], prng, chls[1], ole1);
 
         auto res = macoro::sync_wait(macoro::when_all_ready(std::move(proto0), std::move(proto1)));
 
@@ -129,7 +129,7 @@ void LowMCPerm_secret_shared_input_perm_test()
     std::array<oc::Matrix<u8>, 2> xShares = share(x,prng);
 
 
-    for(auto invPerm : {false,true})
+    for(auto invPerm : { PermOp::Regular,PermOp::Inverse })
     {
         pi.apply<u8>(x, yExp, invPerm);
         std::array<oc::Matrix<u8>, 2> sout;
@@ -137,7 +137,7 @@ void LowMCPerm_secret_shared_input_perm_test()
         sout[1].resize(n, rowSize);
 
         auto proto0 = m1.apply<u8>(xShares[0], sout[0], prng, chls[0], ole0);
-        auto proto1 = m2.apply<u8>(pi, xShares[1], sout[1], prng, chls[1], invPerm, ole1);
+        auto proto1 = m2.apply<u8>(pi,invPerm, xShares[1], sout[1], prng, chls[1], ole1);
 
         auto res = macoro::sync_wait(macoro::when_all_ready(std::move(proto0), std::move(proto1)));
 

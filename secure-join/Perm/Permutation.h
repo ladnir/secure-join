@@ -19,10 +19,16 @@ namespace secJoin
 		auto operator()(const T& x, const T& y) const { return x ^ y; }
 	};
 
+	enum class PermOp
+	{
+		Regular,
+		Inverse
+	};
+
 	class Perm
 	{
 	public:
-		std::vector<u32> mPerm;
+		std::vector<u32> mPi;
 
 		Perm() = default;
 		Perm(const Perm&) = default;
@@ -38,30 +44,30 @@ namespace secJoin
 
 		Perm(u64 n)
 		{
-			mPerm.resize(n);
+			mPi.resize(n);
 			for (u64 i = 0; i < n; ++i)
-				mPerm[i] = i;
+				mPi[i] = i;
 		}
 
 		//initializing permutation with vector 
-		Perm(std::vector<u32> perm) : mPerm(std::move(perm)) {}
-		// Perm(const std::vector<u64>& perm) : mPerm(perm.begin(), perm.end()) {}
-		Perm(u64 s, std::vector<u32> perm) : mPerm(perm.begin(), perm.end()) {
+		Perm(std::vector<u32> perm) : mPi(std::move(perm)) {}
+		// Perm(const std::vector<u64>& perm) : mPi(perm.begin(), perm.end()) {}
+		Perm(u64 s, std::vector<u32> perm) : mPi(perm.begin(), perm.end()) {
 			assert(size() == s);
 		}
 
 
 		void randomize(u64 n, PRNG& prng)
 		{
-			mPerm.resize(n);
+			mPi.resize(n);
 			for (u64 i = 0; i < size(); i++)
-				mPerm[i] = i;
+				mPi[i] = i;
 
 			assert(n < ~u32(0));
 			for (u64 i = 0; i < size(); i++)
 			{
 				auto idx = (prng.get<u32>() % (size() - i)) + i;
-				std::swap(mPerm[i], mPerm[idx]);
+				std::swap(mPi[i], mPi[idx]);
 			}
 		}
 
@@ -77,18 +83,18 @@ namespace secJoin
 		Perm inverse()const;
 
 
-		u64 size() const { return mPerm.size(); }
+		u64 size() const { return mPi.size(); }
 
 
 		// dst[i] = src[perm[i]]
 		template <typename T>
-		void apply(oc::MatrixView<const T> src, oc::MatrixView<T> dst, bool inverse = false) const
+		void apply(oc::MatrixView<const T> src, oc::MatrixView<T> dst, PermOp op = PermOp::Regular) const
 		{
 			assert(src.rows() == size());
 			assert(src.cols() == dst.cols());
 			auto cols = src.cols();
 
-			if (inverse == false)
+			if (op == PermOp::Regular)
 			{
 				if (std::is_trivially_constructible<T>::value)
 				{
@@ -98,14 +104,14 @@ namespace secJoin
 					u64 i = 0;
 					for (; i < size8; i += 8)
 					{
-						const T* __restrict  s0 = &src(mPerm[i + 0], 0);
-						const T* __restrict  s1 = &src(mPerm[i + 1], 0);
-						const T* __restrict  s2 = &src(mPerm[i + 2], 0);
-						const T* __restrict  s3 = &src(mPerm[i + 3], 0);
-						const T* __restrict  s4 = &src(mPerm[i + 4], 0);
-						const T* __restrict  s5 = &src(mPerm[i + 5], 0);
-						const T* __restrict  s6 = &src(mPerm[i + 6], 0);
-						const T* __restrict  s7 = &src(mPerm[i + 7], 0);
+						const T* __restrict  s0 = &src(mPi[i + 0], 0);
+						const T* __restrict  s1 = &src(mPi[i + 1], 0);
+						const T* __restrict  s2 = &src(mPi[i + 2], 0);
+						const T* __restrict  s3 = &src(mPi[i + 3], 0);
+						const T* __restrict  s4 = &src(mPi[i + 4], 0);
+						const T* __restrict  s5 = &src(mPi[i + 5], 0);
+						const T* __restrict  s6 = &src(mPi[i + 6], 0);
+						const T* __restrict  s7 = &src(mPi[i + 7], 0);
 						T* __restrict  d0 = d + 0 * cols;
 						T* __restrict  d1 = d + 1 * cols;
 						T* __restrict  d2 = d + 2 * cols;
@@ -130,7 +136,7 @@ namespace secJoin
 
 					for (; i < size(); i++)
 					{
-						auto s = &src(mPerm[i], 0);
+						auto s = &src(mPi[i], 0);
 						std::memcpy(d, s, cols * sizeof(T));
 						d += cols;
 					}
@@ -140,7 +146,7 @@ namespace secJoin
 					auto d = dst.data();
 					for (u64 i = 0; i < size(); i++)
 					{
-						auto s = &src(mPerm[i], 0);
+						auto s = &src(mPi[i], 0);
 						for (u64 j = 0; j < cols; ++j)
 							d[j] = s[j];
 						d += cols;
@@ -156,14 +162,14 @@ namespace secJoin
 					u64 i = 0;
 					for (; i < size8; i += 8)
 					{
-						T* __restrict d0 = &dst(mPerm[i + 0], 0);
-						T* __restrict d1 = &dst(mPerm[i + 1], 0);
-						T* __restrict d2 = &dst(mPerm[i + 2], 0);
-						T* __restrict d3 = &dst(mPerm[i + 3], 0);
-						T* __restrict d4 = &dst(mPerm[i + 4], 0);
-						T* __restrict d5 = &dst(mPerm[i + 5], 0);
-						T* __restrict d6 = &dst(mPerm[i + 6], 0);
-						T* __restrict d7 = &dst(mPerm[i + 7], 0);
+						T* __restrict d0 = &dst(mPi[i + 0], 0);
+						T* __restrict d1 = &dst(mPi[i + 1], 0);
+						T* __restrict d2 = &dst(mPi[i + 2], 0);
+						T* __restrict d3 = &dst(mPi[i + 3], 0);
+						T* __restrict d4 = &dst(mPi[i + 4], 0);
+						T* __restrict d5 = &dst(mPi[i + 5], 0);
+						T* __restrict d6 = &dst(mPi[i + 6], 0);
+						T* __restrict d7 = &dst(mPi[i + 7], 0);
 						const T* __restrict  s0 = s + 0 * cols;
 						const T* __restrict  s1 = s + 1 * cols;
 						const T* __restrict  s2 = s + 2 * cols;
@@ -188,7 +194,7 @@ namespace secJoin
 
 					for (; i < size(); i++)
 					{
-						auto d = &dst(mPerm[i], 0);
+						auto d = &dst(mPi[i], 0);
 						std::memcpy(d, s, cols * sizeof(T));
 						s += cols;
 					}
@@ -198,7 +204,7 @@ namespace secJoin
 					auto s = src.data();
 					for (u64 i = 0; i < size(); i++)
 					{
-						auto d = &dst(mPerm[i], 0);
+						auto d = &dst(mPi[i], 0);
 						for (u64 j = 0; j < cols; ++j)
 							d[j] = s[j];
 						s += cols;
@@ -208,12 +214,10 @@ namespace secJoin
 		}
 
 		template <typename T>
-		oc::Matrix<T> apply(const oc::Matrix<T>& src, bool inverse = false) const
+		oc::Matrix<T> apply(const oc::Matrix<T>& src, PermOp op = PermOp::Regular) const
 		{
 			oc::Matrix<T> r(src.rows(), src.cols());
-			oc::MatrixView<const u8> ss((u8*)src.data(), src.rows(), src.cols() *sizeof(T));
-			oc::MatrixView<u8> rr((u8*)r.data(), src.rows(), src.cols() * sizeof(T));
-			apply<u8>(ss, rr, inverse);
+			apply<u8>(matrixCast<u8>(src), matrixCast<u8>(r), op);
 			return r;
 		}
 
@@ -260,22 +264,22 @@ namespace secJoin
 
 		auto& operator[](u64 idx) const
 		{
-			return mPerm[idx];
+			return mPi[idx];
 		}
 
 		bool operator==(const Perm& p) const
 		{
-			return mPerm == p.mPerm;
+			return mPi == p.mPi;
 		}
 		bool operator!=(const Perm& p) const
 		{
-			return mPerm != p.mPerm;
+			return mPi != p.mPi;
 		}
 
-		auto begin() { return mPerm.begin(); }
-		auto begin() const { return mPerm.begin(); }
-		auto end() { return mPerm.end(); }
-		auto end() const { return mPerm.end(); }
+		auto begin() { return mPi.begin(); }
+		auto begin() const { return mPi.begin(); }
+		auto end() { return mPi.end(); }
+		auto end() const { return mPi.end(); }
 
 
 		void validate()
@@ -283,9 +287,9 @@ namespace secJoin
 			std::vector<u8> v(size(), 0);
 			for (u64 i = 0; i < size(); ++i)
 			{
-				if (mPerm[i] >= size())
+				if (mPi[i] >= size())
 					throw RTE_LOC;
-				auto& vv = v[mPerm[i]];
+				auto& vv = v[mPi[i]];
 				if (vv)
 					throw RTE_LOC;
 
@@ -300,7 +304,7 @@ namespace secJoin
 	inline std::ostream& operator<<(std::ostream& o, const Perm& p)
 	{
 		o << "[";
-		for (auto pp : p.mPerm)
+		for (auto pp : p.mPi)
 			o << std::hex << pp << " ";
 		o << "]" << std::dec;
 		return o;

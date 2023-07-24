@@ -327,4 +327,35 @@ namespace secJoin
         transpose(r);
         return r;
     }
+
+
+    template<typename T, typename U>
+    oc::MatrixView<T> matrixCast(U&& u)
+    {
+        using UT = decltype(*u.data());
+
+        static_assert(sizeof(UT) % sizeof(T) == 0 || sizeof(UT) > sizeof(T));
+        if (sizeof(UT) > sizeof(T))
+        {
+            if (sizeof(UT) * u.cols() % sizeof(T))
+                throw RTE_LOC;
+        }
+        return oc::MatrixView<T>((T*)u.data(), u.rows(), u.cols() * sizeof(UT) / sizeof(T));
+    }
+
+
+
+    template<typename T, typename U>
+    oc::span<T> spanCast(U&& u)
+    {
+        using UT = decltype(*u.data());
+
+        static_assert(sizeof(UT) % sizeof(T) == 0 || sizeof(UT) > sizeof(T));
+        if (sizeof(UT) > sizeof(T))
+        {
+            if (sizeof(UT) * u.size() % sizeof(T))
+                throw RTE_LOC;
+        }
+        return oc::span<T>((T*)u.data(), u.size() * sizeof(UT) / sizeof(T));
+    }
 }

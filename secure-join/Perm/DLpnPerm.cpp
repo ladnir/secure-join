@@ -1,5 +1,5 @@
 #include "DLpnPerm.h"
-
+#include "secure-join/Util/Matrix.h"
 namespace secJoin
 {
 
@@ -14,9 +14,9 @@ namespace secJoin
         mRecver.setKeyOts(sk);
     }
 
-    macoro::task<> DLpnPermReceiver::genKeyOts(OleGenerator& ole, coproto::Socket&chl)
+    macoro::task<> DLpnPermReceiver::genKeyOts(OleGenerator& ole, coproto::Socket& chl)
     {
-        return mSender.genKeyOts(ole,chl);
+        return mSender.genKeyOts(ole, chl);
     }
 
     macoro::task<> DLpnPermSender::genKeyOts(OleGenerator& ole, coproto::Socket& chl)
@@ -25,7 +25,9 @@ namespace secJoin
     }
 
 
-    void xorShare(oc::MatrixView<const oc::block> v1_,
+    void xorShare(
+        oc::MatrixView<const oc::block> v1_,
+        u64 byteOffset,
         oc::MatrixView<const oc::u8> v2,
         oc::MatrixView<oc::u8>& s)
     {
@@ -34,10 +36,10 @@ namespace secJoin
         //    throw RTE_LOC;
         //if (v1.cols() != v2.cols())
         //    throw RTE_LOC;
-        oc::MatrixView<const u8> v1((u8*)v1_.data(), v1_.rows(), v1_.cols() * sizeof(oc::block));
+        auto v1 = matrixCast<const u8>(v1_);
         for (oc::u64 i = 0; i < s.rows(); ++i)
             for (oc::u64 j = 0; j < s.cols(); ++j)
-                s(i, j) = v1(i, j) ^ v2(i, j);
+                s(i, j) = v1(i, j + byteOffset) ^ v2(i, j);
     }
 
     void xorShare(oc::MatrixView<const u8> v1,
@@ -63,7 +65,7 @@ namespace secJoin
     {
         mHasPreprocess = true;
         mPrePerm.randomize(totElements, prng);
-        return setup(mPrePerm, bytesPerRow, prng, chl, false, ole);
+        return setup(mPrePerm, bytesPerRow, prng, chl, ole);
     }
 
     // generate the preprocessing when all inputs are unknown.
@@ -86,56 +88,47 @@ namespace secJoin
         u64 bytesPerRow,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        bool invPerm,
         OleGenerator& ole)
     {
-        MC_BEGIN(macoro::task<>, &pi, &chl, &prng, &ole, bytesPerRow, this, invPerm,
-            //aesPlaintext = oc::Matrix<oc::block>(),
+        MC_BEGIN(macoro::task<>, &pi, &chl, &prng, &ole, bytesPerRow, this,
             aesCipher = oc::Matrix<oc::block>(),
-            //dlpnCipher = oc::Matrix<oc::block>(),
             blocksPerRow = u64(),
             totElements = u64(),
             aes = oc::AES(),
             key = oc::block());
 
-
-        totElements = pi.mPerm.size();
+        mSetupSize = bytesPerRow;
+        totElements = pi.mPi.size();
         blocksPerRow = oc::divCeil(bytesPerRow, sizeof(oc::block));
+        mByteOffset = 0;
 
         key = prng.get();
         aes.setKey(key);
 
-        if(mRecver.hasKeyOts())
+        if (mRecver.hasKeyOts())
             mRecver.tweakKeyOts(key);
         MC_AWAIT(chl.send(std::move(key)));
-        // if(mRecver.hasKeyOts() == false)
-        //     MC_AWAIT(mRecver.genKeyOts(ole));
-
-        // Encryption starts here
-        //aesPlaintext.resize(totElements, blocksPerRow);
-        aesCipher.resize(totElements, blocksPerRow);
-        //dlpnCipher.resize(totElements, blocksPerRow);
 
         mDelta.resize(totElements, blocksPerRow);
         for (u64 i = 0; i < totElements; i++)
         {
             for (u64 j = 0; j < blocksPerRow; j++)
             {
-                if (!invPerm)
+                //if (!invPerm)
                 {
                     auto srcIdx = pi[i] * blocksPerRow + j;
-                    aesCipher(i, j) = oc::block(0, srcIdx);
+                    mDelta(i, j) = oc::block(0, srcIdx);
                 }
-                else
-                {
-                    auto srcIdx = i * blocksPerRow + j;
-                    aesCipher(pi[i], j) = oc::block(0, srcIdx);
-                }
+                //else
+                //{
+                //    auto srcIdx = i * blocksPerRow + j;
+                //    mDelta(pi[i], j) = oc::block(0, srcIdx);
+                //}
             }
         }
-        aes.ecbEncBlocks(aesCipher, aesCipher);
+        aes.ecbEncBlocks(mDelta, mDelta);
 
-        MC_AWAIT(mRecver.evaluate(aesCipher, mDelta, chl, prng, ole));
+        MC_AWAIT(mRecver.evaluate(mDelta, mDelta, chl, prng, ole));
 
         //for (u64 i = 0; i < totElements; i++)
         //    memcpyMin(mDelta[i], dlpnCipher[i]);
@@ -163,7 +156,9 @@ namespace secJoin
             aes = oc::AES(),
             key = oc::block());
 
+        mSetupSize = bytesPerRow;
         blocksPerRow = oc::divCeil(bytesPerRow, sizeof(oc::block));
+        mByteOffset = 0;
 
         MC_AWAIT(chl.recv(key));
 
@@ -182,69 +177,27 @@ namespace secJoin
             mA(i) = oc::block(0, i);
         aes.ecbEncBlocks(mA, mA);
         mSender.mPrf.eval(mA, mA);
-
-        ////////////////////////////////////////
-
-        //blocksPerRow = oc::divCeil(bytesPerRow, sizeof(oc::block));
-
-        //// Calculating a from the ppt
-        //aesPlaintext.resize(totElements, blocksPerRow);
-        //aesCipher.resize(totElements, blocksPerRow);
-        //dlpnCipher.resize(totElements, blocksPerRow);
-        //preProsdlpnCipher.resize(totElements, blocksPerRow);
-
-        //for (u64 i = 0; i < aesPlaintext.size(); i++)
-        //    aesPlaintext(i) = oc::block(0, i);
-
-
-        //MC_AWAIT(chl.recv(key));
-
-        //if (mSender.hasKeyOts())
-        //    mSender.tweakKeyOts(key);
-        //aes.setKey(key);
-        //aes.ecbEncBlocks(aesPlaintext, aesCipher);
-
-        //MC_AWAIT(mSender.evaluate(dlpnCipher, chl, prng, ole));
-
-        //for (u64 i = 0; i < aesCipher.rows(); i++)
-        //{
-        //    for (u64 j = 0; j < aesCipher.cols(); j++)
-        //    {
-        //        preProsdlpnCipher(i, j) = mSender.mPrf.eval(aesCipher(i, j));
-        //    }
-        //}
-
-        //// Placing a in sout[0]
-        //mA.resize(totElements, bytesPerRow);
-        //for (u64 i = 0; i < totElements; i++)
-        //    memcpyMin(mA[i], preProsdlpnCipher[i]);
-
-        //// Placing [y] in sout[1]
-        //mB.resize(totElements, bytesPerRow);
-
-        //for (u64 i = 0; i < totElements; i++)
-        //    memcpyMin(mB[i], dlpnCipher[i]);
         MC_END();
     }
 
     macoro::task<> DLpnPermReceiver::validateShares(coproto::Socket& sock)
     {
-        assert(hasSetup());
+        //assert(hasSetup());
         MC_BEGIN(macoro::task<>, this, &sock);
-            
+
         MC_AWAIT(sock.send(mA));
         MC_AWAIT(sock.send(mB));
 
         MC_END();
     }
 
-    macoro::task<> DLpnPermSender::validateShares(coproto::Socket& sock, const Perm& p)
+    macoro::task<> DLpnPermSender::validateShares(coproto::Socket& sock, Perm p)
     {
-        assert(hasSetup());
-        MC_BEGIN(macoro::task<>, this, &sock, &p,
+        //assert(hasSetup());
+        MC_BEGIN(macoro::task<>, this, &sock, p,
             A = oc::Matrix<oc::block>{},
             B = oc::Matrix<oc::block>{}
-            );
+        );
 
         A.resize(mDelta.rows(), mDelta.cols());
         B.resize(mDelta.rows(), mDelta.cols());
@@ -266,40 +219,56 @@ namespace secJoin
     template <>
     macoro::task<> DLpnPermSender::apply<u8>(
         const Perm& pi,
+        PermOp op,
         oc::MatrixView<u8> sout,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        bool invPerm,
         OleGenerator& ole)
     {
-        MC_BEGIN(macoro::task<>, &pi, &chl, &prng, &ole, this, sout, invPerm,
+        setPermutation(pi);
+        return apply(op, sout, prng, chl, ole);
+    }
+
+    template <>
+    macoro::task<> DLpnPermSender::apply<u8>(
+        PermOp op,
+        oc::MatrixView<u8> sout,
+        oc::PRNG& prng,
+        coproto::Socket& chl,
+        OleGenerator& ole)
+    {
+        MC_BEGIN(macoro::task<>, &chl, &prng, &ole, this, sout, op,
             xEncrypted = oc::Matrix<u8>(),
             xPermuted = oc::Matrix<u8>(),
             totElements = u64(),
             bytesPerRow = u64(),
             delta = Perm{}
         );
-        totElements = pi.mPerm.size();
+        if (mPi == nullptr)
+            throw RTE_LOC;
+
+        totElements = mPi->mPi.size();
         bytesPerRow = sout.cols();
 
-        if (hasSetup() == false)
-            MC_AWAIT(setup(pi, sout.cols(), prng, chl, invPerm, ole));
+        if (hasSetup(bytesPerRow) == false)
+            MC_AWAIT(setup(*mPi, sout.cols(), prng, chl, ole));
 
         if (mDelta.rows() != totElements)
             throw RTE_LOC;
-        if (mDelta.cols() * sizeof(oc::block) < bytesPerRow)
-            throw RTE_LOC;
+        //if (mDelta.cols() * sizeof(oc::block) < bytesPerRow)
+        //    throw RTE_LOC;
 
         if (mHasPreprocess)
         {
             // delta = pi o pre^-1
             // they are going to update their correlation using delta
             // to translate it to a correlation of pi.
-            delta = invPerm ?
-                pi.compose(mPrePerm) :
-                pi.inverse().compose(mPrePerm)
+            delta = //op == PermOp::Inverse ?
+                //mPi->compose(mPrePerm) :
+                mPi->inverse().compose(mPrePerm)
                 ;
-            MC_AWAIT(chl.send(std::move(delta.mPerm)));
+            MC_AWAIT(chl.send(std::move(delta.mPi)));
+            MC_AWAIT(validateShares(chl, /*mInverse  ? mPi->inverse() : */*mPi));
 
             mHasPreprocess = false;
         }
@@ -309,20 +278,20 @@ namespace secJoin
 
         MC_AWAIT(chl.recv(xEncrypted));
 
-        for (u64 i = 0; i < totElements; ++i)
+        if (op == PermOp::Regular)
         {
-            if (!invPerm)
-            {
-                memcpy(xPermuted[i], xEncrypted[pi[i]]);
-            }
-            else
-            {
-                memcpy(xPermuted[pi[i]], xEncrypted[i]);
-            }
-        }
+            mPi->apply<u8>(xEncrypted, xPermuted, op);
 
-        xorShare(mDelta, xPermuted, sout);
-        mDelta.resize(0, 0);
+            xorShare(mDelta, mByteOffset, xPermuted, sout);
+            mByteOffset += sout.cols();
+        }
+        else
+        {
+            xorShare(mDelta, mByteOffset, xEncrypted, xEncrypted);
+            mPi->apply<u8>(xEncrypted, sout, op);
+            mByteOffset += sout.cols();
+        }
+        //mDelta.resize(0, 0);
 
         MC_END();
     }
@@ -333,26 +302,38 @@ namespace secJoin
     template <>
     macoro::task<> DLpnPermSender::apply<u8>(
         const Perm& pi,
+        PermOp op,
         oc::MatrixView<const u8> in,
         oc::MatrixView<u8> sout,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        bool invPerm,
         OleGenerator& ole)
     {
-        MC_BEGIN(macoro::task<>, &pi, &chl, &prng, &ole, this, sout, invPerm, in,
-            xPermuted = oc::Matrix<u8>(),
-            soutPerm = oc::Matrix<u8>());
+        setPermutation(pi);
+        return apply(op, in, sout, prng, chl, ole);
+    }
+
+    // If DLPN receiver only wants to call apply
+    // when it also has inputs
+    // this will internally call setup for it
+    template <>
+    macoro::task<> DLpnPermSender::apply<u8>(
+        PermOp op,
+        oc::MatrixView<const u8> in,
+        oc::MatrixView<u8> sout,
+        oc::PRNG& prng,
+        coproto::Socket& chl,
+        OleGenerator& ole)
+    {
+        MC_BEGIN(macoro::task<>, &chl, &prng, &ole, this, sout, in, op,
+            xPermuted = oc::Matrix<u8>());
 
         xPermuted.resize(in.rows(), in.cols());
-        soutPerm.resize(sout.rows(), sout.cols());
 
-        MC_AWAIT(apply(pi, soutPerm, prng, chl, invPerm, ole));
-        // MC_AWAIT(setup(pi, bytesPerRow, prng, chl, ole, invPerm));
-        // MC_AWAIT(apply(pi, soutPerm, bytesPerRow, chl, invPerm));
+        MC_AWAIT(apply(op, sout, prng, chl, ole));
 
-        pi.apply<u8>(in, xPermuted, invPerm);
-        xorShare(xPermuted, soutPerm, sout);
+        mPi->apply<u8>(in, xPermuted, op);
+        xorShare(xPermuted, sout, sout);
 
         MC_END();
     }
@@ -361,13 +342,14 @@ namespace secJoin
     // this will internally call setup for it
     template <>
     macoro::task<> DLpnPermReceiver::apply<u8>(
+        PermOp op,
         oc::MatrixView<const u8> input,
         oc::MatrixView<u8> sout,
         oc::PRNG& prng,
         coproto::Socket& chl,
         OleGenerator& ole)
     {
-        MC_BEGIN(macoro::task<>, &chl, &prng, &ole, this, input, sout,
+        MC_BEGIN(macoro::task<>, &chl, &prng, &ole, this, input, sout, op,
             totElements = u64(),
             bytesPerRow = u64(),
             xEncrypted = oc::Matrix<u8>(),
@@ -375,7 +357,7 @@ namespace secJoin
 
         totElements = input.rows();
         bytesPerRow = input.cols();
-        if (hasSetup() == false)
+        if (hasSetup(bytesPerRow) == false)
             MC_AWAIT(setup(totElements, bytesPerRow, prng, chl, ole));
 
         if (mA.rows() != totElements)
@@ -401,31 +383,40 @@ namespace secJoin
             // where mA' = (pi^-1 o pre)(mA)
             //           = delta(mA)
             // 
-            delta.mPerm.resize(totElements);
-            MC_AWAIT(chl.recv(delta.mPerm));
+            delta.mPi.resize(totElements);
+            MC_AWAIT(chl.recv(delta.mPi));
 
             {
                 oc::Matrix<oc::block> AA(mA.rows(), mA.cols());
                 delta.apply<oc::block>(mA, AA);
                 std::swap(mA, AA);
             }
-
+            TODO("REMOVE ME");
+            MC_AWAIT(validateShares(chl));
             mHasPreprocess = false;
         }
 
         // MC_AWAIT(apply(input, sout, chl));
-        //totElements = input.rows();
         xEncrypted.resize(input.rows(), input.cols());
 
-        xorShare(mA, input, xEncrypted);
+        if (op == PermOp::Regular)
+        {
+            xorShare(mA, mByteOffset, input, xEncrypted);
+            MC_AWAIT(chl.send(std::move(xEncrypted)));
+            for (u64 i = 0; i < totElements; ++i)
+                memcpy(sout.data(i), (u8*)mB.data(i) + mByteOffset, sout.cols());
+        }
+        else
+        {
+            xorShare(mB, mByteOffset, input, xEncrypted);
+            MC_AWAIT(chl.send(std::move(xEncrypted)));
+            for (u64 i = 0; i < totElements; ++i)
+                memcpy(sout.data(i), (u8*)mA.data(i) + mByteOffset, sout.cols());
+        }
 
-        MC_AWAIT(chl.send(std::move(xEncrypted)));
-
-        for (u64 i = 0; i < totElements; ++i)
-            memcpyMin(sout[i], mB[i]);
-
-        mA.resize(0, 0);
-        mB.resize(0, 0);
+        mByteOffset += sout.cols();
+        //mA.resize(0, 0);
+        //mB.resize(0, 0);
         MC_END();
     }
 }

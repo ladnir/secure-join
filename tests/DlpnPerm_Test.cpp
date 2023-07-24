@@ -22,7 +22,7 @@ void DlpnPerm_setup_test(const oc::CLP& cmd)
     secJoin::DLpnPermSender dlpnPerm1;
     secJoin::DLpnPermReceiver dlpnPerm2;
 
-    oc::Matrix<oc::block> 
+    oc::Matrix<oc::block>
         aExp(n, oc::divCeil(rowSize, 16));
 
     Perm pi(n, prng0);
@@ -49,18 +49,18 @@ void DlpnPerm_setup_test(const oc::CLP& cmd)
 
     auto sock = coproto::LocalAsyncSocket::makePair();
 
-    for (auto invPerm : { false,true })
+    //for (auto invPerm : { PermOp::Regular,PermOp::Inverse })
     {
 
         // the preprocessing phase
         auto res = coproto::sync_wait(coproto::when_all_ready(
-            dlpnPerm1.setup(pi, rowSize, prng0, sock[0], invPerm, ole1),
+            dlpnPerm1.setup(pi, rowSize, prng0, sock[0], ole1),
             dlpnPerm2.setup(n, rowSize, prng1, sock[1], ole0)
         ));
 
         oc::Matrix<oc::block>  permPiA = reveal(dlpnPerm1.mDelta, dlpnPerm2.mB);
 
-        pi.apply<oc::block>(dlpnPerm2.mA, aExp, invPerm);
+        pi.apply<oc::block>(dlpnPerm2.mA, aExp);
 
         if (eq(aExp, permPiA) == false)
         {
@@ -100,7 +100,7 @@ void DlpnPerm_apply_test(const oc::CLP& cmd)
 
     prng0.get(x.data(), x.size());
     Perm pi(n, prng0);
-    // // std::cout << "The Current Permutation is " << pi.mPerm << std::endl;
+    // // std::cout << "The Current Permutation is " << pi.mPi << std::endl;
 
     // Fake Setup
     OleGenerator ole0, ole1;
@@ -116,11 +116,13 @@ void DlpnPerm_apply_test(const oc::CLP& cmd)
 
     auto sock = coproto::LocalAsyncSocket::makePair();
 
-    for (auto invPerm : { false,true })
+    for (auto invPerm : { PermOp::Regular,PermOp::Inverse })
     {
+        dlpnPerm2.clearPermutation();
+
         auto res1 = coproto::sync_wait(coproto::when_all_ready(
-            dlpnPerm1.apply<u8>(pi, sout1, prng0, sock[0], invPerm, ole0),
-            dlpnPerm2.apply<u8>(x, sout2, prng1, sock[1], ole1)
+            dlpnPerm1.apply<u8>(pi, invPerm, sout1, prng0, sock[0], ole0),
+            dlpnPerm2.apply<u8>(invPerm, x, sout2, prng1, sock[1], ole1)
         ));
 
 
@@ -166,7 +168,7 @@ void DlpnPerm_sharedApply_test(const oc::CLP& cmd)
 
     prng0.get(x.data(), x.size());
     Perm pi(n, prng0);
-    // // std::cout << "The Current Permutation is " << pi.mPerm << std::endl;
+    // // std::cout << "The Current Permutation is " << pi.mPi << std::endl;
 
     // Fake Setup
     OleGenerator ole0, ole1;
@@ -185,11 +187,12 @@ void DlpnPerm_sharedApply_test(const oc::CLP& cmd)
     std::array<oc::Matrix<u8>, 2> xShares = share(x, prng0);
 
 
-    for (auto invPerm : { false,true })
+    for (auto invPerm : { PermOp::Regular,PermOp::Inverse })
     {
+        dlpnPerm2.clearPermutation();
         auto res1 = coproto::sync_wait(coproto::when_all_ready(
-            dlpnPerm1.apply<u8>(pi, xShares[0], sout1, prng0, sock[0], invPerm, ole1),
-            dlpnPerm2.apply<u8>(xShares[1], sout2, prng1, sock[1], ole0)
+            dlpnPerm1.apply<u8>(pi, invPerm, xShares[0], sout1, prng0, sock[0], ole1),
+            dlpnPerm2.apply<u8>(invPerm, xShares[1], sout2, prng1, sock[1], ole0)
         ));
 
 
@@ -228,14 +231,14 @@ void DlpnPerm_prepro_test(const oc::CLP& cmd)
     secJoin::DLpnPermSender dlpnPerm1;
     secJoin::DLpnPermReceiver dlpnPerm2;
 
-    oc::Matrix<u8> x(n, rowSize),
-        yExp(n, rowSize),
-        sout1(n, rowSize),
-        sout2(n, rowSize);
+    oc::Matrix<u8> x(n, rowSize / 2),
+        yExp(n, rowSize / 2),
+        sout1(n, rowSize / 2),
+        sout2(n, rowSize / 2);
 
     prng0.get(x.data(), x.size());
     Perm pi(n, prng0);
-    // // std::cout << "The Current Permutation is " << pi.mPerm << std::endl;
+    // // std::cout << "The Current Permutation is " << pi.mPi << std::endl;
 
     // Fake Setup
     OleGenerator ole0, ole1;
@@ -254,8 +257,9 @@ void DlpnPerm_prepro_test(const oc::CLP& cmd)
     std::array<oc::Matrix<u8>, 2> xShares = share(x, prng0);
 
 
-    for (auto invPerm : { false, true  })
+    for (auto invPerm : { PermOp::Regular, PermOp::Inverse })
     {
+        dlpnPerm2.clearPermutation();
         auto res0 = coproto::sync_wait(coproto::when_all_ready(
             dlpnPerm1.preprocess(n, rowSize, prng0, sock[0], ole1),
             dlpnPerm2.preprocess(n, rowSize, prng1, sock[1], ole0)
@@ -272,7 +276,7 @@ void DlpnPerm_prepro_test(const oc::CLP& cmd)
             auto pre = dlpnPerm1.mPrePerm;
             for (u64 i = 0; i < n; ++i)
                 for (u64 j = 0;j < A.cols(); ++j)
-                    if ((dlpnPerm1.mDelta(i, j) ^ dlpnPerm2.mB(i,j)) != A(pre[i], j))
+                    if ((dlpnPerm1.mDelta(i, j) ^ dlpnPerm2.mB(i, j)) != A(pre[i], j))
                         throw RTE_LOC;
             //Perm pre(n, prng);
             //Perm pi(n, prng);
@@ -301,33 +305,39 @@ void DlpnPerm_prepro_test(const oc::CLP& cmd)
             // 
             // where mA' = (pi^-1 o pre)(mA)
             //           = delta(mA)
-            auto pii = invPerm ? pi.inverse() : pi;
-            auto delta = pii.inverse().compose(pre);
+            //auto pii = invPerm ? pi.inverse() : pi;
+            auto delta = pi.inverse().compose(pre);
 
             auto AA = delta.apply<oc::block>(A);
             for (u64 i = 0; i < n; ++i)
                 for (u64 j = 0;j < A.cols(); ++j)
-                    if (preA(i, j) != AA(pii[i], j))
+                    if (preA(i, j) != AA(pi[i], j))
                         throw RTE_LOC;
 
         }
 
+        dlpnPerm1.setPermutation(pi);
 
-        auto res1 = coproto::sync_wait(coproto::when_all_ready(
-            dlpnPerm1.apply<u8>(pi, xShares[0], sout1, prng0, sock[0], invPerm, ole1),
-            dlpnPerm2.apply<u8>(xShares[1], sout2, prng1, sock[1], ole0)
-        ));
-        std::get<0>(res1).result();
-        std::get<1>(res1).result();
+        for (i64 i = 0; i < 2; ++i)
+        {
 
 
-        oc::Matrix<oc::u8>  yAct = reveal(sout2, sout1);
+            auto res1 = coproto::sync_wait(coproto::when_all_ready(
+                dlpnPerm1.apply<u8>(invPerm, xShares[0], sout1, prng0, sock[0], ole1),
+                dlpnPerm2.apply<u8>(invPerm, xShares[1], sout2, prng1, sock[1], ole0)
+            ));
+            std::get<0>(res1).result();
+            std::get<1>(res1).result();
 
-        pi.apply<u8>(x, yExp, invPerm);
 
-        if (eq(yExp, yAct) == false)
-            throw RTE_LOC;
+            oc::Matrix<oc::u8>  yAct = reveal(sout2, sout1);
 
+            pi.apply<u8>(x, yExp, invPerm);
+
+            if (eq(yExp, yAct) == false)
+                throw RTE_LOC;
+
+        }
     }
 
 }

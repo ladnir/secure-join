@@ -521,7 +521,7 @@ namespace secJoin
         temp.resize(data.numEntries(), data.bitsPerEntry() + 8);
         temp.resize(data.numEntries(), data.bitsPerEntry());
         // temp.reshape(data.bitsPerEntry());
-        MC_AWAIT(sPerm.apply(data, temp, prng, sock, ole, true));
+        MC_AWAIT(sPerm.apply(PermOp::Inverse, data, temp, prng, sock, ole));
         std::swap(data, temp);
         setTimePoint("applyInv-sort");
         //std::cout << "Perm::apply done " << LOCATION << std::endl;
@@ -580,7 +580,7 @@ namespace secJoin
         temp.resize(data.numEntries(), data.bitsPerEntry());
         temp.reshape(data.bitsPerEntry());
         temp.setZero();
-        MC_AWAIT(sPerm.apply(data, temp, prng, sock, ole, false));
+        MC_AWAIT(sPerm.apply(PermOp::Regular, data, temp, prng, sock, ole));
         std::swap(data, temp);
         setTimePoint("apply-sort");
 

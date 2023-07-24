@@ -12,8 +12,8 @@ namespace secJoin
     void AdditivePerm::init(u64 size)
     {
         mShare.resize(size);
-        mPi.mPerm.mPerm.resize(size);
-        mRho.mPerm.resize(size);
+        //mPi.mPi.mPi.resize(size);
+        //mRho.mPi.resize(size);
         mIsSetup = false;
     }
 
@@ -66,27 +66,34 @@ namespace secJoin
             MC_AWAIT(chl.send(coproto::copy(mShare)));
             MC_AWAIT(chl.recv(rho1));
 
-            mRho.mPerm = mShare;
+            mRho.mPi = mShare;
             for (u64 i = 0;i < mRho.size(); ++i)
-                mRho.mPerm[i] ^= rho1(i);
+                mRho.mPi[i] ^= rho1(i);
 
             mIsSetup = true;
             MC_RETURN_VOID();
         }
 
-        mPi.init(mShare.size(), (int)ole.mRole, prng);
+        if (mPi.size() == 0)
+            mPi.init(mShare.size(), (int)ole.mRole, prng);
 
+
+        TODO("change to apply reveal");
         // rho1 will resized() and initialed in the apply function
+        std::cout << (int)ole.mRole << " A::setup apply " << std::endl;
         rho1.resize(mShare.size(), 1);
         MC_AWAIT(mPi.apply<u32>(
+            PermOp::Regular,
             oc::MatrixView<u32>(mShare.data(), mShare.size(), 1),
-            rho1, chl, ole, false));
+            rho1, chl, ole));
+
+        std::cout << (int)ole.mRole << "A::setup exchange " << std::endl;
 
         // Exchanging the [Rho]
         if (mPi.mPartyIdx == 0)
         {
             // First party first sends the [rho] and then receives it
-            MC_AWAIT(chl.send(rho1));
+            MC_AWAIT(chl.send(coproto::copy(rho1)));
 
             rho2.resize(rho1.rows(), rho1.cols());
             MC_AWAIT(chl.recv(rho2));
@@ -97,7 +104,7 @@ namespace secJoin
             rho2.resize(rho1.rows(), rho1.cols());
             MC_AWAIT(chl.recv(rho2));
 
-            MC_AWAIT(chl.send(rho1));
+            MC_AWAIT(chl.send(coproto::copy(rho1)));
         }
 
         // Constructing Rho
@@ -107,7 +114,7 @@ namespace secJoin
         if (mShare.size() != rho1.rows())
             throw RTE_LOC;
 
-        mRho.mPerm.resize(rho1.rows());
+        mRho.mPi.resize(rho1.rows());
 
         // std::cout << "Rho1 Rows " << rho1.rows() << std::endl;
         // std::cout << "Rho1 Cols " << rho1.cols() << std::endl;
@@ -118,7 +125,7 @@ namespace secJoin
         {
             for (i = 0; i < rho1.rows(); ++i)
             {
-                mRho.mPerm[i] = *(u32*)rho1.data(i) ^ *(u32*)rho2.data(i);
+                mRho.mPi[i] = *(u32*)rho1.data(i) ^ *(u32*)rho2.data(i);
                 // #ifndef NDEBUG
                 //                     if (mRho[i] >= size())
                 //                     {
@@ -137,13 +144,26 @@ namespace secJoin
 
                 assert(mRho[i] < size());
             }
+#ifndef NDEBUG
+            mRho.validate();
+#endif
         }
 
         mIsSetup = true;
+        std::cout << (int)ole.mRole << " A::setup done " << std::endl;
 
         MC_END();
     }
 
+
+    macoro::task<> AdditivePerm::apply(PermOp op, BinMatrix& in, BinMatrix& out, oc::PRNG& prng, coproto::Socket& chl, OleGenerator& ole)
+    {
+        if (in.cols() != oc::divCeil(in.bitsPerEntry(), 8))
+            throw RTE_LOC;
+        if (out.cols() != oc::divCeil(out.bitsPerEntry(), 8))
+            throw RTE_LOC;
+        return apply<u8>(op, in.mData, out.mData, prng, chl, ole);
+    }
 
     macoro::task<> AdditivePerm::composeSwap(
         AdditivePerm& pi,
@@ -156,6 +176,12 @@ namespace secJoin
             throw RTE_LOC;
         // dst.init(p2.size(), p2.mPi.mPartyIdx, gen);
         dst.init(size());
-        return pi.apply<u32>(mShare, dst.mShare, prng, chl, gen);
+        return pi.apply<u32>(PermOp::Regular, mShare, dst.mShare, prng, chl, gen);
+    }
+    macoro::task<> AdditivePerm::preprocess(u64 n, u64 bytesPer, coproto::Socket& chl, OleGenerator& ole, oc::PRNG& prng)
+    {
+        TODO("redice the size of possible");
+        mPi.init(n, (int)ole.mRole, prng);
+        return mPi.preprocess(n, bytesPer + sizeof(u32), chl, ole, prng);
     }
 }

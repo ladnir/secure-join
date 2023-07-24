@@ -57,37 +57,30 @@ namespace secJoin
 
         template <typename T>
         macoro::task<> apply(
+            PermOp op,
             oc::span<const T> in,
             oc::span<T> out,
             oc::PRNG& prng,
             coproto::Socket& chl,
-            OleGenerator& ole,
-            bool inv = false);
+            OleGenerator& ole);
 
         template <typename T>
         macoro::task<> apply(
+            PermOp op,
             oc::MatrixView<const T> in,
             oc::MatrixView<T> out,
             oc::PRNG& prng,
             coproto::Socket& chl,
-            OleGenerator& ole,
-            bool inv = false);
+            OleGenerator& ole);
 
 
         macoro::task<> apply(
+            PermOp op,
             BinMatrix& in,
             BinMatrix& out,
             oc::PRNG& prng,
             coproto::Socket& chl,
-            OleGenerator& ole,
-            bool inv = false)
-        {
-            if (in.cols() != oc::divCeil(in.bitsPerEntry(), 8))
-                throw RTE_LOC;
-            if (out.cols() != oc::divCeil(out.bitsPerEntry(), 8))
-                throw RTE_LOC;
-            return apply<u8>(in.mData, out.mData, prng, chl, ole, inv);
-        }
+            OleGenerator& ole);
 
         macoro::task<> composeSwap(
             AdditivePerm& pi,
@@ -100,12 +93,12 @@ namespace secJoin
 
         template <typename T>
         macoro::task<> mockApply(
+            PermOp op,
             oc::MatrixView<const T> in,
             oc::MatrixView<T> out,
             oc::PRNG& prng,
             coproto::Socket& chl,
-            OleGenerator& ole,
-            bool inv);
+            OleGenerator& ole);
 
 
         macoro::task<> preprocess(
@@ -113,10 +106,7 @@ namespace secJoin
             u64 bytesPer, 
             coproto::Socket& chl,
             OleGenerator& ole,
-            oc::PRNG& prng)
-        {
-            return mPi.preprocess(n, bytesPer, chl, ole, prng);
-        }
+            oc::PRNG& prng);
 
     };
 
@@ -124,28 +114,29 @@ namespace secJoin
 
     template <typename T>
     macoro::task<> AdditivePerm::apply(
+        PermOp op,
         oc::span<const T> in,
         oc::span<T> out,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        OleGenerator& ole,
-        bool inv)
+        OleGenerator& ole)
     {
         return apply<T>(
+            op,
             oc::MatrixView<const T>(in.data(), in.size(), 1),
             oc::MatrixView<T>(out.data(), out.size(), 1),
-            prng, chl, ole, inv);
+            prng, chl, ole);
     }
 
 
     template <typename T>
     macoro::task<> AdditivePerm::apply(
+        PermOp op,
         oc::MatrixView<const T> in,
         oc::MatrixView<T> out,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        OleGenerator& ole,
-        bool inv)
+        OleGenerator& ole)
     {
         if (out.rows() != in.rows())
             throw RTE_LOC;
@@ -154,13 +145,14 @@ namespace secJoin
         if (out.rows() != size())
             throw RTE_LOC;
 
-        MC_BEGIN(macoro::task<>, this, in, out, &prng, &chl, &ole, inv,
+        MC_BEGIN(macoro::task<>, this, in, out, &prng, &chl, &ole, op,
             temp = oc::Matrix<T>{},
-            soutInv = oc::Matrix<T>{});
+            soutInv = oc::Matrix<T>{},
+            tt = char{});
 
         if (mInsecureMock)
         {
-            MC_AWAIT(mockApply<T>(in, out, prng, chl, ole, inv));
+            MC_AWAIT(mockApply<T>(op, in, out, prng, chl, ole));
             MC_RETURN_VOID();
         }
 
@@ -168,19 +160,26 @@ namespace secJoin
             MC_AWAIT(setup(chl, ole, prng));
 
 
-        if (inv)
+        std::cout << (int)ole.mRole << " A::apply main " << std::endl;
+
+        MC_AWAIT(chl.send(std::move(tt)));
+        MC_AWAIT(chl.recv(tt));
+        std::cout << (int)ole.mRole << " A::apply main recv " << std::endl;
+
+        if (op == PermOp::Inverse)
         {
             temp.resize(in.rows(), in.cols());
-            MC_AWAIT(mPi.apply<T>(in, temp, chl, ole, false));
-            mRho.apply<T>(temp, out, true);
+            MC_AWAIT(mPi.apply<T>(PermOp::Regular, in, temp, chl, ole));
+            mRho.apply<T>(temp, out, PermOp::Inverse);
         }
         else
         {
             // Local Permutation of [x]
             temp.resize(in.rows(), in.cols());
-            mRho.apply<T>(in, temp);
-            MC_AWAIT(mPi.apply<T>(temp, out, chl, ole, true));
+            mRho.apply<T>(in, temp, PermOp::Regular);
+            MC_AWAIT(mPi.apply<T>(PermOp::Inverse, temp, out, chl, ole));
         }
+        std::cout << (int)ole.mRole << " A::apply done  " << std::endl;
 
         MC_END();
     }
@@ -188,12 +187,12 @@ namespace secJoin
 
     template <typename T>
     macoro::task<> AdditivePerm::mockApply(
+        PermOp op,
         oc::MatrixView<const T> in,
         oc::MatrixView<T> out,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        OleGenerator& ole,
-        bool inv)
+        OleGenerator& ole)
     {
         if (mInsecureMock == false)
             throw RTE_LOC;
@@ -204,14 +203,14 @@ namespace secJoin
         if (out.rows() != size())
             throw RTE_LOC;
 
-        MC_BEGIN(macoro::task<>, this, in, out, &prng, &chl, &ole, inv,
+        MC_BEGIN(macoro::task<>, this, in, out, &prng, &chl, &ole, op,
             temp = oc::Matrix<T>{},
             soutInv = oc::Matrix<T>{});
 
         if (mIsSetup == false)
             MC_AWAIT(setup(chl, ole, prng));
 
-        mRho.apply<T>(in, out, inv);
+        mRho.apply<T>(in, out, op);
 
         MC_END();
 

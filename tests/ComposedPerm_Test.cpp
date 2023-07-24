@@ -37,10 +37,10 @@ void ComposedPerm_basic_test()
     perm1.mIsSecure = false;
     perm2.mIsSecure = false;
 
-    for(auto invPerm :  {false, true})
+    for(auto invPerm : { PermOp::Regular,PermOp::Inverse })
     {
     
-        if(invPerm)
+        if(invPerm == PermOp::Inverse)
         {
             p1.apply<u8>(x, t, invPerm);
             p0.apply<u8>(t, yAct, invPerm);
@@ -58,8 +58,8 @@ void ComposedPerm_basic_test()
         sout[0].resize(n, rowSize);
         sout[1].resize(n, rowSize);
 
-        auto proto0 = perm1.apply<u8>(xShares[0], sout[0], chls[0], ole0, invPerm);
-        auto proto1 = perm2.apply<u8>(xShares[1], sout[1], chls[1], ole1, invPerm);
+        auto proto0 = perm1.apply<u8>(invPerm, xShares[0], sout[0], chls[0], ole0);
+        auto proto1 = perm2.apply<u8>(invPerm, xShares[1], sout[1], chls[1], ole1);
 
         auto res = macoro::sync_wait(macoro::when_all_ready(std::move(proto0), std::move(proto1)));
         std::get<0>(res).result();
@@ -123,10 +123,10 @@ void ComposedPerm_shared_test()
     perm2.setKeyOts(kk,rk, sk);
     perm1.setKeyOts(kk, rk, sk);
 
-    for(auto invPerm :  { false, true})
+    for(auto invPerm : { PermOp::Regular,PermOp::Inverse })
     {
     
-        if(invPerm)
+        if(invPerm == PermOp::Inverse)
         {
             p1.apply<u8>(x, t, invPerm);
             p0.apply<u8>(t, yAct, invPerm);
@@ -145,8 +145,8 @@ void ComposedPerm_shared_test()
         sout[1].resize(n, rowSize);
 
         auto res = macoro::sync_wait(macoro::when_all_ready(
-            perm1.apply<u8>(xShares[0], sout[0], chls[0], ole0, invPerm), 
-            perm2.apply<u8>(xShares[1], sout[1], chls[1], ole1, invPerm)
+            perm1.apply<u8>(invPerm, xShares[0], sout[0], chls[0], ole0),
+            perm2.apply<u8>(invPerm, xShares[1], sout[1], chls[1], ole1)
             ));
         std::get<1>(res).result();
         std::get<0>(res).result();
@@ -211,7 +211,7 @@ void ComposedPerm_prepro_test()
     perm2.setKeyOts(kk, rk, sk);
     perm1.setKeyOts(kk, rk, sk);
 
-    for (auto invPerm : { false, true })
+    for (auto invPerm : { PermOp::Regular,PermOp::Inverse })
     {
         auto res0 = macoro::sync_wait(macoro::when_all_ready(
             perm1.preprocess(n, rowSize, chls[0], ole0, prng0),
@@ -227,8 +227,8 @@ void ComposedPerm_prepro_test()
         sout[1].resize(n, rowSize);
 
         auto res = macoro::sync_wait(macoro::when_all_ready(
-            perm1.apply<u8>(xShares[0], sout[0], chls[0], ole0, invPerm),
-            perm2.apply<u8>(xShares[1], sout[1], chls[1], ole1, invPerm)
+            perm1.apply<u8>(invPerm, xShares[0], sout[0], chls[0], ole0),
+            perm2.apply<u8>(invPerm, xShares[1], sout[1], chls[1], ole1)
         ));
         std::get<1>(res).result();
         std::get<0>(res).result();

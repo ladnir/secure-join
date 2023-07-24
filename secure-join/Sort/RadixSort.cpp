@@ -709,16 +709,16 @@ namespace secJoin
             MC_AWAIT(comm.send(coproto::copy(k)));
             MC_AWAIT(comm.recv(sk));
 
-            p.mPerm.resize(k.rows());
+            p.mPi.resize(k.rows());
             MC_AWAIT(comm.send(coproto::copy(dst.mShare)));
-            MC_AWAIT(comm.recv(p.mPerm));
+            MC_AWAIT(comm.recv(p.mPi));
 
             {
 
                 for (auto i = 0ull; i < k.size(); ++i)
                 {
                     sk(i) ^= k(i);
-                    p.mPerm[i] ^= dst.mShare[i];
+                    p.mPi[i] ^= dst.mShare[i];
                 }
 
                 auto genBitPerm = [&](BinMatrix& k) {
@@ -855,7 +855,7 @@ namespace secJoin
             {
                 auto kk2 = kk;
                 sk.resize(kk.rows(), kk.cols());
-                dst.apply<u8>(kk2, sk, true);
+                dst.apply<u8>(kk2, sk, PermOp::Inverse);
 
                 for (u64 j = 1; j < k.rows(); ++j)
                 {
@@ -885,7 +885,7 @@ namespace secJoin
 
                 // apply the partial sort that we have so far 
                 // to the next L bits of the key.
-                dst.apply<u8>(sk, ssk, true);
+                dst.apply<u8>(sk, ssk, PermOp::Inverse);
 
                 // generate the sorting permutation for the
                 // next L bits of the key.
@@ -898,7 +898,7 @@ namespace secJoin
 
                 auto kk2 = kk;
                 sk.resize(kk2.rows(), kk2.cols());
-                dst.apply<u8>(kk2, sk, true);
+                dst.apply<u8>(kk2, sk, PermOp::Inverse);
 
                 for (u64 j = 1; j < k.rows(); ++j)
                 {
@@ -966,12 +966,12 @@ namespace secJoin
         if (mDebug)
         {
             MC_AWAIT(comm.send(coproto::copy(dst.mShare)));
-            debugPerm.mPerm.resize(dst.size());
-            MC_AWAIT(comm.recv(debugPerm.mPerm));
+            debugPerm.mPi.resize(dst.size());
+            MC_AWAIT(comm.recv(debugPerm.mPi));
 
             for (u64 j = 0; j < debugPerm.size(); ++j)
             {
-                debugPerm.mPerm[j] ^= dst.mShare[j];
+                debugPerm.mPi[j] ^= dst.mShare[j];
             }
 
             if (debugPerm != debugPerms[0])
@@ -995,7 +995,7 @@ namespace secJoin
                 dst.setTimer(getTimer());
             // apply the partial sort that we have so far 
             // to the next L bits of the key.
-            MC_AWAIT(dst.apply<u8>(sk.mData, ssk.mData, gen.mPrng, comm, gen, true));
+            MC_AWAIT(dst.apply<u8>(PermOp::Inverse, sk.mData, ssk.mData, gen.mPrng, comm, gen));
             setTimePoint("apply(sk)");
 
             // generate the sorting permutation for the
@@ -1149,7 +1149,7 @@ namespace secJoin
             perm = sort(data).inverse();
 
             dst.init(perm.size());
-            dst.mShare = perm.mPerm;
+            dst.mShare = perm.mPi;
         }
         else {
             MC_AWAIT(comm.send(coproto::copy(k)));

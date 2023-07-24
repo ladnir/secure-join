@@ -55,20 +55,20 @@ namespace secJoin
         template<typename T>
         static macoro::task<> apply(
             const Perm& pi,
+            PermOp op,
             oc::MatrixView<const T> x2,
             oc::MatrixView<T> sout,
             oc::PRNG& prng,
             coproto::Socket& chl,
-            bool invPerm,
             OleGenerator& ole);
 
         template<typename T>
         static macoro::task<> apply(
             const Perm& pi,
+            PermOp op,
             oc::MatrixView<T> sout,
             oc::PRNG& prng,
             coproto::Socket& chl,
-            bool invPerm,
             OleGenerator& ole);
     };
 
@@ -199,26 +199,26 @@ namespace secJoin
     template<typename T>
     macoro::task<> LowMCPerm::apply(
         const Perm& pi,
+        PermOp op,
         oc::MatrixView<T> sout,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        bool invPerm,
         OleGenerator& ole)
     {
         oc::MatrixView<u8> oo((u8*)sout.data(), sout.rows(), sout.cols() * sizeof(T));
-        return apply<u8>(pi, oo, prng, chl, invPerm, ole);
+        return apply<u8>(pi, op, oo, prng, chl, ole);
     }
 
     template<>
     inline macoro::task<> LowMCPerm::apply<u8>(
         const Perm& pi,
+        PermOp op,
         oc::MatrixView<u8> sout,
         oc::PRNG& _,
         coproto::Socket& chl,
-        bool invPerm,
         OleGenerator& ole)
     {
-        MC_BEGIN(macoro::task<>, &pi, &chl, sout, invPerm, &ole,
+        MC_BEGIN(macoro::task<>, &pi, &chl, sout, op, &ole,
             xEncrypted_ = std::vector<u8>{},
             xEncrypted = span<LowMC2<>::block>{},
             xPermuted = std::vector<LowMC2<>::block>{},
@@ -249,7 +249,7 @@ namespace secJoin
             u64 srcIdx;
             auto counterMode = i * blocksPerRow;
             auto pi_i = pi[i] * blocksPerRow;
-            if (!invPerm)
+            if (op == PermOp::Regular)
             {
                 dst = xPermuted.begin() + counterMode;
                 idx = indexMatrix.begin() + counterMode;
@@ -315,43 +315,43 @@ namespace secJoin
     template<typename T>
     macoro::task<> LowMCPerm::apply(
         const Perm& pi,
+        PermOp op,
         oc::MatrixView<const T> x2,
         oc::MatrixView<T> sout,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        bool invPerm,
         OleGenerator& ole)
     {
         oc::MatrixView<u8> xx((u8*)x2.data(), x2.rows(), x2.cols() * sizeof(T));
         oc::MatrixView<u8> oo((u8*)sout.data(), sout.rows(), sout.cols() * sizeof(T));
 
-        return apply<u8>(pi, xx, oo, prng, chl, invPerm, ole);
+        return apply<u8>(pi, op, xx, oo, prng, chl, ole);
     }
 
     template<>
     inline macoro::task<> LowMCPerm::apply<u8>(
         const Perm& pi,
+        PermOp op,
         oc::MatrixView<const u8> x2,
         oc::MatrixView<u8> sout,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        bool invPerm,
         OleGenerator& ole)
     {
 
-        MC_BEGIN(macoro::task<>, x2, &pi, &chl, sout, &prng, invPerm, &ole,
+        MC_BEGIN(macoro::task<>, x2, &pi, &chl, sout, &prng, op, &ole,
             n = u64(x2.rows()),
             bytesPerRow = u64(x2.cols()),
             x2Perm = oc::Matrix<u8>{}
         );
 
-        MC_AWAIT(LowMCPerm::apply(pi, sout, prng, chl, invPerm, ole));
+        MC_AWAIT(LowMCPerm::apply(pi, op, sout, prng, chl, ole));
         x2Perm.resize(x2.rows(), x2.cols());
 
         // Permuting the secret shares x2
         for (u64 i = 0; i < n; ++i)
         {
-            if (!invPerm)
+            if (op == PermOp::Regular)
                 memcpy(x2Perm.data(i), x2.data(pi[i]), bytesPerRow);
             else
                 memcpy(x2Perm.data(pi[i]), x2.data(i), bytesPerRow);

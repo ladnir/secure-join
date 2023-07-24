@@ -16,7 +16,10 @@ namespace secJoin
 
         bool mHasPreprocess = false;
         Perm mPrePerm;
+        const Perm* mPi = nullptr;
+        Perm mPermStorage;
         oc::Matrix<oc::block> mDelta;
+        u64 mByteOffset = 0, mSetupSize = 0;
 
         DLpnPermSender() = default;
         DLpnPermSender(const DLpnPermSender&) = default;
@@ -24,27 +27,65 @@ namespace secJoin
         DLpnPermSender& operator=(const DLpnPermSender&) = default;
         DLpnPermSender& operator=(DLpnPermSender&&) noexcept = default;
 
+        void setPermutation(Perm&& p)
+        {
+            mPermStorage = std::move(p);
+            setPermutation(mPermStorage);
+        }
+
+        void setPermutation(const Perm& p)
+        {
+            if (mHasPreprocess)
+            {
+                if (p.size() != mDelta.rows())
+                    throw RTE_LOC;
+            }
+            else
+            {
+                mByteOffset = mSetupSize;
+            }
+            mPi = &p;
+        }
+
         // Sender apply: permute a remote x by our pi and get shares as output.
         template <typename T>
         macoro::task<> apply(
             const Perm& pi,
+            PermOp op,
             oc::MatrixView<T> sout,
-
             oc::PRNG& prng,
             coproto::Socket& chl,
-            bool invPerm,
             OleGenerator& ole);
 
         // Sender apply: permute a secret shared input x by our pi and get shares as output
         template <typename T>
         macoro::task<> apply(
-            const Perm& pi,
+            const Perm& pi, 
+            PermOp op,
             oc::MatrixView<const T> in,
             oc::MatrixView<T> sout,
-
             oc::PRNG& prng,
             coproto::Socket& chl,
-            bool invPerm,
+            OleGenerator& ole
+        );
+
+        // Sender apply: permute a remote x by our pi and get shares as output.
+        template <typename T>
+        macoro::task<> apply(
+            PermOp op,
+            oc::MatrixView<T> sout,
+            oc::PRNG& prng,
+            coproto::Socket& chl,
+            OleGenerator& ole);
+
+        // Sender apply: permute a secret shared input x by our pi and get shares as output
+        template <typename T>
+        macoro::task<> apply(
+            PermOp op,
+            oc::MatrixView<const T> in,
+            oc::MatrixView<T> sout,
+            oc::PRNG& prng,
+            coproto::Socket& chl,
             OleGenerator& ole
         );
 
@@ -53,7 +94,8 @@ namespace secJoin
 
 
         bool hasPreprocessing() const { return mHasPreprocess; }
-        bool hasSetup() const { return mDelta.size(); }
+        u64 remainingSetup() const { return mSetupSize - mByteOffset; }
+        bool hasSetup(u64 numBytes) const { return remainingSetup() >= numBytes; }
 
 
         // generate the preprocessing when all inputs are unknown.
@@ -70,10 +112,9 @@ namespace secJoin
             u64 bytesPerRow,
             oc::PRNG& prng,
             coproto::Socket& chl,
-            bool invPerm,
             OleGenerator& ole);
 
-        macoro::task<> validateShares(coproto::Socket& sock, const Perm& p);
+        macoro::task<> validateShares(coproto::Socket& sock, Perm p);
 
     };
 
@@ -87,6 +128,7 @@ namespace secJoin
 
         bool mHasPreprocess = false;
         oc::Matrix<oc::block> mA, mB;
+        u64 mByteOffset = 0, mSetupSize = 0;
 
         DLpnPermReceiver() = default;
         DLpnPermReceiver(const DLpnPermReceiver&) = default;
@@ -101,6 +143,7 @@ namespace secJoin
         // Receiver apply: permute a secret shared input x by the other party's pi and get shares as output
         template <typename T>
         macoro::task<> apply(
+            PermOp op,
             oc::MatrixView<const T> in,
             oc::MatrixView<T> sout,
             oc::PRNG& prng,
@@ -108,9 +151,17 @@ namespace secJoin
             OleGenerator& ole
         );
 
+        void clearPermutation() {
+            if (!mHasPreprocess)
+            {
+                mByteOffset = mSetupSize;
+            }
+        }
 
         bool hasPreprocessing() const { return mHasPreprocess; }
-        bool hasSetup() const { return mA.size(); }
+
+        u64 remainingSetup() const { return mSetupSize - mByteOffset; }
+        bool hasSetup(u64 numBytes) const { return remainingSetup() >= numBytes; }
 
 
         // generate the preprocessing when all inputs are unknown.
@@ -136,55 +187,95 @@ namespace secJoin
     template <>
     macoro::task<> DLpnPermSender::apply<u8>(
         const Perm& pi,
+        PermOp op,
         oc::MatrixView<u8> sout,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        bool invPerm,
         OleGenerator& ole);
 
     template <typename T>
     macoro::task<> DLpnPermSender::apply(
         const Perm& pi,
+        PermOp op,
         oc::MatrixView<T> sout,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        bool invPerm,
         OleGenerator& ole)
     {
-        oc::MatrixView<u8> oo((u8*)sout.data(), sout.rows(), sout.cols() * sizeof(T));
-        return apply<u8>(pi, sout, prng, chl, invPerm, ole);
+        return apply<u8>(pi, op, matrixCast<u8>(sout), prng, chl, ole);
+    }
+
+
+    template <>
+    macoro::task<> DLpnPermSender::apply<u8>(
+        PermOp op,
+        oc::MatrixView<u8> sout,
+        oc::PRNG& prng,
+        coproto::Socket& chl,
+        OleGenerator& ole);
+
+    template <typename T>
+    macoro::task<> DLpnPermSender::apply(
+        PermOp op,
+        oc::MatrixView<T> sout,
+        oc::PRNG& prng,
+        coproto::Socket& chl,
+        OleGenerator& ole)
+    {
+        return apply<u8>(pi, op, matrixCast<u8>(sout), prng, chl, ole);
     }
 
     // Generic version of below method
     template <>
     macoro::task<> DLpnPermSender::apply<u8>(
         const Perm& pi,
+        PermOp op,
         oc::MatrixView<const u8> in,
         oc::MatrixView<u8> sout,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        bool invPerm,
         OleGenerator& ole);
 
     // Generic version of below method
     template <typename T>
     macoro::task<> DLpnPermSender::apply(
         const Perm& pi,
+        PermOp op,
         oc::MatrixView<const T> in,
         oc::MatrixView<T> sout,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        bool invPerm,
         OleGenerator& ole)
     {
-        oc::MatrixView<const u8> xx((u8*)in.data(), in.rows(), in.cols() * sizeof(T));
-        oc::MatrixView<u8> oo((u8*)sout.data(), sout.rows(), sout.cols() * sizeof(T));
-        return apply<u8>(pi, xx, oo, prng, chl, invPerm, ole);
+        return apply<u8>(pi, op, matrixCast<const u8>(in), matrixCast<u8>(sout), prng, chl, ole);
     }
 
+    // Generic version of below method
+    template <>
+    macoro::task<> DLpnPermSender::apply<u8>(
+        PermOp op,
+        oc::MatrixView<const u8> in,
+        oc::MatrixView<u8> sout,
+        oc::PRNG& prng,
+        coproto::Socket& chl,
+        OleGenerator& ole);
+
+    // Generic version of below method
+    template <typename T>
+    macoro::task<> DLpnPermSender::apply(
+        PermOp op,
+        oc::MatrixView<const T> in,
+        oc::MatrixView<T> sout,
+        oc::PRNG& prng,
+        coproto::Socket& chl,
+        OleGenerator& ole)
+    {
+        return apply<u8>(op, matrixCast<const u8>(in), matrixCast<u8>(out), prng, chl, ole);
+    }
 
     template <>
     macoro::task<> DLpnPermReceiver::apply<u8>(
+        PermOp op,
         oc::MatrixView<const u8> in,
         oc::MatrixView<u8> sout,
         oc::PRNG& prng,
@@ -195,15 +286,16 @@ namespace secJoin
     // Generic version of below method
     template <typename T>
     macoro::task<> DLpnPermReceiver::apply(
+        PermOp op,
         oc::MatrixView<const T> in,
         oc::MatrixView<T> sout,
         oc::PRNG& prng,
         coproto::Socket& chl,
         OleGenerator& ole)
     {
-        oc::MatrixView<const u8> xx((u8*)in.data(), in.rows(), in.cols() * sizeof(T));
-        oc::MatrixView<u8> oo((u8*)sout.data(), sout.rows(), sout.cols() * sizeof(T));
-        return apply<u8>(xx, oo, prng, chl, ole);
+        return apply<u8>(op, matrixCast<const u8>(in), matrixCast<u8>(out), prng, chl, ole);
     }
+
+
 
 }

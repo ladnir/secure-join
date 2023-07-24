@@ -445,7 +445,7 @@ void RadixSort_genBitPerm_test()
                             vals[v].push_back(i);
                         }
                         for (u64 i = 0; i < vals.size(); ++i)
-                            exp[jj].mPerm.insert(exp[jj].mPerm.end(), vals[i].begin(), vals[i].end());
+                            exp[jj].mPi.insert(exp[jj].mPi.end(), vals[i].begin(), vals[i].end());
 
                         exp[jj] = exp[jj].inverse();
                     }

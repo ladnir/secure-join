@@ -12,7 +12,7 @@ namespace secJoin
     {
     public:
         u64 mPartyIdx = -1;
-        Perm mPerm;
+        Perm mPi;
         DLpnPermSender mSender;
         DLpnPermReceiver mReceiver;
         bool mIsSecure = true;
@@ -26,141 +26,60 @@ namespace secJoin
         //initializing the permutation
         ComposedPerm(Perm perm, u8 partyIdx)
             : mPartyIdx(partyIdx)
-            , mPerm(std::move(perm))
+            , mPi(std::move(perm))
         {}
+
         ComposedPerm(u64 n, u8 partyIdx, PRNG& prng)
             : mPartyIdx(partyIdx)
-            , mPerm(n, prng)
+            , mPi(n, prng)
         {}
 
         void setKeyOts(
             oc::block& key,
             std::vector<oc::block>& rk,
-            std::vector<std::array<oc::block, 2>>& sk)
-        {
-            mSender.setKeyOts(sk);
-            mReceiver.setKeyOts(key, rk);
-        }
+            std::vector<std::array<oc::block, 2>>& sk);
 
-        macoro::task<> genKeyOts(OleGenerator& ole, coproto::Socket& chl)
-        {
-            MC_BEGIN(macoro::task<>, this, &ole, &chl);
+        macoro::task<> genKeyOts(OleGenerator& ole, coproto::Socket& chl);
 
-            if ((int)ole.mRole)
-            {
-                MC_AWAIT(
-                    macoro::when_all_ready(
-                        mSender.genKeyOts(ole, chl),
-                        mReceiver.genKeyOts(ole, chl))
-                );
-            }
-            else
-            {
-                MC_AWAIT(
-                    macoro::when_all_ready(
-                        mReceiver.genKeyOts(ole, chl),
-                        mSender.genKeyOts(ole, chl))
-                );
-            }
-            MC_END();
-        }
+        u64 size() const { return mPi.size(); }
 
-        u64 size() const
-        {
-            return mPerm.size();
-        }
-
-        void init(u64 n, u8 partyIdx, PRNG& prng)
-        {
-            mPartyIdx = partyIdx;
-            mPerm.randomize(n, prng);
-        }
+        void init(u64 n, u8 partyIdx, PRNG& prng);
 
         macoro::task<> preprocess(
             u64 n,
             u64 bytesPer,
             coproto::Socket& chl,
             OleGenerator& ole,
-            PRNG& prng)
-        {
-            MC_BEGIN(macoro::task<>, this, &ole, &chl, &prng, n, bytesPer,
-                chl2 = coproto::Socket{}
-            );
-            chl2 = chl.fork();
-            if ((int)ole.mRole)
-            {
-                MC_AWAIT(
-                    macoro::when_all_ready(
-                        mSender.preprocess(n, bytesPer, prng, chl, ole),
-                        mReceiver.preprocess(n, bytesPer, prng, chl2, ole))
-                );
-            }
-            else
-            {
-                MC_AWAIT(
-                    macoro::when_all_ready(
-                        mReceiver.preprocess(n, bytesPer, prng, chl, ole),
-                        mSender.preprocess(n, bytesPer, prng, chl2, ole))
-                );
-            }
-            MC_END();
-        }
+            PRNG& prng);
 
         template<typename T>
         macoro::task<> apply(
+            PermOp op,
             oc::MatrixView<const T> in,
             oc::MatrixView<T> out,
             coproto::Socket& chl,
-            OleGenerator& ole,
-            bool inv = false)
-        {
-            if (out.rows() != in.rows() ||
-                out.cols() != in.cols())
-                throw RTE_LOC;
-
-            if (out.rows() != mPerm.size())
-                throw RTE_LOC;
-
-            if (mPartyIdx > 1)
-                throw RTE_LOC;
-
-            MC_BEGIN(macoro::task<>, in, out, &chl, &ole, inv,
-                prng = oc::PRNG(ole.mPrng.get()),
-                this,
-                soutperm = oc::Matrix<T>{}
-            );
-
-            soutperm.resize(in.rows(), in.cols());
-            if ((inv ^ bool(mPartyIdx)) == true)
-            {
-                if (mIsSecure)
-                {
-                    MC_AWAIT(mReceiver.apply<T>(in, soutperm, prng, chl, ole));
-                    MC_AWAIT(mSender.apply<T>(mPerm, soutperm, out, prng, chl, inv, ole));
-                }
-                else
-                {
-                    MC_AWAIT(InsecurePerm::apply<T>(in, soutperm, prng, chl, ole));
-                    MC_AWAIT(InsecurePerm::apply<T>(mPerm, soutperm, out, prng, chl, inv, ole));
-                }
-            }
-            else
-            {
-                if (mIsSecure)
-                {
-                    MC_AWAIT(mSender.apply<T>(mPerm, in, soutperm, prng, chl, inv, ole));
-                    MC_AWAIT(mReceiver.apply<T>(soutperm, out, prng, chl, ole));
-                }
-                else
-                {
-                    MC_AWAIT(InsecurePerm::apply<T>(mPerm, in, soutperm, prng, chl, inv, ole));
-                    MC_AWAIT(InsecurePerm::apply<T>(soutperm, out, prng, chl, ole));
-                }
-            }
-
-            MC_END();
-        }
+            OleGenerator& ole);
 
     };
 
+
+
+    template<>
+    macoro::task<> ComposedPerm::apply<u8>(
+        PermOp op,
+        oc::MatrixView<const u8> in,
+        oc::MatrixView<u8> out,
+        coproto::Socket& chl,
+        OleGenerator& ole);
+
+    template<typename T>
+    macoro::task<> ComposedPerm::apply(
+        PermOp op,
+        oc::MatrixView<const T> in,
+        oc::MatrixView<T> out,
+        coproto::Socket& chl,
+        OleGenerator& ole)
+    {
+        return apply<u8>(op, matrixCast<const u8>(in), matrixCast<u8>(out), chl, ole);
+    }
 }

@@ -115,12 +115,12 @@ namespace secJoin
 
         {
             for (u64 i = 0; i < p.size(); ++i)
-                p.mPerm[i] = x0.mShare[i] ^ x1.mShare[i];
+                p.mPi[i] = x0.mShare[i] ^ x1.mShare[i];
         }
         // else
         //{
         //     for (u64 i = 0; i < p.size(); ++i)
-        //         p.mPerm[i] = x0.mShare[i] + x1.mShare[i];
+        //         p.mPi[i] = x0.mShare[i] + x1.mShare[i];
         // }
 
         // p.validate();

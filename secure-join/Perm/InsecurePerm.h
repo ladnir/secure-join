@@ -27,20 +27,20 @@ namespace secJoin
         template<typename T>
         static macoro::task<> apply(
             const Perm& pi,
+            PermOp op,
             oc::MatrixView<const T> x2,
             oc::MatrixView<T> sout,
             oc::PRNG& prng,
             coproto::Socket& chl,
-            bool invPerm,
             OleGenerator& ole);
 
         template<typename T>
         static macoro::task<> apply(
             const Perm& pi,
+            PermOp op,
             oc::MatrixView<T> sout,
             oc::PRNG& prng,
             coproto::Socket& chl,
-            bool invPerm,
             OleGenerator& ole);
     };
 
@@ -54,10 +54,7 @@ namespace secJoin
         coproto::Socket& chl,
         OleGenerator& ole)
     {
-        oc::MatrixView<u8> xx((u8*)x1.data(), x1.rows(), x1.cols() * sizeof(T));
-        oc::MatrixView<u8> oo((u8*)sout.data(), sout.rows(), sout.cols() * sizeof(T));
-
-        return apply<u8>(xx, oo, prng, chl, ole);
+        return apply<u8>(matrixCast<u8>(x1), matrixCast<u8>(sout), prng, chl, ole);
     }
 
     template<>
@@ -88,26 +85,25 @@ namespace secJoin
     template<typename T>
     macoro::task<> InsecurePerm::apply(
         const Perm& pi,
+        PermOp op,
         oc::MatrixView<T> sout,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        bool invPerm,
         OleGenerator& ole)
     {
-        oc::MatrixView<u8> oo((u8*)sout.data(), sout.rows(), sout.cols() * sizeof(T));
-        return apply<u8>(pi, oo, prng, chl, invPerm, ole);
+        return apply<u8>(pi, op, matrixCast<u8>(sout), prng, chl, ole);
     }
 
     template<>
     inline macoro::task<> InsecurePerm::apply<u8>(
         const Perm& pi,
+        PermOp op,
         oc::MatrixView<u8> sout,
         oc::PRNG&,
         coproto::Socket& chl,
-        bool invPerm,
         OleGenerator&)
     {
-        MC_BEGIN(macoro::task<>, &pi, &chl, sout, invPerm,
+        MC_BEGIN(macoro::task<>, &pi, &chl, sout,  op,
             o = oc::Matrix<u8>{}
         );
         if (sout.rows() != pi.size())
@@ -116,7 +112,7 @@ namespace secJoin
         o.resize(pi.size(), sout.cols());
         MC_AWAIT(chl.recv(o));
 
-        pi.apply<u8>(o, sout, invPerm);
+        pi.apply<u8>(o, sout, op);
 
         for (u64 i = 0; i < sout.size(); ++i)
             sout(i) ^= (0xcc ^ i) + i * 3;
@@ -132,43 +128,40 @@ namespace secJoin
     template<typename T>
     macoro::task<> InsecurePerm::apply(
         const Perm& pi,
+        PermOp op,
         oc::MatrixView<const T> x2,
         oc::MatrixView<T> sout,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        bool invPerm,
         OleGenerator& ole)
     {
-        oc::MatrixView<u8> xx((u8*)x2.data(), x2.rows(), x2.cols() * sizeof(T));
-        oc::MatrixView<u8> oo((u8*)sout.data(), sout.rows(), sout.cols() * sizeof(T));
-
-        return apply<u8>(pi, xx, oo, prng, chl, invPerm, ole);
+        return apply<u8>(pi, op, matrixCast<u8>(x2), matrixCast<u8>(sout), prng, chl, invPerm, ole);
     }
 
     template<>
     inline macoro::task<> InsecurePerm::apply<u8>(
         const Perm& pi,
+        PermOp op,
         oc::MatrixView<const u8> x2,
         oc::MatrixView<u8> sout,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        bool invPerm,
         OleGenerator& ole)
     {
 
-        MC_BEGIN(macoro::task<>, x2, &pi, &chl, sout, &prng, invPerm, &ole,
+        MC_BEGIN(macoro::task<>, x2, &pi, &chl, sout, &prng, op, &ole,
             n = u64(x2.rows()),
             bytesPerRow = u64(x2.cols()),
             x2Perm = oc::Matrix<u8>{}
         );
 
-        MC_AWAIT(InsecurePerm::apply<u8>(pi, sout, prng, chl, invPerm, ole));
+        MC_AWAIT(InsecurePerm::apply<u8>(pi, op, sout, prng, chl, ole));
         x2Perm.resize(x2.rows(), x2.cols());
 
         // Permuting the secret shares x2
         for (u64 i = 0; i < n; ++i)
         {
-            if (!invPerm)
+            if (op == PermOp::Regular)
                 memcpy(x2Perm.data(i), x2.data(pi[i]), bytesPerRow);
             else
                 memcpy(x2Perm.data(pi[i]), x2.data(i), bytesPerRow);
