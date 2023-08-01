@@ -51,11 +51,10 @@ namespace secJoin
         // the number of 128 chunks to evaluate
         u64 mN128 = 0;
 
-        // party index {0,1}
-        u64 mIdx = -1;
-
         // when setting the wires memory, this records how many remain unmapped.
         u64 mRemainingMappings = 0;
+
+        u64 mRole = -1;
 
         OtExtType mOtExtType;
         
@@ -74,9 +73,6 @@ namespace secJoin
         // the remaining gates to be evaluated.
         span<oc::BetaGate> mGates;
 
-        // randomness source.
-        oc::PRNG mPrng;
-
         // the index of the circuit to print if debugging is enabled.
         u64 mDebugPrintIdx = -1;
 
@@ -90,8 +86,12 @@ namespace secJoin
         // use correlations provided by ole.
         void init(
             u64 n,
-            const BetaCircuit& cir,
-            OleGenerator& ole);
+            const BetaCircuit& cir);
+
+        bool hasPreprocessing() const
+        {
+            return mCir.mNonlinearGateCount == 0 || mTriples.mSize;
+        }
 
         // set the i'th input. There should be mN rows of `input`, each row holding
         // mCur.mInput[i].size() bits (rounded up to 8 * sizeof(T)).
@@ -183,7 +183,11 @@ namespace secJoin
             }
         }
 
+        macoro::task<> preprocess(OleGenerator& gen, coproto::Socket& chl);
+
         // run the gmw protocol.
+        coproto::task<> run(OleGenerator& gen, coproto::Socket& chl);
+
         coproto::task<> run(coproto::Socket& chl);
 
         void getOutput(u64 i, BinMatrix& out)
@@ -235,9 +239,10 @@ namespace secJoin
         block* multSend(block* x, block* y, oc::GateType gt,
             block* a,
             block* c,
-            block* sendIter)
+            block* sendIter,
+            u64 idx)
         {
-            if (mIdx == 0)
+            if (idx == 0)
                 return multSendP1(x, y, gt, a, c, sendIter);
             else
                 return multSendP2(x, y, a, c, sendIter);
@@ -256,9 +261,10 @@ namespace secJoin
             block* b,
             block* c,
             block* d,
-            block* recvIter)
+            block* recvIter,
+            u64 idx)
         {
-            if (mIdx == 0)
+            if (idx == 0)
                 return multRecvP1(x, y, z, gt, b, c, d, recvIter);
             else
                 return multRecvP2(x, y, z, b, c, d, recvIter);

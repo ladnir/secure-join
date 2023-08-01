@@ -1045,7 +1045,7 @@ namespace secJoin
 
 
 
-            // The parties input x1 sharing of the u=(u0,u1) such that 
+            // The parties input a sharing of the u=(u0,u1) such that 
             // 
             //   u = u0 + u1 mod 3
             // 
@@ -1058,7 +1058,7 @@ namespace secJoin
             //   u0 1 | 1 0 0 
             //      2 | 0 0 1
             //   
-            // Logically, what we are going to do is x1 1-out-of-3
+            // Logically, what we are going to do is a 1-out-of-3
             // OT. The PrfSender with u0 will use select the row of
             // this table based on u0. For example, if u0=0 then the 
             // truth table reduces to
@@ -1069,14 +1069,14 @@ namespace secJoin
             // the element indexed bu u1. For example, they should pick up 
             // 1 iff u1 = 1.
             // 
-            // To maintain security, we need to give the PrfReceiver x1 sharing
-            // of this value, not the value itself. The PrfSender will pick x1 random mask
+            // To maintain security, we need to give the PrfReceiver a sharing
+            // of this value, not the value itself. The PrfSender will pick a random mask
             // 
             //   r
             // 
             // and then the PrfReceiver should learn that table above XOR r.
             // 
-            // We can build x1 1-out-of-3 OT from OLE. Each mod2 / 1-out-of-3 OT consumes 2 
+            // We can build a 1-out-of-3 OT from OLE. Each mod2 / 1-out-of-3 OT consumes 2 
             // binary OLE's. A single OLE consists of PrfSender holding 
             // 
             //     x0, y0
@@ -1086,7 +1086,7 @@ namespace secJoin
             //     x1, y1
             // 
             // such that (x0+x1) = (y0*y1). We will partially derandomize these
-            // by allowing the PrfSender to change their y0 to be x1 chosen
+            // by allowing the PrfSender to change their y0 to be a chosen
             // value, x0. This is done by sending
             // 
             //   d = (y1+x0)

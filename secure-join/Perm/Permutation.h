@@ -297,6 +297,11 @@ namespace secJoin
 			}
 		}
 
+
+		void clear()
+		{
+			mPi.clear();
+		}
 	};
 
 

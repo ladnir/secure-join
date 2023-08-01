@@ -60,6 +60,14 @@ namespace secJoin
             coproto::Socket& chl,
             OleGenerator& ole);
 
+
+        void clear()
+        {
+            mPartyIdx = -1;
+            mPi.clear();
+            mSender.clear();
+            mReceiver.clear();
+        }
     };
 
 

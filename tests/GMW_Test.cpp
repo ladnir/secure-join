@@ -177,8 +177,8 @@ namespace secJoin_Tests
         ole1.fakeInit(OleGenerator::Role::Receiver);
 
         auto cir = isZeroCircuit(bc);
-        cmp0.init(n * 128, cir, ole0);
-        cmp1.init(n * 128, cir, ole1);
+        cmp0.init(n * 128, cir);
+        cmp1.init(n * 128, cir);
 
         std::vector<block> a0(n), b0(n), c0(n), d0(n);
         //std::vector<block> a1(n), b1(n), c1(n), d1(n);
@@ -250,8 +250,8 @@ namespace secJoin_Tests
         ole1.fakeInit(OleGenerator::Role::Receiver);
 
         auto cir = isZeroCircuit(bc);
-        cmp0.init(n * 128, cir, ole0);
-        cmp1.init(n * 128, cir, ole1);
+        cmp0.init(n * 128, cir);
+        cmp1.init(n * 128, cir);
 
         std::vector<block> a0(n), b0(n), c0(n), d0(n);
         std::vector<block> a1(n), b1(n), c1(n), d1(n);
@@ -405,7 +405,7 @@ namespace secJoin_Tests
         OleGenerator ole;
         ole.fakeInit(OleGenerator::Role::Sender);
         Gmw gmw;
-        gmw.init(n, cir, ole);
+        gmw.init(n, cir);
 
         Matrix<u8> in(n, oc::divCeil(w, 8));
         Matrix<u8> out(n, oc::divCeil(w, 8));
@@ -430,7 +430,7 @@ namespace secJoin_Tests
         OleGenerator ole;
         ole.fakeInit(OleGenerator::Role::Sender);
         Gmw gmw;
-        gmw.init(n, cir, ole);
+        gmw.init(n, cir);
 
         Matrix<u8> in0(n, oc::divCeil(w, 8));
         Matrix<u8> in1(n, oc::divCeil(w, 8));
@@ -443,7 +443,7 @@ namespace secJoin_Tests
         gmw.setInput(0, in0);
         gmw.setInput(1, in1);
         coproto::Socket chl;
-        macoro::sync_wait(gmw.run(chl));
+        macoro::sync_wait(gmw.run(ole, chl));
         gmw.getOutput(0, out);
 
         for (u64 i = 0; i < out.size(); ++i)
@@ -475,8 +475,8 @@ namespace secJoin_Tests
         //ole1.init(OleGenerator::Role::Receiver, tp, chls[1], prng, 1 << 20, 1 << 20, 4);
 
         Gmw gmw0, gmw1;
-        gmw0.init(n, cir, ole0);
-        gmw1.init(n, cir, ole1);
+        gmw0.init(n, cir);
+        gmw1.init(n, cir);
 
         gmw0.mO.mDebug = true;
         gmw1.mO.mDebug = true;
@@ -497,8 +497,8 @@ namespace secJoin_Tests
         gmw1.setInput(0, sin0[1]);
         gmw1.setInput(1, sin1[1]);
 
-        auto p0 = gmw0.run(chls[0]);
-        auto p1 = gmw1.run(chls[1]);
+        auto p0 = gmw0.run(ole0, chls[0]);
+        auto p1 = gmw1.run(ole1, chls[1]);
         eval(p0, p1);
 
         gmw0.getOutput(0, out0);
@@ -553,8 +553,8 @@ namespace secJoin_Tests
         ole0.fakeInit(OleGenerator::Role::Sender);
         ole1.fakeInit(OleGenerator::Role::Receiver);
         Gmw gmw0, gmw1;
-        gmw0.init(n, cir, ole0);
-        gmw1.init(n, cir, ole1);
+        gmw0.init(n, cir);
+        gmw1.init(n, cir);
 
         gmw0.mO.mDebug = true;
         gmw1.mO.mDebug = true;
@@ -579,8 +579,8 @@ namespace secJoin_Tests
 
 
 
-        auto p0 = gmw0.run(sockets[0]);
-        auto p1 = gmw1.run(sockets[1]);
+        auto p0 = gmw0.run(ole0, sockets[0]);
+        auto p1 = gmw1.run(ole1, sockets[1]);
         eval(p0, p1);
 
         gmw0.getOutput(0, out0);
@@ -645,8 +645,8 @@ namespace secJoin_Tests
         ole0.fakeInit(OleGenerator::Role::Sender);
         ole1.fakeInit(OleGenerator::Role::Receiver);
         Gmw gmw0, gmw1;
-        gmw0.init(n, cir, ole0);
-        gmw1.init(n, cir, ole1);
+        gmw0.init(n, cir);
+        gmw1.init(n, cir);
 
         gmw0.mO.mDebug = true;
         gmw1.mO.mDebug = true;
@@ -667,8 +667,8 @@ namespace secJoin_Tests
         gmw1.setInput(0, sin0[1]);
         gmw1.setInput(1, sin1[1]);
 
-        auto p0 = gmw0.run(sockets[0]);
-        auto p1 = gmw1.run(sockets[1]);
+        auto p0 = gmw0.run(ole0, sockets[0]);
+        auto p1 = gmw1.run(ole1, sockets[1]);
         eval(p0, p1);
 
         gmw0.getOutput(0, out0);
@@ -724,8 +724,8 @@ namespace secJoin_Tests
         OleGenerator ole0, ole1;
         ole0.fakeInit(OleGenerator::Role::Sender);
         ole1.fakeInit(OleGenerator::Role::Receiver);
-        gmw0.init(n, cir, ole0);
-        gmw1.init(n, cir, ole1);
+        gmw0.init(n, cir);
+        gmw1.init(n, cir);
         gmw0.mO.mDebug = true;
         gmw1.mO.mDebug = true;
 
@@ -755,8 +755,8 @@ namespace secJoin_Tests
 
 
 
-        auto p0 = gmw0.run(sockets[0]);
-        auto p1 = gmw1.run(sockets[1]);
+        auto p0 = gmw0.run(ole0, sockets[0]);
+        auto p1 = gmw1.run(ole1, sockets[1]);
         eval(p0, p1);
 
         gmw0.getOutput(0, out0);
@@ -811,8 +811,8 @@ namespace secJoin_Tests
         OleGenerator ole0, ole1;
         ole0.fakeInit(OleGenerator::Role::Sender);
         ole1.fakeInit(OleGenerator::Role::Receiver);
-        gmw0.init(n, cir, ole0);
-        gmw1.init(n, cir, ole1);
+        gmw0.init(n, cir);
+        gmw1.init(n, cir);
         gmw0.mO.mDebug = true;
         gmw1.mO.mDebug = true;
         gmw0.mO.mDebug = true;
@@ -846,8 +846,8 @@ namespace secJoin_Tests
         gmw1.setInput(0, sin0[1]);
         gmw1.setInput(1, sin1[1]);
 
-        auto p0 = gmw0.run(sockets[0]);
-        auto p1 = gmw1.run(sockets[1]);
+        auto p0 = gmw0.run(ole0, sockets[0]);
+        auto p1 = gmw1.run(ole1, sockets[1]);
         eval(p0, p1);
 
         gmw0.getOutput(0, out0);
@@ -911,8 +911,8 @@ namespace secJoin_Tests
         ole0.fakeInit(OleGenerator::Role::Sender);
         ole1.fakeInit(OleGenerator::Role::Receiver);
 
-        gmw0.init(n, cir, ole0);
-        gmw1.init(n, cir, ole1);
+        gmw0.init(n, cir);
+        gmw1.init(n, cir);
         gmw0.mO.mDebug = true;
         gmw1.mO.mDebug = true;
 
@@ -921,8 +921,8 @@ namespace secJoin_Tests
         gmw1.setInput(0, sin0[1]);
         gmw1.setInput(1, sin1[1]);
 
-        auto p0 = gmw0.run(sockets[0]);
-        auto p1 = gmw1.run(sockets[1]);
+        auto p0 = gmw0.run(ole0, sockets[0]);
+        auto p1 = gmw1.run(ole1, sockets[1]);
         eval(p0, p1);
 
         gmw0.getOutput(0, sout[0]);
@@ -978,8 +978,8 @@ namespace secJoin_Tests
         ole0.fakeInit(OleGenerator::Role::Sender);
         ole1.fakeInit(OleGenerator::Role::Receiver);
 
-        gmw0.init(n, cir, ole0);
-        gmw1.init(n, cir, ole1);
+        gmw0.init(n, cir);
+        gmw1.init(n, cir);
         gmw0.mO.mDebug = true;
         gmw1.mO.mDebug = true;
 
@@ -989,8 +989,8 @@ namespace secJoin_Tests
         gmw1.setInput(0, sin0[1]);
         gmw1.setInput(1, sin1[1]);
 
-        auto p0 = gmw0.run(sockets[0]);
-        auto p1 = gmw1.run(sockets[1]);
+        auto p0 = gmw0.run(ole0, sockets[0]);
+        auto p1 = gmw1.run(ole1, sockets[1]);
         eval(p0, p1);
 
         gmw0.getOutput(0, sout[0]);

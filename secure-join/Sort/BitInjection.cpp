@@ -41,12 +41,40 @@ namespace secJoin
         }
     }
 
+
+
+    macoro::task<> BitInject::preprocess(
+        u64 n,
+        u64 inBitCount,
+        OleGenerator& gen,
+        coproto::Socket& sock)
+    {
+        MC_BEGIN(macoro::task<>, this, n, inBitCount, &gen, &sock);
+
+
+        mRole = (int)gen.mRole;
+        //if (n == 0 || inBitCount == 0)
+        //    throw RTE_LOC;
+
+        if (gen.mRole == OleGenerator::Role::Receiver)
+        {
+            MC_AWAIT_SET(mRecvReq, gen.otRecvRequest(n * inBitCount));
+        }
+        else
+        {
+            MC_AWAIT_SET(mSendReq, gen.otSendRequest(n * inBitCount));
+        }
+
+        mHasPreprocessing = true;
+        MC_END();
+    }
+
     // convert each bit of the binary secret sharing `in`
      // to integer Z_{2^outBitCount} arithmetic sharings.
      // Each row of `in` should have `inBitCount` bits.
      // out will therefore have dimension `in.rows()` rows 
      // and `inBitCount` columns.
-    macoro::task<> bitInjection(
+    macoro::task<> BitInject::bitInjection(
         u64 inBitCount,
         const oc::Matrix<u8>& in,
         u64 outBitCount,
@@ -54,11 +82,31 @@ namespace secJoin
         OleGenerator& gen,
         coproto::Socket& sock)
     {
-        MC_BEGIN(macoro::task<>, inBitCount, &in, outBitCount, &out, &sock, &gen,
+        MC_BEGIN(macoro::task<>, this, inBitCount, &in, outBitCount, &out, &gen, &sock);
+
+        if (hasPreprocessing() == false)
+            MC_AWAIT(preprocess(in.rows(), inBitCount, gen, sock));
+
+        MC_AWAIT(bitInjection(inBitCount, in, outBitCount, out, sock));
+
+        MC_END();
+    }
+
+    // convert each bit of the binary secret sharing `in`
+     // to integer Z_{2^outBitCount} arithmetic sharings.
+     // Each row of `in` should have `inBitCount` bits.
+     // out will therefore have dimension `in.rows()` rows 
+     // and `inBitCount` columns.
+    macoro::task<> BitInject::bitInjection(
+        u64 inBitCount,
+        const oc::Matrix<u8>& in,
+        u64 outBitCount,
+        oc::Matrix<u32>& out,
+        coproto::Socket& sock)
+    {
+        MC_BEGIN(macoro::task<>, this, inBitCount, &in, outBitCount, &out, &sock,
             in2 = oc::Matrix<u8>{},
             ec = macoro::result<void>{},
-            recvReq = Request<OtRecv>{},
-            sendReq = Request<OtSend>{},
             recvs = std::vector<OtRecv>{},
             send = OtSend{},
             i = u64{ 0 },
@@ -73,14 +121,17 @@ namespace secJoin
         out.resize(in.rows(), inBitCount);
         mask = outBitCount == 32 ? -1 : ((1 << outBitCount) - 1);
 
-        if (gen.mRole == OleGenerator::Role::Receiver)
+        if (mRole)
         {
-            MC_AWAIT_SET(recvReq, gen.otRecvRequest(in.rows() * inBitCount));
+            if (hasPreprocessing() == false)
+                throw RTE_LOC;
+            if (mRecvReq.mSize < in.rows() * inBitCount)
+                throw RTE_LOC;
 
             while (i < out.size())
             {
                 recvs.emplace_back();
-                MC_AWAIT_SET(recvs.back(), recvReq.get());
+                MC_AWAIT_SET(recvs.back(), mRecvReq.get());
 
                 m = std::min<u64>(recvs.back().size(), out.size() - i);
                 recvs.back().mChoice.resize(m);
@@ -130,11 +181,14 @@ namespace secJoin
         else
         {
 
-            MC_AWAIT_SET(sendReq, gen.otSendRequest(in.rows() * inBitCount));
+            if (hasPreprocessing() == false)
+                throw RTE_LOC;
+            if (mSendReq.mSize < in.rows() * inBitCount)
+                throw RTE_LOC;
 
             while (i < out.size())
             {
-                MC_AWAIT_SET(send, sendReq.get());
+                MC_AWAIT_SET(send, mSendReq.get());
 
                 m = std::min<u64>(send.size(), out.size() - i);
                 diff.resize(m);

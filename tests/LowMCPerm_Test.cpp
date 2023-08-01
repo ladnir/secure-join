@@ -33,8 +33,8 @@ void LocMC_eval_test(const oc::CLP& cmd)
     ole0.fakeInit(OleGenerator::Role::Sender);
     ole1.fakeInit(OleGenerator::Role::Receiver);
     Gmw gmw0, gmw1;
-    gmw0.init(n, cir, ole0);
-    gmw1.init(n, cir, ole1);
+    gmw0.init(n, cir);
+    gmw1.init(n, cir);
 
     gmw0.setInput(0, x);
     gmw0.setInput(1, x);
@@ -47,8 +47,8 @@ void LocMC_eval_test(const oc::CLP& cmd)
         gmw1.setZeroInput(i + 2);
     }
 
-    auto proto0 = gmw0.run(chls[0]);
-    auto proto1 = gmw1.run(chls[1]);
+    auto proto0 = gmw0.run(ole0, chls[0]);
+    auto proto1 = gmw1.run(ole1, chls[1]);
 
     auto res = macoro::sync_wait(macoro::when_all_ready(std::move(proto0), std::move(proto1)));
 

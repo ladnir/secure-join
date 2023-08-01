@@ -80,14 +80,11 @@ namespace secJoin
 
         TODO("change to apply reveal");
         // rho1 will resized() and initialed in the apply function
-        std::cout << (int)ole.mRole << " A::setup apply " << std::endl;
         rho1.resize(mShare.size(), 1);
         MC_AWAIT(mPi.apply<u32>(
             PermOp::Regular,
             oc::MatrixView<u32>(mShare.data(), mShare.size(), 1),
             rho1, chl, ole));
-
-        std::cout << (int)ole.mRole << "A::setup exchange " << std::endl;
 
         // Exchanging the [Rho]
         if (mPi.mPartyIdx == 0)
@@ -150,7 +147,6 @@ namespace secJoin
         }
 
         mIsSetup = true;
-        std::cout << (int)ole.mRole << " A::setup done " << std::endl;
 
         MC_END();
     }
@@ -163,6 +159,19 @@ namespace secJoin
         if (out.cols() != oc::divCeil(out.bitsPerEntry(), 8))
             throw RTE_LOC;
         return apply<u8>(op, in.mData, out.mData, prng, chl, ole);
+    }
+
+    macoro::task<> AdditivePerm::compose(
+        AdditivePerm& pi,
+        AdditivePerm& dst,
+        oc::PRNG& prng,
+        coproto::Socket& chl,
+        OleGenerator& gen)
+    {
+        if (pi.size() != size())
+            throw RTE_LOC;
+        dst.init(size());
+        return apply<u32>(PermOp::Regular, pi.mShare, dst.mShare, prng, chl, gen);
     }
 
     macoro::task<> AdditivePerm::composeSwap(

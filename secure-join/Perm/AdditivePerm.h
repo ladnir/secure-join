@@ -90,6 +90,13 @@ namespace secJoin
             OleGenerator& gen);
 
 
+        macoro::task<> compose(
+            AdditivePerm& pi,
+            AdditivePerm& dst,
+            oc::PRNG& prng,
+            coproto::Socket& chl,
+            OleGenerator& gen);
+
 
         template <typename T>
         macoro::task<> mockApply(
@@ -108,6 +115,17 @@ namespace secJoin
             OleGenerator& ole,
             oc::PRNG& prng);
 
+        bool hasSetup(u64 bytes) const
+        {
+            return mPi.mSender.hasSetup(bytes + sizeof(u32) * !mIsSetup);
+        }
+
+        void clear()
+        {
+            mPi.clear();
+            mRho.clear();
+            mShare.clear();
+        }
     };
 
 
@@ -160,11 +178,8 @@ namespace secJoin
             MC_AWAIT(setup(chl, ole, prng));
 
 
-        std::cout << (int)ole.mRole << " A::apply main " << std::endl;
-
         MC_AWAIT(chl.send(std::move(tt)));
         MC_AWAIT(chl.recv(tt));
-        std::cout << (int)ole.mRole << " A::apply main recv " << std::endl;
 
         if (op == PermOp::Inverse)
         {
@@ -179,7 +194,6 @@ namespace secJoin
             mRho.apply<T>(in, temp, PermOp::Regular);
             MC_AWAIT(mPi.apply<T>(PermOp::Inverse, temp, out, chl, ole));
         }
-        std::cout << (int)ole.mRole << " A::apply done  " << std::endl;
 
         MC_END();
     }

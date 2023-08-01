@@ -46,6 +46,7 @@ namespace secJoin
 
         mSender.setPermutation(mPi);
         //chl2 = chl.fork();
+        TODO("parallel");
         if ((int)ole.mRole)
         {
             //MC_AWAIT(
@@ -103,11 +104,8 @@ namespace secJoin
         {
             if (mIsSecure)
             {
-                std::cout << (int)ole.mRole << " C:apply 1 "  << std::endl;
                 MC_AWAIT(mReceiver.apply<u8>(op, in, soutperm, prng, chl, ole));
-                std::cout << (int)ole.mRole << " C:apply 2 " << std::endl;
                 MC_AWAIT(mSender.apply<u8>(op, soutperm, out, prng, chl, ole));
-                std::cout << (int)ole.mRole << " C:apply done " << std::endl;
             }
             else
             {
@@ -119,11 +117,8 @@ namespace secJoin
         {
             if (mIsSecure)
             {
-                std::cout << (int)ole.mRole << " C:apply 1 " << std::endl;
                 MC_AWAIT(mSender.apply<u8>(op, in, soutperm, prng, chl, ole));
-                std::cout << (int)ole.mRole << " C:apply 2 " << std::endl;
                 MC_AWAIT(mReceiver.apply<u8>(op, soutperm, out, prng, chl, ole));
-                std::cout << (int)ole.mRole << " C:apply done " << std::endl;
             }
             else
             {

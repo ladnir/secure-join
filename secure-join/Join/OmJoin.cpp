@@ -138,12 +138,12 @@ namespace secJoin
         {
             memcpy(sKeys.data(i + 1), data.data(i) + keyByteOffset, keyByteSize);
         }
-        bin.init(n, cir, ole);
+        bin.init(n, cir);
 
         bin.setInput(0, sKeys.subMatrix(0, n));
         bin.setInput(1, sKeys.subMatrix(1, n));
 
-        MC_AWAIT(bin.run(sock));
+        MC_AWAIT(bin.run(ole, sock));
 
         out.resize(n, 1);
         bin.getOutput(0, out);
@@ -415,7 +415,7 @@ namespace secJoin
             offset = u64{});
 
         cir = *oc::BetaLibrary{}.int_int_bitwiseAnd(1, 1, 1);
-        gmw.init(data.rows(), cir, ole);
+        gmw.init(data.rows(), cir);
 
         if (data.bitsPerEntry() % 8 != 1)
         {
@@ -434,7 +434,7 @@ namespace secJoin
         offsets.emplace_back(Offset{ 0,1 });
         //MC_AWAIT(print(temp, choice, sock, (int)ole.mRole, "active", offsets));
 
-        MC_AWAIT(gmw.run(sock));
+        MC_AWAIT(gmw.run(ole, sock));
 
         gmw.getOutput(0, temp);
 
@@ -500,7 +500,7 @@ namespace secJoin
         sPerm.mInsecureMock = mInsecureMockSubroutines;
 
         // get the stable sorting permutation sPerm
-        MC_AWAIT(sort.genPerm(keys, sPerm, ole, sock));
+        MC_AWAIT(sort.genPerm(keys, sPerm, ole, sock,prng));
         setTimePoint("sort");
 
         //std::cout << "genPerm done " << LOCATION << std::endl;

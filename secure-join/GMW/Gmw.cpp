@@ -10,15 +10,12 @@
 namespace secJoin
 {
     using PRNG = oc::PRNG;
+
     void Gmw::init(
         u64 n,
-        const BetaCircuit& cir,
-        OleGenerator& gen)
+        const BetaCircuit& cir)
     {
-        mIdx = gen.mRole == OleGenerator::Role::Sender ? 1 : 0;
         mN = n;
-        //mGen = &gen;
-        mTriples = macoro::sync_wait(gen.binOleRequest(2 * cir.mNonlinearGateCount * oc::roundUpTo(mN, 128)));
 
         mCir = cir;
         mN128 = oc::divCeil(mN, 128);
@@ -34,7 +31,6 @@ namespace secJoin
         mMem.clear();
         //memset(mWords.data(), 0, mWords.size() * sizeof(*mWords.data()));
 
-        mPrng.SetSeed(gen.mPrng.get());
         mPrint = mCir.mPrints.begin();
     }
 
@@ -65,31 +61,6 @@ namespace secJoin
         oc::MatrixView<u8> memView = getInputView(i);
         memset(memView.data(), 0, memView.size());
     }
-
-    //coproto::task<> Gmw::run(coproto::Socket& chl)
-    //{
-    //    MC_BEGIN(coproto::task<>, this, &chl, i = u64{});
-
-    //    if (mO.mDebug)
-    //    {
-    //        mO.mWords.resize(mWords.rows(), mN128);
-
-    //        MC_AWAIT(chl.send(coproto::copy(mWords)));
-    //        MC_AWAIT(chl.recv(mO.mWords));
-
-    //        for (i = 0; i < mWords.size(); i++)
-    //        {
-    //            mO.mWords(i) = mO.mWords(i) ^ mWords(i);
-    //        }
-    //    }
-
-    //    mRoundIdx = 0;
-
-    //    for (i = 0; i < numRounds(); ++i)
-    //        MC_AWAIT(roundFunction(chl));
-
-    //    MC_END();
-    //}
 
     void Gmw::implGetOutput(u64 i, oc::MatrixView<u8> out, u64 alignment)
     {
@@ -148,19 +119,19 @@ namespace secJoin
         }
         else
         {
-            static_assert(std::is_nothrow_move_constructible<oc::Matrix<block>>::value,"assumes");
+            static_assert(std::is_nothrow_move_constructible<oc::Matrix<block>>::value, "assumes");
             block* old = nullptr;
-            if(mMem.size())
+            if (mMem.size())
                 old = mMem.back().data();
             mMem.emplace_back();
 
-            if(old && old != (mMem.end() - 2)->data())
+            if (old && old != (mMem.end() - 2)->data())
                 throw RTE_LOC;
-                
+
             mMem.back().resize(wires.size(), mN128, oc::AllocType::Uninitialized);
             for (u64 j = 0; j < wires.size(); ++j)
             {
-                  map(wires[j], mMem.back()[j].data());
+                map(wires[j], mMem.back()[j].data());
                 //mWords[] =;
             }
         }
@@ -169,98 +140,18 @@ namespace secJoin
         return memView;
     }
 
-    //void Gmw::genSilentTriples(u64 batchSize, u64 numThreads)
-    //{
+    macoro::task<> Gmw::preprocess(OleGenerator& gen, coproto::Socket& chl)
+    {
+        MC_BEGIN(macoro::task<>, this, &gen, &chl);
 
-    //    mSilent.init(mNumOts, batchSize, numThreads, Mode::Dual, mPrng.get());
-    //    mSilent.requiredBaseOts()
-    //}
+        if (mCir.mGates.size() == 0)
+            throw std::runtime_error("init(...) must be called first. " LOCATION);
 
-//    coproto::task<> Gmw::generateTriple(
-//        u64 batchSize,
-//        u64 numThreads,
-//        coproto::Socket& chl)
-//    {
-//        MC_BEGIN(coproto::task<>, this, &tg = mSilent, batchSize, numThreads, &chl,
-//            A2 = std::vector<block>{},
-//            B2 = std::vector<block>{},
-//            C2 = std::vector<block>{},
-//            D2 = std::vector<block>{},
-//            mid = mNumOts / 128 / 2
-//        );
-//
-//        if (mNumOts == 0)
-//            MC_RETURN_VOID();
-//
-//        setTimePoint("Gmw::generateTriple begin");
-//        if (mTimer)
-//            tg.setTimer(*mTimer);
-//
-//        tg.init(mNumOts, batchSize, numThreads, mIdx ? Mode::Receiver : Mode::Sender, mPrng.get());
-//
-//#ifndef SECUREJOIN_ENABLE_FAKE_GEN
-//
-//        if (tg.hasBaseOts() == false)
-//            MC_AWAIT(tg.generateBaseOts(mIdx, mPrng, chl));
-//#endif
-//
-//        MC_AWAIT(tg.expand(chl));
-//        if (mIdx)
-//        {
-//            mA = tg.mMult.subspan(0, mid);
-//            mC = tg.mMult.subspan(mid);
-//            mC2 = tg.mMult.subspan(mid);
-//            mB = tg.mAdd.subspan(0, mid);
-//            mD = tg.mAdd.subspan(mid);
-//        }
-//        else
-//        {
-//            mA = tg.mMult.subspan(mid);
-//            mC = tg.mMult.subspan(0, mid);
-//            mC2 = tg.mMult.subspan(0, mid);
-//            mB = tg.mAdd.subspan(mid);
-//            mD = tg.mAdd.subspan(0, mid);
-//        }
-//
-//        if (mO.mDebug)
-//        {
-//
-//            A2.resize(mA.size());
-//            B2.resize(mA.size());
-//            C2.resize(mA.size());
-//            D2.resize(mA.size());
-//
-//            MC_AWAIT(chl.send(coproto::copy(mA)));
-//            MC_AWAIT(chl.send(coproto::copy(mB)));
-//            MC_AWAIT(chl.send(coproto::copy(mC)));
-//            MC_AWAIT(chl.send(coproto::copy(mD)));
-//
-//            MC_AWAIT(chl.recv(A2));
-//            MC_AWAIT(chl.recv(B2));
-//            MC_AWAIT(chl.recv(C2));
-//            MC_AWAIT(chl.recv(D2));
-//
-//            for (u64 i = 0; i < mA.size(); ++i)
-//            {
-//                if (neq((mA[i] & C2[i]) ^ mB[i], D2[i]))
-//                {
-//                    std::cout << "bad triple at 0." << i << ", n " << mNumOts << std::endl;
-//                    throw std::runtime_error("");
-//                }
-//
-//                if (neq((A2[i] & mC[i]) ^ B2[i], mD[i]))
-//                {
-//                    std::cout << "bad triple at 1." << i << ", n " << mNumOts << std::endl;
-//                    throw std::runtime_error("");
-//                }
-//
-//            }
-//        }
-//
-//        setTimePoint("Gmw::generateTriple end");
-//        MC_END();
-//    }
-//
+        mRole = (int)gen.mRole;
+        MC_AWAIT_SET(mTriples, 
+            gen.binOleRequest(2 * mCir.mNonlinearGateCount * oc::roundUpTo(mN, 128), 0, chl.mId));
+        MC_END();
+    }
 
     // The basic protocol where the inputs are not shared:
     // Sender has 
@@ -298,9 +189,21 @@ namespace secJoin
     // Recver outputs: z2 = x2y2 + z12 + z22 
     //                    = x2y2 + r1 + r2
     //                    = x2y2 + r
+    coproto::task<> Gmw::run(OleGenerator& gen, coproto::Socket& chl)
+    {
+        MC_BEGIN(coproto::task<>, this, &chl, &gen);
+
+        if (hasPreprocessing() == false)
+            MC_AWAIT(preprocess(gen, chl));
+
+        MC_AWAIT(run(chl));
+
+        MC_END();
+    }
+
     coproto::task<> Gmw::run(coproto::Socket& chl)
     {
-        MC_BEGIN(coproto::task<>, this, &chl,
+        MC_BEGIN(coproto::task<>, this, &chl, 
             gates = span<oc::BetaGate>{},
             gate = span<oc::BetaGate>::iterator{},
             dirtyBits = std::vector<u8>{},
@@ -324,11 +227,13 @@ namespace secJoin
             batchSize = 1ull << 14
         );
 
-        if (mIdx == ~0ull)
+        if (mCir.mGates.size() == 0ull)
             throw std::runtime_error("Gmw::init(...) was not called");
 
-        finalizeMapping();
+        if (hasPreprocessing() == false)
+            throw std::runtime_error("Gmw::run was called with no preprocessing or OleGenerator. " LOCATION);
 
+        finalizeMapping();
         if (mO.mDebug)
         {
             mO.mWords.resize(mWords.size(), mN128);
@@ -386,7 +291,7 @@ namespace secJoin
                 auto min = std::min<u64>(a.size() - j, add.size() / 2);
 
                 span<block> aa, bb, cc, dd;
-                if (mIdx == 0)
+                if (mRole)
                 {
                     aa = mult.subspan(0, min);
                     cc = mult.subspan(min, min);
@@ -467,8 +372,12 @@ namespace secJoin
                         buffIter = buff.data();
                     }
 
-
-                    buffIter = multSend(in[0], in[1], gate->mType, a.data() + j, c.data() + j, buffIter);
+                    buffIter = multSend(
+                        in[0], in[1], 
+                        gate->mType, 
+                        a.data() + j, 
+                        c.data() + j, 
+                        buffIter, mRole);
 
                     j += mN128;
 
@@ -490,7 +399,7 @@ namespace secJoin
                     for (u64 i = 0; i < mN128; ++i)
                         out[i] = in[0][i] ^ in[1][i];
 
-                    if (gate->mType == oc::GateType::Nxor && mIdx == 0)
+                    if (gate->mType == oc::GateType::Nxor && mRole)
                     {
                         for (u64 i = 0; i < mN128; ++i)
                             out[i] = out[i] ^ oc::AllOneBlock;
@@ -530,7 +439,9 @@ namespace secJoin
                     buffIter = multRecv(in[0], in[1], out, gate->mType,
                         b.data() + j,
                         c.data() + j,
-                        d.data() + j, buffIter);
+                        d.data() + j, 
+                        buffIter, mRole);
+
                     j += mN128;
                 }
             }
@@ -545,7 +456,7 @@ namespace secJoin
                         mDebugPrintIdx < mN &&
                         mPrint != mCir.mPrints.end() &&
                         mPrint->mGateIdx <= gIdx &&
-                        mIdx)
+                        mRole)
                     {
                         auto wireIdx = mPrint->mWire;
                         auto invert = mPrint->mInvert;
@@ -620,7 +531,7 @@ namespace secJoin
                     print(mCir.mGates.size());
                 }
 
-                ww.resize(mWords.size()* mN128);
+                ww.resize(mWords.size() * mN128);
                 for (u64 i = 0; i < mWords.size(); ++i)
                     for (u64 j = 0; j < mN128; ++j)
                         ww[i * mN128 + j] = mWords[i][j];
@@ -642,7 +553,7 @@ namespace secJoin
                             auto row = i;
                             auto col = j;
 
-                            oc::lout << "p" << mIdx << " mem[" << row << ", " << col <<
+                            oc::lout << "p" << mRole << " mem[" << row << ", " << col <<
                                 "] exp: " << exp <<
                                 ", act: " << act <<
                                 "\ndiff:" << (exp ^ act) << std::endl;

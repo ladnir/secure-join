@@ -361,7 +361,7 @@ namespace secJoin
                     parent.mSufBit.resize(size, 1, 2 * sizeof(block));
                 }
 
-                bin.init(size, cir, gen);
+                bin.init(size, cir);
 
                 u64 inIdx = 0, outIdx = 0;
                 if (type & Type::Prefix)
@@ -385,7 +385,7 @@ namespace secJoin
             }
 
             // eval
-            MC_AWAIT(bin.run(comm));
+            MC_AWAIT(bin.run(gen, comm));
 
 
             if (size != 1)
@@ -627,7 +627,7 @@ namespace secJoin
                 auto& children = levels[cLvl];
 
 
-                bin.init(size, nodeCir, gen);
+                bin.init(size, nodeCir);
 
                 u64 inIdx = 0, outIdx = 0;
                 if (type & Type::Prefix)
@@ -664,7 +664,7 @@ namespace secJoin
             }
 
             // eval
-            MC_AWAIT(bin.run(comm));
+            MC_AWAIT(bin.run(gen, comm));
 
             // for unit testing, we want to save these intermediate values.
             if (debugLevels)

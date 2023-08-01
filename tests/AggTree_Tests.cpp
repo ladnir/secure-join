@@ -40,7 +40,7 @@ void eval(BetaCircuit& cir,
         for (u64 i = 0; i < 2; ++i)
         {
             gen[i].fakeInit((OleGenerator::Role)i);
-            bin[i].init(numShares, cir, gen[i]);
+            bin[i].init(numShares, cir);
         }
 
         for (u64 i = 0; i < numInputs; ++i)
@@ -65,8 +65,8 @@ void eval(BetaCircuit& cir,
         }
 
         auto mR = macoro::sync_wait(macoro::when_all_ready(
-            bin[0].run(comm[0]),
-            bin[1].run(comm[1])
+            bin[0].run(gen[0], comm[0]),
+            bin[1].run(gen[1], comm[1])
         ));
 
         std::get<0>(mR).result();

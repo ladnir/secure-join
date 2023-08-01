@@ -4,6 +4,7 @@
 #include "secure-join/Perm/AdditivePerm.h"
 #include "secure-join/Defines.h"
 #include "secure-join/OleGenerator.h"
+#include "secure-join/Sort/BitInjection.h"
 
 #include "cryptoTools/Circuit/BetaLibrary.h"
 #include "cryptoTools/Common/Log.h"
@@ -37,40 +38,68 @@ namespace secJoin
         // mock the sorting protocol (insecure).
         bool mInsecureMock = false;
 
+        bool mHasPreprocessing = false;
+
+        u64 mL = 2;
+
+        u64 mRole = -1;
+
+        u64 mIndexToOneHotCircuitBitCount = 0;
+        oc::BetaCircuit mIndexToOneHotCircuit;
+        oc::BetaCircuit mArith2BinCir;
+
+
+        std::vector<AdditivePerm> mPerms;
+        std::vector<BitInject> mBitInjects;
+        std::vector<Gmw> mIndexToOneHotGmw, mArithToBinGmw;
+        std::vector<Request<OtRecv>> mHadamardSumRecvOts;
+        std::vector<Request<OtSend>> mHadamardSumSendOts;
+
+        macoro::task<> preprocess(
+            u64 n, 
+            u64 bitCount,
+            OleGenerator& gen,
+            coproto::Socket& comm,
+            oc::PRNG& prng);
+
         using Matrix32 = oc::Matrix<u32>;
 
         RadixSort() = default;
         RadixSort(RadixSort&&) = default;
-        oc::BetaCircuit mArith2BinCir;
+
+        bool hasPreprocessing()
+        {
+            return mHasPreprocessing;
+        }
 
         // compute dst = sum_i f.col(i) * s.col(i) where * 
         // is the hadamard (component-wise) product. 
         macoro::task<> hadamardSum(
+            u64 round,
             BinMatrix& f,
             Matrix32& s,
             AdditivePerm& dst,
-            OleGenerator& gen,
             coproto::Socket& comm);
         // from each row, we generate a series of sharing flag bits
         // f.col(0) ,..., f.col(n) where f.col(i) is one if k=i.
         // Computes the same function as genValMask but is more efficient
         // due to the use a binary secret sharing.
         macoro::task<> genValMasks2(
+            u64 round,
             u64 bitCount,
             const BinMatrix& k,
             Matrix32& f,
             BinMatrix& fBin,
-            OleGenerator& gen,
             coproto::Socket& comm);
 
 
         // Generate a permutation dst which will be the inverse of the
         // permutation that permutes the keys k into sorted order. 
         macoro::task<> genBitPerm(
+            u64 round,
             u64 keyBitCount,
             const BinMatrix& k,
             AdditivePerm& dst,
-            OleGenerator& gen,
             coproto::Socket& comm);
 
 
@@ -79,13 +108,13 @@ namespace secJoin
         BinMatrix extract(u64 begin, u64 size, const BinMatrix& k);
 
 
-        u64 mL = 2;
         // generate the (inverse) permutation that sorts the keys k.
         macoro::task<> genPerm(
             const BinMatrix& k,
             AdditivePerm& dst,
             OleGenerator& gen,
-            coproto::Socket& comm);
+            coproto::Socket& comm, 
+            oc::PRNG& prng);
 
         //// sort `src` based on the key `k`. The sorted values are written to `dst`
         //// and the sorting (inverse) permutation is written to `dstPerm`.
@@ -108,12 +137,21 @@ namespace secJoin
 
         // this circuit takes as input a index i\in {0,1}^L and outputs
         // a binary vector o\in {0,1}^{2^L} where is one at index i.
-        static oc::BetaCircuit indexToOneHotCircuit(u64 L);
+        void initIndexToOneHotCircuit(u64 L);
 
+
+        void initArith2BinCircuit(u64 n);
 
         // compute a running sum. replace each element f(i,j) with the sum all previous 
         // columns f(*,1),...,f(*,j-1) plus the elements of f(0,j)+....+f(i-1,j).
         static void aggregateSum(const Matrix32& f, Matrix32& s, u64 partyIdx);
+
+        macoro::task<> hadamardSumPreprocess(
+            u64 size,
+            OleGenerator& gen,
+            coproto::Socket&,
+            Request<OtRecv>&,
+            Request<OtSend>&);
 
         macoro::task<> mockSort(
             const BinMatrix& k,

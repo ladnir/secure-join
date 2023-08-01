@@ -311,7 +311,7 @@ namespace secJoin
 
             {
 
-                bin.init(size, cir, gen);
+                bin.init(size, cir);
 
                 int inIdx = 0;
                 // the input values v for each leaf node.
@@ -350,7 +350,7 @@ namespace secJoin
                 }
             }
 
-            MC_AWAIT(bin.run(comm));
+            MC_AWAIT(bin.run(gen, comm));
 
             {
                 BinMatrix leftOut(size, bitsPerEntry), rghtOut(size, bitsPerEntry);

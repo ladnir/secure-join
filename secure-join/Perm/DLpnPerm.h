@@ -27,6 +27,19 @@ namespace secJoin
         DLpnPermSender& operator=(const DLpnPermSender&) = default;
         DLpnPermSender& operator=(DLpnPermSender&&) noexcept = default;
 
+
+
+        void clear()
+        {
+            mHasPreprocess = false;
+            mPrePerm.clear();
+            mPi = nullptr;
+            mPermStorage.clear();
+            mDelta.resize(0, 0);
+            mSetupSize = 0;
+            mHasPreprocess = 0;
+        }
+
         void setPermutation(Perm&& p)
         {
             mPermStorage = std::move(p);
@@ -139,6 +152,15 @@ namespace secJoin
         void setKeyOts(oc::block& key, std::vector<oc::block>& rk);
         macoro::task<> genKeyOts(OleGenerator& ole, coproto::Socket& chl);
 
+
+        void clear()
+        {
+            mA.resize(0, 0);
+            mB.resize(0, 0);
+            mByteOffset = 0;
+            mSetupSize = 0;
+            mHasPreprocess = 0;
+        }
 
         // Receiver apply: permute a secret shared input x by the other party's pi and get shares as output
         template <typename T>
