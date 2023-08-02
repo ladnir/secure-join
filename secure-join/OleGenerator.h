@@ -15,74 +15,12 @@
 #include "macoro/thread_pool.h"
 #include "macoro/channel_spsc.h"
 #include "macoro/manual_reset_event.h"
+#include "secure-join/CorGenerator/Correlations.h"
 
 namespace secJoin
 {
     class OleGenerator;
     using SessionID = coproto::SessionID;
-    struct OtSend
-    {
-        OtSend() = default;
-        OtSend(const OtSend&) = delete;
-        OtSend& operator=(const OtSend&) = delete;
-        OtSend(OtSend&&) = default;
-        OtSend& operator=(OtSend&&) = default;
-
-        oc::AlignedUnVector<std::array<oc::block, 2>> mMsg;
-        u64 size() const
-        {
-            return mMsg.size();
-        }
-    };
-
-    struct OtRecv
-    {
-
-        OtRecv() = default;
-        OtRecv(const OtRecv&) = delete;
-        OtRecv& operator=(const OtRecv&) = delete;
-        OtRecv(OtRecv&&) = default;
-        OtRecv& operator=(OtRecv&&) = default;
-
-        oc::BitVector mChoice;
-        oc::AlignedUnVector<oc::block> mMsg;
-
-        u64 size() const
-        {
-            return mMsg.size();
-        }
-    };
-
-    struct BinOle
-    {
-
-        BinOle() = default;
-        BinOle(const BinOle&) = delete;
-        BinOle& operator=(const BinOle&) = delete;
-        BinOle(BinOle&&) = default;
-        BinOle& operator=(BinOle&&) = default;
-
-        oc::AlignedUnVector<oc::block> mMult, mAdd;
-        u64 size() const
-        {
-            return mMult.size() * 128;
-        }
-    };
-
-    struct ArithTriple {
-
-
-        //ArithTriple() = default;
-        //ArithTriple(const ArithTriple&) = delete;
-        //ArithTriple& operator=(const ArithTriple&) = delete;
-        //ArithTriple(ArithTriple&&) = default;
-        //ArithTriple& operator=(ArithTriple&&) = default;
-
-        u64 mBitCount = 0;
-        oc::AlignedUnVector<u32> mA, mB, mC;
-
-        u64 size() { return mA.size(); }
-    };
 
 
     struct CorRequest
@@ -541,10 +479,10 @@ namespace secJoin
         {
             return request<OtSend>(numCorrelations, OtSend{}, reservoirSize, sessionID);
         }
-        macoro::task<Request<ArithTriple>> arithTripleRequest(u64 numCorrelations, u64 bitCount, u64 reservoirSize = 0, SessionID sessionID = SessionID::root())
-        {
-            return request<ArithTriple>(numCorrelations, ArithTriple{ bitCount }, reservoirSize, sessionID);
-        }
+        //macoro::task<Request<ArithTriple>> arithTripleRequest(u64 numCorrelations, u64 bitCount, u64 reservoirSize = 0, SessionID sessionID = SessionID::root())
+        //{
+        //    return request<ArithTriple>(numCorrelations, ArithTriple{ bitCount }, reservoirSize, sessionID);
+        //}
 
         void log(std::string m)
         {

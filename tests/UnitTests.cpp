@@ -19,12 +19,17 @@
 #include "AggTree_Tests.h"
 #include "OmJoin_Test.h"
 #include "CWrapper_Test.h"
+#include "CorGenerator_Test.h"
 
 namespace secJoin_Tests
 {
     oc::TestCollection Tests(
         [](oc::TestCollection& t)
         {
+
+
+            t.add("CorGenerator_Ot_Test                          ", CorGenerator_Ot_Test);
+            t.add("CorGenerator_BinOle_Test                      ", CorGenerator_BinOle_Test);
             t.add("Generator_BinOle_Test                         ", Generator_BinOle_Test);
             t.add("Generator_Ot_Test                             ", Generator_Ot_Test);
             t.add("Generator_ArithTriple_Test                    ", Generator_ArithTriple_Test);

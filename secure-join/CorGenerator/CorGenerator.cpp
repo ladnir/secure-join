@@ -1,0 +1,1 @@
+#include "CorGenerator.h"

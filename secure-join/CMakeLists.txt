@@ -6,6 +6,11 @@ set(SRCS
     "Prf/DarkMatter22Prf.cpp"
 
     "OleGenerator.cpp"
+
+    "CorGenerator/CorGenerator.cpp"
+    "CorGenerator/OtGenerator.cpp"
+    "CorGenerator/BinOleGenerator.cpp"
+
     
     "Perm/Permutation.cpp"
     "Perm/ComposedPerm.cpp"
