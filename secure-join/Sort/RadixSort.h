@@ -3,7 +3,7 @@
 #include "secure-join/Perm/ComposedPerm.h"
 #include "secure-join/Perm/AdditivePerm.h"
 #include "secure-join/Defines.h"
-#include "secure-join/OleGenerator.h"
+#include "secure-join/CorGenerator/CorGenerator.h"
 #include "secure-join/Sort/BitInjection.h"
 
 #include "cryptoTools/Circuit/BetaLibrary.h"
@@ -52,13 +52,13 @@ namespace secJoin
         std::vector<AdditivePerm> mPerms;
         std::vector<BitInject> mBitInjects;
         std::vector<Gmw> mIndexToOneHotGmw, mArithToBinGmw;
-        std::vector<Request<OtRecv>> mHadamardSumRecvOts;
-        std::vector<Request<OtSend>> mHadamardSumSendOts;
+        std::vector<OtRecvGenerator> mHadamardSumRecvOts;
+        std::vector<OtSendGenerator> mHadamardSumSendOts;
 
         macoro::task<> preprocess(
             u64 n, 
             u64 bitCount,
-            OleGenerator& gen,
+            CorGenerator& gen,
             coproto::Socket& comm,
             oc::PRNG& prng);
 
@@ -112,7 +112,7 @@ namespace secJoin
         macoro::task<> genPerm(
             const BinMatrix& k,
             AdditivePerm& dst,
-            OleGenerator& gen,
+            CorGenerator& gen,
             coproto::Socket& comm, 
             oc::PRNG& prng);
 
@@ -122,7 +122,7 @@ namespace secJoin
         //	u64 keyBitCount,
         //	const BinMatrix& k,
         //	const BinMatrix& src,
-        //	OleGenerator& gen,
+        //	CorGenerator& gen,
         //	coproto::Socket& comm);
 
         //// sort `src` based on the key `k`. The sorted values are written to `dst`
@@ -132,7 +132,7 @@ namespace secJoin
         //	const BinMatrix& src,
         //	BinMatrix& dst,
         //	ComposedPerm& dstPerm,
-        //	OleGenerator& gen,
+        //	CorGenerator& gen,
         //	coproto::Socket& comm);
 
         // this circuit takes as input a index i\in {0,1}^L and outputs
@@ -148,15 +148,16 @@ namespace secJoin
 
         macoro::task<> hadamardSumPreprocess(
             u64 size,
-            OleGenerator& gen,
+            CorGenerator& gen,
             coproto::Socket&,
-            Request<OtRecv>&,
-            Request<OtSend>&);
+            OtRecvGenerator&,
+            OtSendGenerator&,
+            oc::PRNG& prng);
 
         macoro::task<> mockSort(
             const BinMatrix& k,
             AdditivePerm& dst,
-            OleGenerator& ole,
+            CorGenerator& ole,
             coproto::Socket& comm);
 
         macoro::task<> checkHadamardSum(

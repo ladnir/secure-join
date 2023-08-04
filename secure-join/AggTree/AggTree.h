@@ -9,7 +9,7 @@
 #include "Level.h"
 #include "libOTe/Tools/Tools.h"
 #include "coproto/Socket/Socket.h"
-#include "secure-join/OleGenerator.h"
+#include "secure-join/CorGenerator/CorGenerator.h"
 #include "secure-join/GMW/Gmw.h"
 
 //#include "reveal.h"
@@ -61,10 +61,11 @@ namespace secJoin
             const Operator& op,
             Type type,
             coproto::Socket& comm,
-            OleGenerator& gen,
+            CorGenerator& gen,
+            oc::PRNG& prng,
             BinMatrix& dst)
         {
-            MC_BEGIN(macoro::task<>, this, &src, &controlBits, &op, type, &comm, &gen, &dst,
+            MC_BEGIN(macoro::task<>, this, &src, &controlBits, &op, type, &comm, &gen, &dst, &prng,
                 root = Level{},
                 upLevels = std::vector<SplitLevel>{},
                 newVals = SplitLevel{}
@@ -74,15 +75,15 @@ namespace secJoin
 
             upLevels.resize(mLogn);
 
-            MC_AWAIT(upstream(src, controlBits, op, type, comm, gen, root, upLevels));
-            MC_AWAIT(downstream(src, op, root, upLevels, newVals, type, comm, gen));
+            MC_AWAIT(upstream(src, controlBits, op, type, comm, gen, prng, root, upLevels));
+            MC_AWAIT(downstream(src, op, root, upLevels, newVals, type, comm, gen, prng));
 
             upLevels.resize(1);
 
             if (dst.numEntries() != mN || dst.bitsPerEntry() != src.bitsPerEntry())
                 dst.resize(mN, src.bitsPerEntry());
 
-            MC_AWAIT(computeLeaf(upLevels[0], newVals, op, dst, type, comm, gen));
+            MC_AWAIT(computeLeaf(upLevels[0], newVals, op, dst, type, prng, comm, gen));
 
             MC_END();
         }
@@ -142,7 +143,8 @@ namespace secJoin
             const Operator& op,
             Type type,
             coproto::Socket& comm,
-            OleGenerator& gen,
+            CorGenerator& gen,
+            oc::PRNG& prng,
             Level& root,
             span<SplitLevel> levels);
 
@@ -188,7 +190,8 @@ namespace secJoin
             SplitLevel& preSuf,
             Type type,
             coproto::Socket& comm,
-            OleGenerator& gen,
+            CorGenerator& gen,
+            oc::PRNG& prng,
             std::vector<SplitLevel>* debugLevels = nullptr);
 
         //	// apply the downstream circuit to each level of the tree.
@@ -198,11 +201,12 @@ namespace secJoin
             const Operator& op,
             BinMatrix& dst,
             Type type,
+            oc::PRNG& prng,
             coproto::Socket& comm,
-            OleGenerator& gen)
+            CorGenerator& gen)
         {
 
-            MC_BEGIN(macoro::task<>, this, &leaves, &preSuf, &op, &dst, type, &comm, &gen,
+            MC_BEGIN(macoro::task<>, this, &leaves, &preSuf, &op, &dst, type, &comm, &gen,&prng,
                 lib = oc::BetaLibrary{},
                 cir = oc::BetaCircuit{},
                 bitsPerEntry = u64{},
@@ -350,7 +354,7 @@ namespace secJoin
                 }
             }
 
-            MC_AWAIT(bin.run(gen, comm));
+            MC_AWAIT(bin.run(gen, comm, prng));
 
             {
                 BinMatrix leftOut(size, bitsPerEntry), rghtOut(size, bitsPerEntry);

@@ -27,12 +27,12 @@ namespace secJoin
     //    mPi.receiverSetup(sk);
     //}
 
-    //macoro::task<> AdditivePerm::senderSetup(OleGenerator& ole)
+    //macoro::task<> AdditivePerm::senderSetup(CorGenerator& ole)
     //{
     //    return (mPi.senderSetup(ole));
     //}
 
-    //macoro::task<> AdditivePerm::receiverSetup(OleGenerator& ole)
+    //macoro::task<> AdditivePerm::receiverSetup(CorGenerator& ole)
     //{
     //    return (mPi.receiverSetup(ole));
     //}
@@ -51,7 +51,7 @@ namespace secJoin
     //
     macoro::task<> AdditivePerm::setup(
         coproto::Socket& chl,
-        OleGenerator& ole,
+        CorGenerator& ole,
         PRNG& prng)
     {
         MC_BEGIN(macoro::task<>, this, &chl, &ole, &prng,
@@ -84,7 +84,7 @@ namespace secJoin
         MC_AWAIT(mPi.apply<u32>(
             PermOp::Regular,
             oc::MatrixView<u32>(mShare.data(), mShare.size(), 1),
-            rho1, chl, ole));
+            rho1, chl, ole, prng));
 
         // Exchanging the [Rho]
         if (mPi.mPartyIdx == 0)
@@ -152,7 +152,7 @@ namespace secJoin
     }
 
 
-    macoro::task<> AdditivePerm::apply(PermOp op, BinMatrix& in, BinMatrix& out, oc::PRNG& prng, coproto::Socket& chl, OleGenerator& ole)
+    macoro::task<> AdditivePerm::apply(PermOp op, BinMatrix& in, BinMatrix& out, oc::PRNG& prng, coproto::Socket& chl, CorGenerator& ole)
     {
         if (in.cols() != oc::divCeil(in.bitsPerEntry(), 8))
             throw RTE_LOC;
@@ -166,7 +166,7 @@ namespace secJoin
         AdditivePerm& dst,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        OleGenerator& gen)
+        CorGenerator& gen)
     {
         if (pi.size() != size())
             throw RTE_LOC;
@@ -179,7 +179,7 @@ namespace secJoin
         AdditivePerm& dst,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        OleGenerator& gen)
+        CorGenerator& gen)
     {
         if (pi.size() != size())
             throw RTE_LOC;
@@ -187,7 +187,7 @@ namespace secJoin
         dst.init(size());
         return pi.apply<u32>(PermOp::Regular, mShare, dst.mShare, prng, chl, gen);
     }
-    macoro::task<> AdditivePerm::preprocess(u64 n, u64 bytesPer, coproto::Socket& chl, OleGenerator& ole, oc::PRNG& prng)
+    macoro::task<> AdditivePerm::preprocess(u64 n, u64 bytesPer, coproto::Socket& chl, CorGenerator& ole, oc::PRNG& prng)
     {
         TODO("redice the size of possible");
         mPi.init(n, (int)ole.mRole, prng);

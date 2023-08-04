@@ -121,9 +121,10 @@ namespace secJoin
         u64 keyBitCount,
         coproto::Socket& sock,
         BinMatrix& out,
-        OleGenerator& ole)
+        CorGenerator& ole,
+        oc::PRNG&prng)
     {
-        MC_BEGIN(macoro::task<>, &data, &sock, &out, &ole, keyByteOffset, keyBitCount,
+        MC_BEGIN(macoro::task<>, &data, &sock, &out, &ole, keyByteOffset, keyBitCount, &prng,
             cir = oc::BetaCircuit{},
             sKeys = BinMatrix{},
             bin = Gmw{},
@@ -143,7 +144,7 @@ namespace secJoin
         bin.setInput(0, sKeys.subMatrix(0, n));
         bin.setInput(1, sKeys.subMatrix(1, n));
 
-        MC_AWAIT(bin.run(ole, sock));
+        MC_AWAIT(bin.run(ole, sock, prng));
 
         out.resize(n, 1);
         bin.getOutput(0, out);
@@ -404,10 +405,11 @@ namespace secJoin
         BinMatrix& data,
         BinMatrix& choice,
         BinMatrix& out,
-        OleGenerator& ole,
+        CorGenerator& ole,
+        oc::PRNG& prng,
         coproto::Socket& sock)
     {
-        MC_BEGIN(macoro::task<>, &data, &choice, &out, &ole, &sock,
+        MC_BEGIN(macoro::task<>, &data, &choice, &out, &ole, &sock, &prng,
             gmw = Gmw{},
             cir = oc::BetaCircuit{},
             temp = BinMatrix{},
@@ -434,7 +436,7 @@ namespace secJoin
         offsets.emplace_back(Offset{ 0,1 });
         //MC_AWAIT(print(temp, choice, sock, (int)ole.mRole, "active", offsets));
 
-        MC_AWAIT(gmw.run(ole, sock));
+        MC_AWAIT(gmw.run(ole, sock, prng));
 
         gmw.getOutput(0, temp);
 
@@ -469,7 +471,7 @@ namespace secJoin
         std::vector<ColRef> selects,
         SharedTable& out,
         oc::PRNG& prng,
-        OleGenerator& ole,
+        CorGenerator& ole,
         coproto::Socket& sock)
     {
         MC_BEGIN(macoro::task<>, this, leftJoinCol, rightJoinCol, selects, &out, &prng, &ole, &sock,
@@ -532,7 +534,7 @@ namespace secJoin
         // compare adjacent keys. controlBits[i] = 1 if k[i]==k[i-1].
         // put another way, controlBits[i] = 1 if keys[i] is from the
         // right table and has a matching key from the left table.
-        MC_AWAIT(getControlBits(data, keyOffset, keys.bitsPerEntry(), sock, controlBits, ole));
+        MC_AWAIT(getControlBits(data, keyOffset, keys.bitsPerEntry(), sock, controlBits, ole, prng));
         setTimePoint("control");
         //std::cout << "controlBits done " << LOCATION << std::endl;
 
@@ -550,7 +552,7 @@ namespace secJoin
         // duplicate the rows in data that are from L into any matching
         // rows that correspond to R.
         dup = getDupCircuit();
-        MC_AWAIT(aggTree.apply(data, controlBits, dup, AggTreeType::Prefix, sock, ole, temp));
+        MC_AWAIT(aggTree.apply(data, controlBits, dup, AggTreeType::Prefix, sock, ole, prng, temp));
         std::swap(data, temp);
         setTimePoint("duplicate");
 
@@ -560,7 +562,7 @@ namespace secJoin
             MC_AWAIT(print(data, controlBits, sock, (int)ole.mRole, "agg", offsets));
 
 
-        MC_AWAIT(updateActiveFlag(data, controlBits, temp, ole, sock));
+        MC_AWAIT(updateActiveFlag(data, controlBits, temp, ole, prng, sock));
         std::swap(data, temp);
         //std::cout << "Active done " << LOCATION << std::endl;
 

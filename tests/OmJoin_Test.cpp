@@ -47,7 +47,7 @@ void OmJoin_loadKeys_Test()
     }
 }
 
-void OmJoin_getControlBits_Test()
+void OmJoin_getControlBits_Test(const oc::CLP& cmd)
 {
     u64 n = 342;
     // u64 m = 32;
@@ -74,13 +74,16 @@ void OmJoin_getControlBits_Test()
 
     share(k, kk[0], kk[1], prng);
 
-    OleGenerator ole0, ole1;
-    ole0.fakeInit(OleGenerator::Role::Sender);
-    ole1.fakeInit(OleGenerator::Role::Receiver);
+    CorGenerator ole0, ole1;
+    ole0.mock(CorGenerator::Role::Sender);
+    ole1.mock(CorGenerator::Role::Receiver);
+    ole0.mMock = cmd.isSet("noMock") == false;
+    ole1.mMock = cmd.isSet("noMock") == false;
+
 
     auto r = macoro::sync_wait(macoro::when_all_ready(
-        OmJoin::getControlBits(kk[0], offset, keyBitCount, sock[0], cc[0], ole0),
-        OmJoin::getControlBits(kk[1], offset, keyBitCount, sock[1], cc[1], ole1)));
+        OmJoin::getControlBits(kk[0], offset, keyBitCount, sock[0], cc[0], ole0, prng),
+        OmJoin::getControlBits(kk[1], offset, keyBitCount, sock[1], cc[1], ole1, prng)));
 
     std::get<0>(r).result();
     std::get<1>(r).result();
@@ -264,24 +267,29 @@ void OmJoin_join_Test(const oc::CLP& cmd)
     u64 nL = cmd.getOr("L", 511),
         nR = cmd.getOr("R", 81);
 
+    u64 keySize = cmd.getOr("keySize", 21);
     bool printSteps = cmd.isSet("print");
     bool mock = !cmd.isSet("noMock");
 
+    auto mod = 1ull << keySize;
     Table L, R;
 
     L.init(nL, { {
-        {"L1", TypeID::IntID, 21},
+        {"L1", TypeID::IntID, keySize},
         {"L2", TypeID::IntID, 16}
     } });
     R.init(nR, { {
-        {"R1", TypeID::IntID, 21},
+        {"R1", TypeID::IntID, keySize},
         {"R2", TypeID::IntID, 7}
     } });
 
+    std::unordered_set<u64> keys;
     for (u64 i = 0; i < nL; ++i)
     {
         // u64 k 
-        auto ii = i * 3;
+        auto ii = (i * 3) % mod;
+        if (keys.insert(ii).second == false)
+            throw RTE_LOC;
         memcpy(&L.mColumns[0].mData.mData(i, 0), &ii, L.mColumns[0].mData.bytesPerEntry());
         L.mColumns[1].mData.mData(i, 0) = i % 4;
         L.mColumns[1].mData.mData(i, 1) = i % 3;
@@ -314,9 +322,12 @@ void OmJoin_join_Test(const oc::CLP& cmd)
     join0.mInsecureMockSubroutines = mock;
     join1.mInsecureMockSubroutines = mock;
 
-    OleGenerator ole0, ole1;
-    ole0.fakeInit(OleGenerator::Role::Sender);
-    ole1.fakeInit(OleGenerator::Role::Receiver);
+    CorGenerator ole0, ole1;    
+    ole0.mock(CorGenerator::Role::Sender);
+    ole1.mock(CorGenerator::Role::Receiver);
+    ole0.mMock = mock;
+    ole1.mMock = mock;
+
 
     PRNG prng0(oc::ZeroBlock);
     PRNG prng1(oc::OneBlock);
@@ -411,9 +422,12 @@ void OmJoin_join_BigKey_Test(const oc::CLP& cmd)
     join0.mInsecureMockSubroutines = mock;
     join1.mInsecureMockSubroutines = mock;
 
-    OleGenerator ole0, ole1;
-    ole0.fakeInit(OleGenerator::Role::Sender);
-    ole1.fakeInit(OleGenerator::Role::Receiver);
+    CorGenerator ole0, ole1;
+    ole0.mock(CorGenerator::Role::Sender);
+    ole1.mock(CorGenerator::Role::Receiver);
+    ole0.mMock = mock;
+    ole1.mMock = mock;
+
 
     PRNG prng0(oc::ZeroBlock);
     PRNG prng1(oc::OneBlock);
@@ -508,9 +522,12 @@ void OmJoin_join_Reveal_Test(const oc::CLP& cmd)
     join0.mInsecureMockSubroutines = mock;
     join1.mInsecureMockSubroutines = mock;
 
-    OleGenerator ole0, ole1;
-    ole0.fakeInit(OleGenerator::Role::Sender);
-    ole1.fakeInit(OleGenerator::Role::Receiver);
+    CorGenerator ole0, ole1;
+    ole0.mock(CorGenerator::Role::Sender);
+    ole1.mock(CorGenerator::Role::Receiver);
+    ole0.mMock = mock;
+    ole1.mMock = mock;
+
 
     PRNG prng0(oc::ZeroBlock);
     PRNG prng1(oc::OneBlock);
@@ -579,41 +596,41 @@ auto communicate(
 
     // write any outgoing data to a file me_i.bin where i in the message index.
     auto write = [&]()
+    {
+        // the the outbound messages that the protocol has generated.
+        // This will consist of all the outbound messages that can be 
+        // generated without receiving the next inbound message.
+        auto b = sock.getOutbound();
+
+        // If we do have outbound messages, then lets write them to a file.
+        if (b && b->size())
         {
-            // the the outbound messages that the protocol has generated.
-            // This will consist of all the outbound messages that can be 
-            // generated without receiving the next inbound message.
-            auto b = sock.getOutbound();
+            std::ofstream message;
+            auto temp = me + ".tmp";
+            auto file = me + "_" + std::to_string(s) + ".bin";
+            message.open(temp, std::ios::binary | std::ios::trunc);
+            message.write((char*)b->data(), b->size());
+            message.close();
 
-            // If we do have outbound messages, then lets write them to a file.
-            if (b && b->size())
+            if (verbose)
             {
-                std::ofstream message;
-                auto temp = me + ".tmp";
-                auto file = me + "_" + std::to_string(s) + ".bin";
-                message.open(temp, std::ios::binary | std::ios::trunc);
-                message.write((char*)b->data(), b->size());
-                message.close();
+                // optional for debug purposes.
+                oc::RandomOracle hash(16);
+                hash.Update(b->data(), b->size());
+                oc::block h; hash.Final(h);
 
-                if (verbose)
-                {
-                    // optional for debug purposes.
-                    oc::RandomOracle hash(16);
-                    hash.Update(b->data(), b->size());
-                    oc::block h; hash.Final(h);
-
-                    std::cout << me << " write " << std::to_string(s) << ", " << b->size() << " bytes " << h << "\n";
-                }
-
-                if (rename(temp.c_str(), file.c_str()) != 0)
-                    std::cout << me << " file renamed failed\n";
-                else if (verbose)
-                    std::cout << me << " file renamed successfully\n";
-
-                ++s;
+                std::cout << me << " write " << std::to_string(s) << ", " << b->size() << " bytes " << h << "\n";
             }
 
-        };
+            if (rename(temp.c_str(), file.c_str()) != 0)
+                std::cout << me << " file renamed failed\n";
+            else if (verbose)
+                std::cout << me << " file renamed successfully\n";
+
+            ++s;
+        }
+
+    };
 
     // write incoming data from a file them_i.bin where i in the message index.
     auto read = [&]() {
@@ -650,7 +667,7 @@ auto communicate(
         // run the protocol forward, possibly generating more outbound protocol
         // messages.
         sock.processInbound(buff);
-        };
+    };
 
     // The sender we generate the first message.
     if (sender)
@@ -713,9 +730,12 @@ void OmJoin_join_round_Test(const oc::CLP& cmd)
     join0.mInsecureMockSubroutines = mock;
     join1.mInsecureMockSubroutines = mock;
 
-    OleGenerator ole0, ole1;
-    ole0.fakeInit(OleGenerator::Role::Sender);
-    ole1.fakeInit(OleGenerator::Role::Receiver);
+    CorGenerator ole0, ole1;
+    ole0.mock(CorGenerator::Role::Sender);
+    ole1.mock(CorGenerator::Role::Receiver);
+    ole0.mMock = mock;
+    ole1.mMock = mock;
+
 
     PRNG prng0(oc::ZeroBlock);
     PRNG prng1(oc::OneBlock);

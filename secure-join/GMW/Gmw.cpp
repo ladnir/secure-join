@@ -140,16 +140,15 @@ namespace secJoin
         return memView;
     }
 
-    macoro::task<> Gmw::preprocess(OleGenerator& gen, coproto::Socket& chl)
+    macoro::task<> Gmw::preprocess(CorGenerator& gen, coproto::Socket& chl, oc::PRNG& prng)
     {
-        MC_BEGIN(macoro::task<>, this, &gen, &chl);
+        MC_BEGIN(macoro::task<>, this, &gen, &chl, &prng);
 
         if (mCir.mGates.size() == 0)
             throw std::runtime_error("init(...) must be called first. " LOCATION);
 
         mRole = (int)gen.mRole;
-        MC_AWAIT_SET(mTriples, 
-            gen.binOleRequest(2 * mCir.mNonlinearGateCount * oc::roundUpTo(mN, 128), 0, chl.mId));
+        MC_AWAIT(gen.binOleRequest(mTriples, 2 * mCir.mNonlinearGateCount * oc::roundUpTo(mN, 128), chl, prng));
         MC_END();
     }
 
@@ -189,21 +188,25 @@ namespace secJoin
     // Recver outputs: z2 = x2y2 + z12 + z22 
     //                    = x2y2 + r1 + r2
     //                    = x2y2 + r
-    coproto::task<> Gmw::run(OleGenerator& gen, coproto::Socket& chl)
+    coproto::task<> Gmw::run(CorGenerator& gen, coproto::Socket& chl, oc::PRNG& prng)
     {
-        MC_BEGIN(coproto::task<>, this, &chl, &gen);
+        MC_BEGIN(coproto::task<>, this, &chl, &gen, &prng,
+            pre = macoro::eager_task<>{});
 
         if (hasPreprocessing() == false)
-            MC_AWAIT(preprocess(gen, chl));
+            pre = preprocess(gen, chl, prng) | macoro::make_eager();
 
         MC_AWAIT(run(chl));
+
+        if (pre.handle())
+            MC_AWAIT(pre);
 
         MC_END();
     }
 
     coproto::task<> Gmw::run(coproto::Socket& chl)
     {
-        MC_BEGIN(coproto::task<>, this, &chl, 
+        MC_BEGIN(coproto::task<>, this, &chl,
             gates = span<oc::BetaGate>{},
             gate = span<oc::BetaGate>::iterator{},
             dirtyBits = std::vector<u8>{},
@@ -231,7 +234,7 @@ namespace secJoin
             throw std::runtime_error("Gmw::init(...) was not called");
 
         if (hasPreprocessing() == false)
-            throw std::runtime_error("Gmw::run was called with no preprocessing or OleGenerator. " LOCATION);
+            throw std::runtime_error("Gmw::run was called with no preprocessing or CorGenerator. " LOCATION);
 
         finalizeMapping();
         if (mO.mDebug)
@@ -281,7 +284,7 @@ namespace secJoin
             {
                 if (add.size() == 0)
                 {
-                    MC_AWAIT_SET(triple, mTriples.get());
+                    MC_AWAIT(mTriples.get(triple));
                     add = triple.mAdd;
                     mult = triple.mMult;
                 }
@@ -373,10 +376,10 @@ namespace secJoin
                     }
 
                     buffIter = multSend(
-                        in[0], in[1], 
-                        gate->mType, 
-                        a.data() + j, 
-                        c.data() + j, 
+                        in[0], in[1],
+                        gate->mType,
+                        a.data() + j,
+                        c.data() + j,
                         buffIter, mRole);
 
                     j += mN128;
@@ -439,7 +442,7 @@ namespace secJoin
                     buffIter = multRecv(in[0], in[1], out, gate->mType,
                         b.data() + j,
                         c.data() + j,
-                        d.data() + j, 
+                        d.data() + j,
                         buffIter, mRole);
 
                     j += mN128;
@@ -565,6 +568,10 @@ namespace secJoin
             }
 
         }
+
+        if (mTriples.mSize)
+            MC_AWAIT(mTriples.close());
+        mTriples = {};
 
         MC_END();
     }

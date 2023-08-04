@@ -3,9 +3,103 @@
 namespace secJoin
 {
 
+    void fakeFill(u64 m, BinOle& ole, bool sender, coproto::SessionID sid)
+    {
+        //mNumBinOle += m;
+        assert(m % 128 == 0);
+        m = m / 128;
+
+        //oc::PRNG prng(oc::block(mCurSize++));
+        ole.mAdd.resize(m);
+        ole.mMult.resize(m);
+        auto add = ole.mAdd.data();
+        auto mult = ole.mMult.data();
+
+        auto m8 = m / 8 * 8;
+        oc::block mm8(4532453452, 43254534);
+        oc::block mm;
+        memcpy(mm.data(), sid.mVal, sizeof(oc::block));
+        //oc::block mm(2342314, 213423);
+
+        if (sender)
+        {
+            oc::block aa8(0, 43254534);
+            //oc::block aa(0, 213423);
+            oc::block aa(0, mm.get<u64>(0));
+            u64 i = 0;
+            while (i < m8)
+            {
+                mult[i + 0] = mm;
+                mult[i + 1] = mm;
+                mult[i + 2] = mm;
+                mult[i + 3] = mm;
+                mult[i + 4] = mm;
+                mult[i + 5] = mm;
+                mult[i + 6] = mm;
+                mult[i + 7] = mm;
+                add[i + 0] = aa;
+                add[i + 1] = aa;
+                add[i + 2] = aa;
+                add[i + 3] = aa;
+                add[i + 4] = aa;
+                add[i + 5] = aa;
+                add[i + 6] = aa;
+                add[i + 7] = aa;
+                mm += mm8;
+                aa += aa8;
+                i += 8;
+            }
+            for (; i < m; ++i)
+            {
+                //oc::block m0 = std::array<u32, 4>{i, i, i, i};// prng.get();
+                //oc::block m1 = std::array<u32, 4>{i, i, i, i};//prng.get();
+                //oc::block a0 = std::array<u32, 4>{0, i, 0, i};//prng.get();
+                //auto a1 = std::array<u32, 4>{i, 0, i, 0};;// m0& m1^ a0;
+                mult[i] = oc::block(i, i);
+                add[i] = oc::block(0, i);
+            }
+        }
+        else
+        {
+            oc::block aa8(4532453452, 0);
+            //oc::block aa(2342314, 0);
+            oc::block aa(mm.get<u64>(1), 0);
+            u64 i = 0;
+            while (i < m8)
+            {
+                //oc::block mm(i, i);
+                //oc::block aa(i, 0);
+                mult[i + 0] = mm;
+                mult[i + 1] = mm;
+                mult[i + 2] = mm;
+                mult[i + 3] = mm;
+                mult[i + 4] = mm;
+                mult[i + 5] = mm;
+                mult[i + 6] = mm;
+                mult[i + 7] = mm;
+                add[i + 0] = aa;
+                add[i + 1] = aa;
+                add[i + 2] = aa;
+                add[i + 3] = aa;
+                add[i + 4] = aa;
+                add[i + 5] = aa;
+                add[i + 6] = aa;
+                add[i + 7] = aa;
+                mm += mm8;
+                aa += aa8;
+                i += 8;
+            }
+            for (; i < m; ++i)
+            {
+                mult[i] = oc::block(i, i);
+                add[i] = oc::block(i, 0);
+            }
+        }
+    }
 
     void BinOleGenerator::Impl::init(u64 size, coproto::Socket& sock, oc::PRNG& prng)
     {
+        mSize = size;
         mSock = sock.fork();
         mPrng = prng.get<oc::block>();
     }
@@ -52,7 +146,11 @@ namespace secJoin
         MC_END();
     }
 
-    macoro::task<> BinOleGenerator::Impl::task() { return std::move(mT); }
+    macoro::task<> BinOleGenerator::Impl::task() {
+        if (!mT.handle())
+            throw RTE_LOC;
+        return std::move(mT);
+    }
 
     void BinOleGenerator::Impl::compressRecver(oc::BitVector& bv, span<oc::block> recvMsg, span<oc::block> add, span<oc::block> mult)
     {
@@ -246,8 +344,11 @@ namespace secJoin
         u64 batchSize,
         coproto::Socket& sock,
         oc::PRNG& prng,
-        Base& base)
+        Base& base,
+        bool mock)
     {
+        mMock = mock;
+        mSize = n;
         mCorrelations.reserve(oc::divCeil(n, batchSize));
         for (u64 i = 0; i < n; i += batchSize)
         {
@@ -255,23 +356,27 @@ namespace secJoin
             mCorrelations.emplace_back();
             mCorrelations.back().init(size, sock, prng, base);
         }
+
+        mRole = std::is_same_v<Base, SendBase>;
     }
 
-    template void BinOleGenerator::init<SendBase>(u64, u64, coproto::Socket&, oc::PRNG&, SendBase&);
-    template void BinOleGenerator::init<RecvBase>(u64, u64, coproto::Socket&, oc::PRNG&, RecvBase&);
+    template void BinOleGenerator::init<SendBase>(u64, u64, coproto::Socket&, oc::PRNG&, SendBase&, bool);
+    template void BinOleGenerator::init<RecvBase>(u64, u64, coproto::Socket&, oc::PRNG&, RecvBase&, bool);
 
-    macoro::task<> BinOleGenerator::task()
-    {
-        MC_BEGIN(macoro::task<>, this, i = u64{});
+    //macoro::task<> BinOleGenerator::task()
+    //{
+    //    MC_BEGIN(macoro::task<>, this, i = u64{});
 
-        TODO("ex handling");
-        for (i = 0; i < mCorrelations.size(); ++i)
-            mCorrelations[i].mTask = mCorrelations[i].task() | macoro::make_eager();
-        for (i = 0; i < mCorrelations.size(); ++i)
-            MC_AWAIT(mCorrelations[i].mTask);
-
-        MC_END();
-    }
+    //    TODO("ex handling");
+    //    for (i = 0; i < mCorrelations.size(); ++i)
+    //        mCorrelations[i].mTask = mCorrelations[i].task() | macoro::make_eager();
+    //    //for (i = 0; i < mCorrelations.size(); ++i)
+    //    //{
+    //    //    MC_AWAIT(mCorrelations[i].mTask);
+    //    //    mCorrelations[i].mDone.set();
+    //    //}
+    //    MC_END();
+    //}
 
     macoro::task<> BinOleGenerator::get(BinOle& d)
     {
@@ -280,10 +385,21 @@ namespace secJoin
         if (mIdx >= mCorrelations.size())
             throw RTE_LOC;
 
-        MC_AWAIT(mCorrelations[mIdx].mTask);
 
-        d.mMult = std::move(mCorrelations[mIdx].mMult);
-        d.mAdd = std::move(mCorrelations[mIdx].mAdd);
+        if (mMock)
+        {
+            auto s = mCorrelations[mIdx].mSize;
+            auto r = mRole;
+            fakeFill(s, d, r,  mCorrelations[mIdx].mSock.mId);
+        }
+        else
+        {
+
+            MC_AWAIT(mCorrelations[mIdx].mDone);
+
+            d.mMult = std::move(mCorrelations[mIdx].mMult);
+            d.mAdd = std::move(mCorrelations[mIdx].mAdd);
+        }
         ++mIdx;
 
         MC_END();

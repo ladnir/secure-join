@@ -298,7 +298,7 @@ namespace secJoin
 
 
 
-        void fakeInit(Role role)
+        void mock(Role role)
         {
             mFakeGen = true;
             mRole = role;

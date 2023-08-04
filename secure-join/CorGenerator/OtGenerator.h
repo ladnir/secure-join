@@ -10,6 +10,7 @@
 #include "macoro/task.h"
 #include "macoro/channel.h"
 #include "macoro/macros.h"
+#include "macoro/manual_reset_event.h"
 
 #include "libOTe/TwoChooseOne/Silent/SilentOtExtSender.h"
 #include "libOTe/TwoChooseOne/Silent/SilentOtExtReceiver.h"
@@ -64,6 +65,7 @@ namespace secJoin
             oc::BitVector mChoice;
             oc::AlignedUnVector<oc::block> mMsg;
             macoro::eager_task<> mTask;
+            macoro::async_manual_reset_event mDone;
             coproto::Socket mSock;
             oc::PRNG mPrng;
 
@@ -72,30 +74,53 @@ namespace secJoin
         };
 
         std::vector<Impl> mCorrelations;
-        u64 mIdx = 0;
-        macoro::eager_task<> mTask;
+        u64 mIdx = 0, mSize = 0;
+        bool mMock = false;
 
         void init(
             u64 n,
             u64 batchSize,
             coproto::Socket& sock,
             oc::PRNG& prng,
-            SendBase& base);
-
-
-        void start()
-        {
-            if (mTask.handle())
-                throw RTE_LOC;
-            mTask = task() | macoro::make_eager();
-        }
-
-        macoro::task<> task();
+            SendBase& base,
+            bool mock);
 
         macoro::task<> get(OtRecv& d);
 
+        macoro::task<> task()
+        {
+            MC_BEGIN(macoro::task<>, this,
+                i = u64{});
 
-        macoro::eager_task<> close() { return std::move(mTask); }
+            if (mMock)
+                MC_RETURN_VOID();
+
+            for (i = 0; i < mCorrelations.size(); ++i)
+            {
+                //std::cout << "start ot recv " << mCorrelations[i].mSock.mId << std::endl;
+                mCorrelations[i].mTask = mCorrelations[i].task() | macoro::make_eager();
+            }
+
+            for (i = 0; i < mCorrelations.size(); ++i)
+            {
+                MC_AWAIT(mCorrelations[i].mTask);
+                mCorrelations[i].mDone.set();
+            }
+
+            MC_END();
+        }
+
+        //macoro::task<> close() {
+        //    MC_BEGIN(macoro::task<>, this);
+        //    if (mMock)
+        //        MC_RETURN_VOID();
+
+        //    while (mIdx < mCorrelations.size())
+        //    {
+        //        MC_AWAIT(mCorrelations[mIdx++].mTask);
+        //    }
+        //    MC_END();
+        //}
     };
 
 
@@ -109,6 +134,7 @@ namespace secJoin
             oc::SilentOtExtSender mSender;
             oc::AlignedUnVector<std::array<oc::block, 2>> mMsg;
             macoro::eager_task<> mTask;
+            macoro::async_manual_reset_event mDone;
 
             coproto::Socket mSock;
             oc::PRNG mPrng;
@@ -119,28 +145,53 @@ namespace secJoin
         };
 
         std::vector<Impl> mCorrelations;
-        u64 mIdx = 0;
-        macoro::eager_task<> mTask;
+        u64 mIdx = 0, mSize = 0;
+        bool mMock = false;
 
         void init(
             u64 n,
             u64 batchSize,
             coproto::Socket& sock,
             oc::PRNG& prng,
-            RecvBase& base);
+            RecvBase& base,
+            bool mock);
 
-        macoro::task<> task();
+        //macoro::task<> task();
 
-        void start()
+        macoro::task<> task()
         {
-            if (mTask.handle())
-                throw RTE_LOC;
-            mTask = task() | macoro::make_eager();
+            MC_BEGIN(macoro::task<>, this, i = u64{});
+            if (mMock)
+                MC_RETURN_VOID();
+
+            for (i = 0; i < mCorrelations.size(); ++i)
+            {
+                //std::cout << "start ot send " << mCorrelations[i].mSock.mId << std::endl;
+                mCorrelations[i].mTask = mCorrelations[i].task() | macoro::make_eager();
+            }
+
+            for (i = 0; i < mCorrelations.size(); ++i)
+            {
+                MC_AWAIT(mCorrelations[i].mTask);
+                mCorrelations[i].mDone.set();
+            }
+
+            MC_END();
         }
 
         macoro::task<> get(OtSend& d);
 
-        macoro::eager_task<> close() { return std::move(mTask); }
+        macoro::task<> close() {
+            MC_BEGIN(macoro::task<>, this);
+            if (mMock)
+                MC_RETURN_VOID();
+
+            while (mIdx < mCorrelations.size())
+            {
+                MC_AWAIT(mCorrelations[mIdx++].mTask);
+            }
+            MC_END();
+        }
 
     };
 }

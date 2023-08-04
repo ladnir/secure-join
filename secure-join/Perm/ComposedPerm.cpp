@@ -8,24 +8,28 @@ namespace secJoin
         mSender.setKeyOts(sk);
         mReceiver.setKeyOts(key, rk);
     }
-    macoro::task<> ComposedPerm::genKeyOts(OleGenerator& ole, coproto::Socket& chl)
+    macoro::task<> ComposedPerm::genKeyOts(CorGenerator& ole, coproto::Socket& chl, oc::PRNG& prng)
     {
-        MC_BEGIN(macoro::task<>, this, &ole, &chl);
+        MC_BEGIN(macoro::task<>, this, &ole, &chl, &prng,
+            sock2 = coproto::Socket{},
+            prng2 = oc::PRNG{});
 
+        sock2 = chl.fork();
+        prng2 = prng.get<oc::block>();
         if ((int)ole.mRole)
         {
             MC_AWAIT(
                 macoro::when_all_ready(
-                    mSender.genKeyOts(ole, chl),
-                    mReceiver.genKeyOts(ole, chl))
+                    mSender.genKeyOts(ole, chl, prng),
+                    mReceiver.genKeyOts(ole, sock2, prng2))
             );
         }
         else
         {
             MC_AWAIT(
                 macoro::when_all_ready(
-                    mReceiver.genKeyOts(ole, chl),
-                    mSender.genKeyOts(ole, chl))
+                    mReceiver.genKeyOts(ole, chl, prng),
+                    mSender.genKeyOts(ole, sock2, prng2))
             );
         }
         MC_END();
@@ -35,7 +39,7 @@ namespace secJoin
         mPartyIdx = partyIdx;
         mPi.randomize(n, prng);
     }
-    macoro::task<> ComposedPerm::preprocess(u64 n, u64 bytesPer, coproto::Socket& chl, OleGenerator& ole, PRNG& prng)
+    macoro::task<> ComposedPerm::preprocess(u64 n, u64 bytesPer, coproto::Socket& chl, CorGenerator& ole, PRNG& prng)
     {
         MC_BEGIN(macoro::task<>, this, &ole, &chl, &prng, n, bytesPer,
             chl2 = coproto::Socket{ }
@@ -78,7 +82,9 @@ namespace secJoin
         oc::MatrixView<const u8> in,
         oc::MatrixView<u8> out,
         coproto::Socket& chl,
-        OleGenerator& ole)
+        CorGenerator& ole,
+        oc::PRNG& prng
+        )
     {
         if (out.rows() != in.rows() ||
             out.cols() != in.cols())
@@ -90,8 +96,7 @@ namespace secJoin
         if (mPartyIdx > 1)
             throw RTE_LOC;
 
-        MC_BEGIN(macoro::task<>, in, out, &chl, &ole, op,
-            prng = oc::PRNG(ole.mPrng.get()),
+        MC_BEGIN(macoro::task<>, in, out, &chl, &ole, op, &prng,
             this,
             soutperm = oc::Matrix<u8>{}
         );

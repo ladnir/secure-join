@@ -496,7 +496,7 @@ namespace secJoin
 
         if (!mFakeGen)
         {
-            throw std::runtime_error("known issue with OleGenerator, use fakeInit for now. " LOCATION);
+            throw std::runtime_error("known issue with OleGenerator, use mock for now. " LOCATION);
             mCtrl = control() | macoro::make_eager();
         }
     }

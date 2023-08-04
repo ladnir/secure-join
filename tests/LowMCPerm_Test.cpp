@@ -29,9 +29,9 @@ void LocMC_eval_test(const oc::CLP& cmd)
     oc::PRNG prng1(oc::block(0, 1));
 
     auto chls = coproto::LocalAsyncSocket::makePair();
-    OleGenerator ole0, ole1;
-    ole0.fakeInit(OleGenerator::Role::Sender);
-    ole1.fakeInit(OleGenerator::Role::Receiver);
+    CorGenerator ole0, ole1;
+    ole0.mock(CorGenerator::Role::Sender);
+    ole1.mock(CorGenerator::Role::Receiver);
     Gmw gmw0, gmw1;
     gmw0.init(n, cir);
     gmw1.init(n, cir);
@@ -47,8 +47,8 @@ void LocMC_eval_test(const oc::CLP& cmd)
         gmw1.setZeroInput(i + 2);
     }
 
-    auto proto0 = gmw0.run(ole0, chls[0]);
-    auto proto1 = gmw1.run(ole1, chls[1]);
+    auto proto0 = gmw0.run(ole0, chls[0], prng0);
+    auto proto1 = gmw1.run(ole1, chls[1], prng0);
 
     auto res = macoro::sync_wait(macoro::when_all_ready(std::move(proto0), std::move(proto1)));
 
@@ -72,9 +72,9 @@ void LowMCPerm_perm_test(const oc::CLP& cmd)
     oc::PRNG prng(oc::block(0, 0));
 
     auto chls = coproto::LocalAsyncSocket::makePair();
-    OleGenerator ole0, ole1;
-    ole0.fakeInit(OleGenerator::Role::Sender);
-    ole1.fakeInit(OleGenerator::Role::Receiver);
+    CorGenerator ole0, ole1;
+    ole0.mock(CorGenerator::Role::Sender);
+    ole1.mock(CorGenerator::Role::Receiver);
 
 
     // Initializing the vector x & permutation pi
@@ -120,9 +120,9 @@ void LowMCPerm_secret_shared_input_perm_test()
 
     Perm pi(n,prng);
 
-    OleGenerator ole0, ole1;
-    ole0.fakeInit(OleGenerator::Role::Sender);
-    ole1.fakeInit(OleGenerator::Role::Receiver);
+    CorGenerator ole0, ole1;
+    ole0.mock(CorGenerator::Role::Sender);
+    ole1.mock(CorGenerator::Role::Receiver);
 
     // Initializing the vector x & permutation pi
     prng.get(x.data(), x.size());

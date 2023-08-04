@@ -28,9 +28,9 @@ void DlpnPerm_setup_test(const oc::CLP& cmd)
     Perm pi(n, prng0);
 
     // Fake Setup
-    OleGenerator ole0, ole1;
-    ole0.fakeInit(OleGenerator::Role::Sender);
-    ole1.fakeInit(OleGenerator::Role::Receiver);
+    CorGenerator ole0, ole1;
+    ole0.mock(CorGenerator::Role::Sender);
+    ole1.mock(CorGenerator::Role::Receiver);
 
     // DLpnPrf dm;
     oc::block kk = prng0.get();
@@ -103,9 +103,9 @@ void DlpnPerm_apply_test(const oc::CLP& cmd)
     // // std::cout << "The Current Permutation is " << pi.mPi << std::endl;
 
     // Fake Setup
-    OleGenerator ole0, ole1;
-    ole0.fakeInit(OleGenerator::Role::Sender);
-    ole1.fakeInit(OleGenerator::Role::Receiver);
+    CorGenerator ole0, ole1;
+    ole0.mock(CorGenerator::Role::Sender);
+    ole1.mock(CorGenerator::Role::Receiver);
 
     // auto res = coproto::sync_wait(coproto::when_all_ready(
     //     dlpnPerm1.receiverSetup(ole0),
@@ -128,11 +128,6 @@ void DlpnPerm_apply_test(const oc::CLP& cmd)
 
         std::get<0>(res1).result();
         std::get<1>(res1).result();
-
-        coproto::sync_wait(coproto::when_all_ready(
-            ole0.stop(),
-            ole1.stop()
-        ));
 
         oc::Matrix<oc::u8>  yAct = reveal(sout2, sout1);
 
@@ -171,14 +166,14 @@ void DlpnPerm_sharedApply_test(const oc::CLP& cmd)
     // // std::cout << "The Current Permutation is " << pi.mPi << std::endl;
 
     // Fake Setup
-    OleGenerator ole0, ole1;
-    ole0.fakeInit(OleGenerator::Role::Sender);
-    ole1.fakeInit(OleGenerator::Role::Receiver);
+    CorGenerator ole0, ole1;
+    ole0.mock(CorGenerator::Role::Sender);
+    ole1.mock(CorGenerator::Role::Receiver);
 
     auto sock = coproto::LocalAsyncSocket::makePair();
     auto res = coproto::sync_wait(coproto::when_all_ready(
-        dlpnPerm1.genKeyOts(ole0, sock[0]),
-        dlpnPerm2.genKeyOts(ole1, sock[1])
+        dlpnPerm1.genKeyOts(ole0, sock[0], prng0),
+        dlpnPerm2.genKeyOts(ole1, sock[1], prng0)
     ));
 
     std::get<0>(res).result();
@@ -198,11 +193,6 @@ void DlpnPerm_sharedApply_test(const oc::CLP& cmd)
 
         std::get<0>(res1).result();
         std::get<1>(res1).result();
-
-        coproto::sync_wait(coproto::when_all_ready(
-            ole0.stop(),
-            ole1.stop()
-        ));
 
         oc::Matrix<oc::u8>  yAct = reveal(sout2, sout1);
 
@@ -241,14 +231,14 @@ void DlpnPerm_prepro_test(const oc::CLP& cmd)
     // // std::cout << "The Current Permutation is " << pi.mPi << std::endl;
 
     // Fake Setup
-    OleGenerator ole0, ole1;
-    ole0.fakeInit(OleGenerator::Role::Sender);
-    ole1.fakeInit(OleGenerator::Role::Receiver);
+    CorGenerator ole0, ole1;
+    ole0.mock(CorGenerator::Role::Sender);
+    ole1.mock(CorGenerator::Role::Receiver);
 
     auto sock = coproto::LocalAsyncSocket::makePair();
     auto res = coproto::sync_wait(coproto::when_all_ready(
-        dlpnPerm1.genKeyOts(ole0, sock[0]),
-        dlpnPerm2.genKeyOts(ole1, sock[1])
+        dlpnPerm1.genKeyOts(ole0, sock[0], prng0),
+        dlpnPerm2.genKeyOts(ole1, sock[1], prng1)
     ));
 
     std::get<0>(res).result();

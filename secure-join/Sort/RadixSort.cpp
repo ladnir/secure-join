@@ -63,23 +63,29 @@ namespace secJoin
 
     macoro::task<> RadixSort::hadamardSumPreprocess(
         u64 size,
-        OleGenerator& gen,
+        CorGenerator& gen,
         coproto::Socket&sock, 
-        Request<OtRecv>&recv, 
-        Request<OtSend>&send)
+        OtRecvGenerator&recv, 
+        OtSendGenerator&send,
+        oc::PRNG&prng)
     {
-        MC_BEGIN(macoro::task<>, this, &gen, &sock, &recv, &send, size);
+        //std::cout << (int)gen.mRole << " had pre" << std::endl;
+        MC_BEGIN(macoro::task<>, this, &gen, &sock, &recv, &send, size, &prng);
 
-        if (gen.mRole == OleGenerator::Role::Sender)
+        //std::cout << (int)gen.mRole << " had start" << std::endl;
+        if (gen.mRole == CorGenerator::Role::Sender)
         {
-            MC_AWAIT_SET(recv, gen.otRecvRequest(size, 0, sock.mId));
-            MC_AWAIT_SET(send, gen.otSendRequest(size, 0, sock.mId));
+            TODO("parallel");
+            MC_AWAIT(gen.otRecvRequest(recv, size, sock, prng));
+            MC_AWAIT(gen.otSendRequest(send, size, sock.fork(), prng));
         }
         else
         {
-            MC_AWAIT_SET(send, gen.otSendRequest(size, 0, sock.mId));
-            MC_AWAIT_SET(recv, gen.otRecvRequest(size, 0, sock.mId));
+            MC_AWAIT(gen.otSendRequest(send, size, sock, prng));
+            MC_AWAIT(gen.otRecvRequest(recv, size, sock.fork(), prng));
         }
+
+        //std::cout << (int)gen.mRole << " had finished" << std::endl;
 
         MC_END();
     }
@@ -95,9 +101,9 @@ namespace secJoin
     {
         MC_BEGIN(macoro::task<>, this, &f, &s, &dst, &comm, round,
 
-            otRecvReq = Request<OtRecv>{},
+            otRecvReq = OtRecvGenerator{},
+            otSendReq = OtSendGenerator{},
             otRecv = OtRecv{},
-            otSendReq = Request<OtSend>{},
             otSend = OtSend{},
             a = std::vector<oc::AlignedUnVector<u32>>{},
             shares = std::vector<u32>{},
@@ -123,7 +129,7 @@ namespace secJoin
 
         otRecvReq = std::move(mHadamardSumRecvOts[round]);
         otSendReq = std::move(mHadamardSumSendOts[round]);
-        //if (gen.mRole == OleGenerator::Role::Sender)
+        //if (gen.mRole == CorGenerator::Role::Sender)
         //{
         //    MC_AWAIT_SET(otRecvReq, gen.otRecvRequest(s.size()));
         //    MC_AWAIT_SET(otSendReq, gen.otSendRequest(s.size()));
@@ -145,7 +151,7 @@ namespace secJoin
                 // recv
                 for (i = 0; i < s.size();)
                 {
-                    MC_AWAIT_SET(otRecv, otRecvReq.get());
+                    MC_AWAIT(otRecvReq.get(otRecv));
                     m = std::min<u64>(s.size() - i, otRecv.size());
 
                     for (u64 j = 0; j < m; ++j, ++i)
@@ -178,7 +184,7 @@ namespace secJoin
                 // send
                 for (i = 0, r = 0; i < f.size();)
                 {
-                    MC_AWAIT_SET(otSend, otSendReq.get());
+                    MC_AWAIT(otSendReq.get(otSend));
                     m = std::min<u64>(s.size() - i, otSend.size());
                     diff.resize(m);
                     MC_AWAIT(comm.recv(diff));
@@ -957,7 +963,7 @@ namespace secJoin
     macoro::task<> RadixSort::preprocess(
         u64 n,
         u64 bitCount,
-        OleGenerator& gen,
+        CorGenerator& gen,
         coproto::Socket& comm,
         oc::PRNG& prng)
     {
@@ -967,7 +973,9 @@ namespace secJoin
             i = u64{},
             byteCount = u64{},
             tasks = std::vector<macoro::eager_task<>>{},
-            socks = std::vector<coproto::Socket>{});
+            socks = std::vector<coproto::Socket>{},
+            parallel = false);
+
 
 
         mRole = (int)gen.mRole;
@@ -992,30 +1000,39 @@ namespace secJoin
                 tasks.emplace_back(mPerms[i].preprocess(
                     n, byteCount,
                     socks.back(), gen, prng) | macoro::make_eager());
+
+                if (!parallel)
+                    MC_AWAIT(tasks.back());
             }
 
             mBitInjects.emplace_back();
             assert(socks.capacity() > socks.size());
             socks.emplace_back(comm.fork());
             tasks.emplace_back(
-                mBitInjects[i].preprocess(n, pow2L, gen, socks.back()) | macoro::make_eager()
+                mBitInjects[i].preprocess(n, pow2L, gen, prng, socks.back()) | macoro::make_eager()
             );
+            if (!parallel)
+                MC_AWAIT(tasks.back());
 
             mIndexToOneHotGmw.emplace_back();
             mIndexToOneHotGmw.back().init(n, mIndexToOneHotCircuit);
             assert(socks.capacity() > socks.size());
             socks.emplace_back(comm.fork());
             tasks.emplace_back(
-                mIndexToOneHotGmw.back().preprocess(gen, socks.back()) | macoro::make_eager()
+                mIndexToOneHotGmw.back().preprocess(gen, socks.back(),prng) | macoro::make_eager()
             );
+            if (!parallel)
+                MC_AWAIT(tasks.back());
 
             mArithToBinGmw.emplace_back();
             mArithToBinGmw.back().init(n, mArith2BinCir);
             assert(socks.capacity() > socks.size());
             socks.emplace_back(comm.fork());
             tasks.emplace_back(
-                mArithToBinGmw.back().preprocess(gen, socks.back()) | macoro::make_eager()
+                mArithToBinGmw.back().preprocess(gen, socks.back(), prng) | macoro::make_eager()
             );
+            if (!parallel)
+                MC_AWAIT(tasks.back());
 
 
             mHadamardSumRecvOts.emplace_back();
@@ -1023,17 +1040,20 @@ namespace secJoin
             assert(socks.capacity() > socks.size());
             socks.emplace_back(comm.fork());
             tasks.emplace_back(
-                hadamardSumPreprocess(n * pow2L ,gen, socks.back(), mHadamardSumRecvOts.back(), mHadamardSumSendOts.back()) | macoro::make_eager()
+                hadamardSumPreprocess(n * pow2L ,gen, socks.back(), mHadamardSumRecvOts.back(), mHadamardSumSendOts.back(), prng) | macoro::make_eager()
             );
+            if (!parallel)
+                MC_AWAIT(tasks.back());
 
             //mHadamardSumRecvOts.back()
         }
 
-        for (i = 0; i < socks.size(); ++i)
-            MC_AWAIT(socks[i].flush());
+        if (parallel)
+        {
 
-        for (i = 0; i < tasks.size(); ++i)
-            MC_AWAIT(tasks[i]);
+            for (i = 0; i < tasks.size(); ++i)
+                MC_AWAIT(tasks[i]);
+        }
 
         mHasPreprocessing = true;
         MC_END();
@@ -1043,7 +1063,7 @@ namespace secJoin
     macoro::task<> RadixSort::genPerm(
         const BinMatrix& k,
         AdditivePerm& dst,
-        OleGenerator& gen,
+        CorGenerator& gen,
         coproto::Socket& comm,
         oc::PRNG& prng)
     {
@@ -1121,7 +1141,8 @@ namespace secJoin
             // to the next L bits of the key.
             // 4 + 1 bytes
             assert(mPerms[i - 1].hasSetup(sk.bytesPerEntry()));
-            MC_AWAIT(mPerms[i - 1].apply<u8>(PermOp::Inverse, sk.mData, ssk.mData, gen.mPrng, comm, gen));
+            MC_AWAIT(mPerms[i - 1].apply<u8>(
+                PermOp::Inverse, sk.mData, ssk.mData, prng, comm, gen));
             setTimePoint("apply(sk)");
 
             // generate the sorting permutation for the
@@ -1133,7 +1154,7 @@ namespace secJoin
             // the permutation that sorts the next L bits
             // 4 bytes
             assert(mPerms[i - 1].hasSetup(4));
-            MC_AWAIT(mPerms[i - 1].compose(rho, mPerms[i], gen.mPrng, comm, gen));
+            MC_AWAIT(mPerms[i - 1].compose(rho, mPerms[i], prng, comm, gen));
             setTimePoint("compose");
             mPerms[i - 1].clear();
             //std::swap(dst, sigma2);
@@ -1153,7 +1174,7 @@ namespace secJoin
     //	u64 keyBitCount,
     //	const BinMatrix& k,
     //	const BinMatrix& src,
-    //	OleGenerator& gen,
+    //	CorGenerator& gen,
     //	coproto::Socket& comm)
     //{
 
@@ -1179,7 +1200,7 @@ namespace secJoin
     //	const BinMatrix& src,
     //	BinMatrix& dst,
     //	ComposedPerm& dstPerm,
-    //	OleGenerator& gen,
+    //	CorGenerator& gen,
     //	coproto::Socket& comm)
     //{
     //	if (k.rows() != src.rows())
@@ -1272,14 +1293,14 @@ namespace secJoin
     macoro::task<> RadixSort::mockSort(
         const BinMatrix& k,
         AdditivePerm& dst,
-        OleGenerator& ole,
+        CorGenerator& ole,
         coproto::Socket& comm)
     {
         MC_BEGIN(macoro::task<>, &k, &dst, &ole, &comm,
             data = BinMatrix{},
             perm = Perm{});
 
-        if (ole.mRole == OleGenerator::Role::Receiver)
+        if (ole.mRole == CorGenerator::Role::Receiver)
         {
             data.resize(k.rows(), k.bitsPerEntry());
             MC_AWAIT(comm.recv(data));

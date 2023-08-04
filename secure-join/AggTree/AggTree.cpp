@@ -312,11 +312,12 @@ namespace secJoin
         const Operator& op,
         Type type,
         coproto::Socket& comm,
-        OleGenerator& gen,
+        CorGenerator& gen,
+        oc::PRNG& prng,
         Level& root,
         span<SplitLevel> levels)
     {
-        MC_BEGIN(macoro::task<>, this, &src, &controlBits, &op, type, comm, &gen, &root, levels,
+        MC_BEGIN(macoro::task<>, this, &src, &controlBits, &op, type, comm, &gen, &root, levels,&prng,
             bin = Gmw{},
             cir = oc::BetaCircuit{},
             bitsPerEntry = u64{},
@@ -385,7 +386,7 @@ namespace secJoin
             }
 
             // eval
-            MC_AWAIT(bin.run(gen, comm));
+            MC_AWAIT(bin.run(gen, comm, prng));
 
 
             if (size != 1)
@@ -585,10 +586,11 @@ namespace secJoin
         SplitLevel& newVals,
         Type type,
         coproto::Socket& comm,
-        OleGenerator& gen,
+        CorGenerator& gen,
+        oc::PRNG& prng,
         std::vector<SplitLevel>* debugLevels)
     {
-        MC_BEGIN(macoro::task<>, this, &src, &op, &root, levels, &newVals, type, &comm, &gen, debugLevels,
+        MC_BEGIN(macoro::task<>, this, &src, &op, &root, levels, &newVals, type, &comm, &gen, debugLevels, &prng,
             bitsPerEntry = u64{},
             nodeCir = oc::BetaCircuit{},
             bin = Gmw{},
@@ -664,7 +666,7 @@ namespace secJoin
             }
 
             // eval
-            MC_AWAIT(bin.run(gen, comm));
+            MC_AWAIT(bin.run(gen, comm, prng));
 
             // for unit testing, we want to save these intermediate values.
             if (debugLevels)

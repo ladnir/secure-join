@@ -80,7 +80,7 @@ namespace secJoin
     //        ////    mCorrelations[t.first] = std::make_unique<T>(std::move(t.second));
     //        ////    //if (mRemReq.size())
     //        ////    //{
-    //        ////    //    MC_AWAIT(mGen->mControlQueue->push(OleGenerator::Command{ std::move(mRemReq.back()) }));
+    //        ////    //    MC_AWAIT(mGen->mControlQueue->push(CorGenerator::Command{ std::move(mRemReq.back()) }));
     //        ////    //    mRemReq.pop_back();
     //        ////    //}
     //        ////}

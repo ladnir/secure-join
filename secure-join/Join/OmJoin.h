@@ -27,7 +27,8 @@ namespace secJoin
 			BinMatrix& data,
 			BinMatrix& choice,
 			BinMatrix& out,
-			OleGenerator& ole,
+			CorGenerator& ole,
+			oc::PRNG&prng,
 			coproto::Socket& sock);
 
 
@@ -53,7 +54,8 @@ namespace secJoin
 			u64 keyBitCount,
 			coproto::Socket& sock,
 			BinMatrix& out,
-			OleGenerator& ole);
+			CorGenerator& ole,
+			oc::PRNG& prng);
 
 		// concatinate all the columns
 		// Then append `numDummies` empty rows to the end.
@@ -95,7 +97,7 @@ namespace secJoin
 			std::vector<ColRef> selects,
 			SharedTable& out,
 			oc::PRNG& prng,
-			OleGenerator& ole,
+			CorGenerator& ole,
 			coproto::Socket& sock);
 	};
 

@@ -82,9 +82,9 @@ void RadixSort_hadamardSum_test()
     share(l, l0, l1, prng);
     share(r, r0, r1, prng);
 
-    OleGenerator g0, g1;
-    g0.fakeInit(OleGenerator::Role::Sender);
-    g1.fakeInit(OleGenerator::Role::Receiver);
+    CorGenerator g0, g1;
+    g0.mock(CorGenerator::Role::Sender);
+    g1.mock(CorGenerator::Role::Receiver);
     s0.mDebug = true;
     s1.mDebug = true;
 
@@ -135,9 +135,9 @@ void RadixSort_oneHot_test()
     u64 mod = 1ull << L;
     auto comm = coproto::LocalAsyncSocket::makePair();
     std::array<std::future<void>, 2> f;
-    std::array<OleGenerator, 2> g;
-    g[0].fakeInit(OleGenerator::Role::Sender);
-    g[1].fakeInit(OleGenerator::Role::Receiver);
+    std::array<CorGenerator, 2> g;
+    g[0].mock(CorGenerator::Role::Sender);
+    g[1].mock(CorGenerator::Role::Receiver);
 
     oc::PRNG prng(oc::ZeroBlock);
     Matrix<u8> kk(n, 1);
@@ -159,8 +159,8 @@ void RadixSort_oneHot_test()
     gmw[1].setInput(0, k[1]);
 
     macoro::sync_wait(macoro::when_all_ready(
-        gmw[0].run(g[0], comm[0]),
-        gmw[1].run(g[1], comm[1])
+        gmw[0].run(g[0], comm[0], prng),
+        gmw[1].run(g[1], comm[1], prng)
     ));
 
     bits[0].resize(n, 1);
@@ -208,17 +208,17 @@ void RadixSort_bitInjection_test()
             k[i].back() &= mask;
 
     }
-    OleGenerator g0, g1;
-    g0.fakeInit(OleGenerator::Role::Receiver);
-    g1.fakeInit(OleGenerator::Role::Sender);
+    CorGenerator g0, g1;
+    g0.mock(CorGenerator::Role::Receiver);
+    g1.mock(CorGenerator::Role::Sender);
 
     share(k, L, k0, k1, prng);
 
     BitInject bi0, bi1;
 
     macoro::sync_wait(macoro::when_all_ready(
-        bi0.bitInjection(L, k0, 32, f0, g0, comm[0]),
-        bi1.bitInjection(L, k1, 32, f1, g1, comm[1])
+        bi0.bitInjection(L, k0, 32, f0, g0, prng, comm[0]),
+        bi1.bitInjection(L, k1, 32, f1, g1, prng, comm[1])
     ));
 
     auto ff = reveal(f0, f1);
@@ -270,9 +270,9 @@ void RadixSort_genValMasks2_test()
                 vals[v].push_back(i);
             }
 
-            OleGenerator g0, g1;
-            g0.fakeInit(OleGenerator::Role::Receiver);
-            g1.fakeInit(OleGenerator::Role::Sender);
+            CorGenerator g0, g1;
+            g0.mock(CorGenerator::Role::Receiver);
+            g1.mock(CorGenerator::Role::Sender);
 
             share(k, k0, k1, prng);
             s0.mL = L;
@@ -428,9 +428,9 @@ void RadixSort_genBitPerm_test()
                     assert(m < 64);
                     BinMatrix k(n, m);
                     BinMatrix sk[2];
-                    OleGenerator g[2];
-                    g[0].fakeInit(OleGenerator::Role::Sender);
-                    g[1].fakeInit(OleGenerator::Role::Receiver);
+                    CorGenerator g[2];
+                    g[0].mock(CorGenerator::Role::Sender);
+                    g[1].mock(CorGenerator::Role::Receiver);
 
                     //m = L;
                     auto ll = oc::divCeil(m, L);
@@ -531,9 +531,9 @@ void RadixSort_genPerm_test()
             {
                 for (u64 tt = 0; tt < trials; ++tt)
                 {
-                    OleGenerator g0, g1;
-                    g0.fakeInit(OleGenerator::Role::Sender);
-                    g1.fakeInit(OleGenerator::Role::Receiver);
+                    CorGenerator g0, g1;
+                    g0.mock(CorGenerator::Role::Sender);
+                    g1.mock(CorGenerator::Role::Receiver);
 
                     PRNG prng(block(0, 0));
                     RadixSort s0, s1;
@@ -607,9 +607,9 @@ void RadixSort_mock_test()
         {
             for (u64 tt = 0; tt < trials; ++tt)
             {
-                OleGenerator g0, g1;
-                g0.fakeInit(OleGenerator::Role::Sender);
-                g1.fakeInit(OleGenerator::Role::Receiver);
+                CorGenerator g0, g1;
+                g0.mock(CorGenerator::Role::Sender);
+                g1.mock(CorGenerator::Role::Receiver);
 
                 PRNG prng(block(0, 0));
                 RadixSort s0, s1;

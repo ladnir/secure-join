@@ -50,7 +50,7 @@ namespace secJoin
         //
         macoro::task<> setup(
             coproto::Socket& chl,
-            OleGenerator& ole,
+            CorGenerator& ole,
             PRNG& prng);
 
         u64 size() const { return mShare.size(); }
@@ -62,7 +62,7 @@ namespace secJoin
             oc::span<T> out,
             oc::PRNG& prng,
             coproto::Socket& chl,
-            OleGenerator& ole);
+            CorGenerator& ole);
 
         template <typename T>
         macoro::task<> apply(
@@ -71,7 +71,7 @@ namespace secJoin
             oc::MatrixView<T> out,
             oc::PRNG& prng,
             coproto::Socket& chl,
-            OleGenerator& ole);
+            CorGenerator& ole);
 
 
         macoro::task<> apply(
@@ -80,14 +80,14 @@ namespace secJoin
             BinMatrix& out,
             oc::PRNG& prng,
             coproto::Socket& chl,
-            OleGenerator& ole);
+            CorGenerator& ole);
 
         macoro::task<> composeSwap(
             AdditivePerm& pi,
             AdditivePerm& dst,
             oc::PRNG& prng,
             coproto::Socket& chl,
-            OleGenerator& gen);
+            CorGenerator& gen);
 
 
         macoro::task<> compose(
@@ -95,7 +95,7 @@ namespace secJoin
             AdditivePerm& dst,
             oc::PRNG& prng,
             coproto::Socket& chl,
-            OleGenerator& gen);
+            CorGenerator& gen);
 
 
         template <typename T>
@@ -105,14 +105,14 @@ namespace secJoin
             oc::MatrixView<T> out,
             oc::PRNG& prng,
             coproto::Socket& chl,
-            OleGenerator& ole);
+            CorGenerator& ole);
 
 
         macoro::task<> preprocess(
             u64 n, 
             u64 bytesPer, 
             coproto::Socket& chl,
-            OleGenerator& ole,
+            CorGenerator& ole,
             oc::PRNG& prng);
 
         bool hasSetup(u64 bytes) const
@@ -137,7 +137,7 @@ namespace secJoin
         oc::span<T> out,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        OleGenerator& ole)
+        CorGenerator& ole)
     {
         return apply<T>(
             op,
@@ -154,7 +154,7 @@ namespace secJoin
         oc::MatrixView<T> out,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        OleGenerator& ole)
+        CorGenerator& ole)
     {
         if (out.rows() != in.rows())
             throw RTE_LOC;
@@ -184,7 +184,7 @@ namespace secJoin
         if (op == PermOp::Inverse)
         {
             temp.resize(in.rows(), in.cols());
-            MC_AWAIT(mPi.apply<T>(PermOp::Regular, in, temp, chl, ole));
+            MC_AWAIT(mPi.apply<T>(PermOp::Regular, in, temp, chl, ole, prng));
             mRho.apply<T>(temp, out, PermOp::Inverse);
         }
         else
@@ -192,7 +192,7 @@ namespace secJoin
             // Local Permutation of [x]
             temp.resize(in.rows(), in.cols());
             mRho.apply<T>(in, temp, PermOp::Regular);
-            MC_AWAIT(mPi.apply<T>(PermOp::Inverse, temp, out, chl, ole));
+            MC_AWAIT(mPi.apply<T>(PermOp::Inverse, temp, out, chl, ole, prng));
         }
 
         MC_END();
@@ -206,7 +206,7 @@ namespace secJoin
         oc::MatrixView<T> out,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        OleGenerator& ole)
+        CorGenerator& ole)
     {
         if (mInsecureMock == false)
             throw RTE_LOC;

@@ -2,7 +2,7 @@
 #include "secure-join/config.h"
 #include "secure-join/Defines.h"
 #include "secure-join/Prf/DarkMatter22Prf.h"
-#include "secure-join/OleGenerator.h"
+#include "secure-join/CorGenerator/CorGenerator.h"
 
 #include "cryptoTools/Common/BitIterator.h"
 #include <bitset>
@@ -105,7 +105,7 @@ namespace secJoin
 
         bool hasKeyOts() const {return mIsKeyOTsSet;}
 
-        macoro::task<> genKeyOts(OleGenerator& ole, coproto::Socket& sock);
+        macoro::task<> genKeyOts(CorGenerator& ole, coproto::Socket& sock, oc::PRNG& prng);
 
         void setKeyOts(span<oc::block> ots);
 
@@ -134,14 +134,14 @@ namespace secJoin
             span<oc::block> y,
             coproto::Socket& sock,
             oc::PRNG& _,
-            OleGenerator& gen);
+            CorGenerator& gen);
 
         macoro::task<> mod2(
             oc::MatrixView<oc::block> u0,
             oc::MatrixView<oc::block> u1,
             oc::MatrixView<oc::block> out,
             coproto::Socket& sock,
-            Request<BinOle>& ole);
+            BinOleGenerator& ole);
 
         // re-randomize the OTs seeds with the tweak.
         void tweakKeyOts(oc::block tweak)
@@ -186,7 +186,7 @@ namespace secJoin
 
         bool hasKeyOts() const {return mIsKeyOTsSet;}
 
-        macoro::task<> genKeyOts(OleGenerator& ole, coproto::Socket& sock);
+        macoro::task<> genKeyOts(CorGenerator& ole, coproto::Socket& sock, oc::PRNG& prng);
 
         void setKeyOts(span<std::array<oc::block, 2>> ots);
 
@@ -209,14 +209,14 @@ namespace secJoin
             span<oc::block> y,
             coproto::Socket& sock,
             oc::PRNG&,
-            OleGenerator& gen);
+            CorGenerator& gen);
 
         macoro::task<> mod2(
             oc::MatrixView<oc::block> u0,
             oc::MatrixView<oc::block> u1,
             oc::MatrixView<oc::block> out,
             coproto::Socket& sock,
-            Request<BinOle>& ole);
+            BinOleGenerator& ole);
 
         // re-randomize the OTs seeds with the tweak.
         void tweakKeyOts(oc::block tweak)

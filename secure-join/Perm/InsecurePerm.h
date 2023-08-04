@@ -5,7 +5,7 @@
 #include "cryptoTools/Common/Matrix.h"
 #include "coproto/coproto.h"
 
-#include "secure-join/OleGenerator.h"
+#include "secure-join/CorGenerator/CorGenerator.h"
 
 // using coproto::LocalAsyncSocket;
 
@@ -22,7 +22,7 @@ namespace secJoin
             oc::MatrixView<T> sout,
             oc::PRNG& prng,
             coproto::Socket& chl,
-            OleGenerator& ole);
+            CorGenerator& ole);
 
         template<typename T>
         static macoro::task<> apply(
@@ -32,7 +32,7 @@ namespace secJoin
             oc::MatrixView<T> sout,
             oc::PRNG& prng,
             coproto::Socket& chl,
-            OleGenerator& ole);
+            CorGenerator& ole);
 
         template<typename T>
         static macoro::task<> apply(
@@ -41,7 +41,7 @@ namespace secJoin
             oc::MatrixView<T> sout,
             oc::PRNG& prng,
             coproto::Socket& chl,
-            OleGenerator& ole);
+            CorGenerator& ole);
     };
 
 
@@ -52,7 +52,7 @@ namespace secJoin
         oc::MatrixView<T> sout,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        OleGenerator& ole)
+        CorGenerator& ole)
     {
         return apply<u8>(matrixCast<u8>(x1), matrixCast<u8>(sout), prng, chl, ole);
     }
@@ -63,7 +63,7 @@ namespace secJoin
         oc::MatrixView<u8> sout,
         oc::PRNG&,
         coproto::Socket& chl,
-        OleGenerator&)
+        CorGenerator&)
     {
         MC_BEGIN(macoro::task<>, x1, &chl, sout
         );
@@ -89,7 +89,7 @@ namespace secJoin
         oc::MatrixView<T> sout,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        OleGenerator& ole)
+        CorGenerator& ole)
     {
         return apply<u8>(pi, op, matrixCast<u8>(sout), prng, chl, ole);
     }
@@ -101,7 +101,7 @@ namespace secJoin
         oc::MatrixView<u8> sout,
         oc::PRNG&,
         coproto::Socket& chl,
-        OleGenerator&)
+        CorGenerator&)
     {
         MC_BEGIN(macoro::task<>, &pi, &chl, sout,  op,
             o = oc::Matrix<u8>{}
@@ -133,7 +133,7 @@ namespace secJoin
         oc::MatrixView<T> sout,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        OleGenerator& ole)
+        CorGenerator& ole)
     {
         return apply<u8>(pi, op, matrixCast<u8>(x2), matrixCast<u8>(sout), prng, chl, invPerm, ole);
     }
@@ -146,7 +146,7 @@ namespace secJoin
         oc::MatrixView<u8> sout,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        OleGenerator& ole)
+        CorGenerator& ole)
     {
 
         MC_BEGIN(macoro::task<>, x2, &pi, &chl, sout, &prng, op, &ole,

@@ -50,7 +50,7 @@ namespace secJoin
             oc::MatrixView<T> sout,
             oc::PRNG& prng,
             coproto::Socket& chl,
-            OleGenerator& ole);
+            CorGenerator& ole);
 
         template<typename T>
         static macoro::task<> apply(
@@ -60,7 +60,7 @@ namespace secJoin
             oc::MatrixView<T> sout,
             oc::PRNG& prng,
             coproto::Socket& chl,
-            OleGenerator& ole);
+            CorGenerator& ole);
 
         template<typename T>
         static macoro::task<> apply(
@@ -69,7 +69,7 @@ namespace secJoin
             oc::MatrixView<T> sout,
             oc::PRNG& prng,
             coproto::Socket& chl,
-            OleGenerator& ole);
+            CorGenerator& ole);
     };
 
 
@@ -80,7 +80,7 @@ namespace secJoin
         oc::MatrixView<T> sout,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        OleGenerator& ole)
+        CorGenerator& ole)
     {
         oc::MatrixView<u8> xx((u8*)x1.data(), x1.rows(), x1.cols() * sizeof(T));
         oc::MatrixView<u8> oo((u8*)sout.data(), sout.rows(), sout.cols() * sizeof(T));
@@ -94,7 +94,7 @@ namespace secJoin
         oc::MatrixView<u8> sout,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        OleGenerator& ole)
+        CorGenerator& ole)
     {
         MC_BEGIN(macoro::task<>, x1, &chl, sout, &prng, &ole,
             n = u64(x1.rows()),
@@ -169,7 +169,7 @@ namespace secJoin
             gmw0.setInput(2 + i, roundkeysMatrix[i]);
         }
 
-        MC_AWAIT(gmw0.run(ole, chl));
+        MC_AWAIT(gmw0.run(ole, chl, prng));
 
         if (bytesPerRow % sizeof(LowMC2<>::block) == 0)
         {
@@ -203,7 +203,7 @@ namespace secJoin
         oc::MatrixView<T> sout,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        OleGenerator& ole)
+        CorGenerator& ole)
     {
         oc::MatrixView<u8> oo((u8*)sout.data(), sout.rows(), sout.cols() * sizeof(T));
         return apply<u8>(pi, op, oo, prng, chl, ole);
@@ -214,11 +214,11 @@ namespace secJoin
         const Perm& pi,
         PermOp op,
         oc::MatrixView<u8> sout,
-        oc::PRNG& _,
+        oc::PRNG& prng,
         coproto::Socket& chl,
-        OleGenerator& ole)
+        CorGenerator& ole)
     {
-        MC_BEGIN(macoro::task<>, &pi, &chl, sout, op, &ole,
+        MC_BEGIN(macoro::task<>, &pi, &chl, sout, op, &ole, &prng,
             xEncrypted_ = std::vector<u8>{},
             xEncrypted = span<LowMC2<>::block>{},
             xPermuted = std::vector<LowMC2<>::block>{},
@@ -282,7 +282,7 @@ namespace secJoin
             gmw1.setZeroInput(2 + i);
         }
 
-        MC_AWAIT(gmw1.run(ole, chl));
+        MC_AWAIT(gmw1.run(ole, chl, prng));
 
         if (bytesPerRow % sizeof(LowMC2<>::block) == 0)
         {
@@ -320,7 +320,7 @@ namespace secJoin
         oc::MatrixView<T> sout,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        OleGenerator& ole)
+        CorGenerator& ole)
     {
         oc::MatrixView<u8> xx((u8*)x2.data(), x2.rows(), x2.cols() * sizeof(T));
         oc::MatrixView<u8> oo((u8*)sout.data(), sout.rows(), sout.cols() * sizeof(T));
@@ -336,7 +336,7 @@ namespace secJoin
         oc::MatrixView<u8> sout,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        OleGenerator& ole)
+        CorGenerator& ole)
     {
 
         MC_BEGIN(macoro::task<>, x2, &pi, &chl, sout, &prng, op, &ole,

@@ -68,7 +68,7 @@ namespace secJoin
             oc::MatrixView<T> sout,
             oc::PRNG& prng,
             coproto::Socket& chl,
-            OleGenerator& ole);
+            CorGenerator& ole);
 
         // Sender apply: permute a secret shared input x by our pi and get shares as output
         template <typename T>
@@ -79,7 +79,7 @@ namespace secJoin
             oc::MatrixView<T> sout,
             oc::PRNG& prng,
             coproto::Socket& chl,
-            OleGenerator& ole
+            CorGenerator& ole
         );
 
         // Sender apply: permute a remote x by our pi and get shares as output.
@@ -89,7 +89,7 @@ namespace secJoin
             oc::MatrixView<T> sout,
             oc::PRNG& prng,
             coproto::Socket& chl,
-            OleGenerator& ole);
+            CorGenerator& ole);
 
         // Sender apply: permute a secret shared input x by our pi and get shares as output
         template <typename T>
@@ -99,11 +99,11 @@ namespace secJoin
             oc::MatrixView<T> sout,
             oc::PRNG& prng,
             coproto::Socket& chl,
-            OleGenerator& ole
+            CorGenerator& ole
         );
 
         void setKeyOts(std::vector<std::array<oc::block, 2>>& sk);
-        macoro::task<> genKeyOts(OleGenerator& ole, coproto::Socket& chl);
+        macoro::task<> genKeyOts(CorGenerator& ole, coproto::Socket& chl, oc::PRNG& prng);
 
 
         bool hasPreprocessing() const { return mHasPreprocess; }
@@ -117,7 +117,7 @@ namespace secJoin
             u64 bytesPerRow,
             oc::PRNG& prng,
             coproto::Socket& chl,
-            OleGenerator& ole);
+            CorGenerator& ole);
 
         // generate the preprocessing for us holding pi.
         macoro::task<> setup(
@@ -125,7 +125,7 @@ namespace secJoin
             u64 bytesPerRow,
             oc::PRNG& prng,
             coproto::Socket& chl,
-            OleGenerator& ole);
+            CorGenerator& ole);
 
         macoro::task<> validateShares(coproto::Socket& sock, Perm p);
 
@@ -150,7 +150,7 @@ namespace secJoin
         DLpnPermReceiver& operator=(DLpnPermReceiver&&) noexcept = default;
 
         void setKeyOts(oc::block& key, std::vector<oc::block>& rk);
-        macoro::task<> genKeyOts(OleGenerator& ole, coproto::Socket& chl);
+        macoro::task<> genKeyOts(CorGenerator& ole, coproto::Socket& chl, oc::PRNG& prng);
 
 
         void clear()
@@ -170,7 +170,7 @@ namespace secJoin
             oc::MatrixView<T> sout,
             oc::PRNG& prng,
             coproto::Socket& chl,
-            OleGenerator& ole
+            CorGenerator& ole
         );
 
         void clearPermutation() {
@@ -192,7 +192,7 @@ namespace secJoin
             u64 bytesPerRow,
             oc::PRNG& prng,
             coproto::Socket& chl,
-            OleGenerator& ole);
+            CorGenerator& ole);
 
         // generate the preprocessing when the other party hold pi.
         macoro::task<> setup(
@@ -200,7 +200,7 @@ namespace secJoin
             u64 bytesPerRow,
             oc::PRNG& prng,
             coproto::Socket& chl,
-            OleGenerator& ole);
+            CorGenerator& ole);
 
         macoro::task<> validateShares(coproto::Socket& sock);
 
@@ -213,7 +213,7 @@ namespace secJoin
         oc::MatrixView<u8> sout,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        OleGenerator& ole);
+        CorGenerator& ole);
 
     template <typename T>
     macoro::task<> DLpnPermSender::apply(
@@ -222,7 +222,7 @@ namespace secJoin
         oc::MatrixView<T> sout,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        OleGenerator& ole)
+        CorGenerator& ole)
     {
         return apply<u8>(pi, op, matrixCast<u8>(sout), prng, chl, ole);
     }
@@ -234,7 +234,7 @@ namespace secJoin
         oc::MatrixView<u8> sout,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        OleGenerator& ole);
+        CorGenerator& ole);
 
     template <typename T>
     macoro::task<> DLpnPermSender::apply(
@@ -242,7 +242,7 @@ namespace secJoin
         oc::MatrixView<T> sout,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        OleGenerator& ole)
+        CorGenerator& ole)
     {
         return apply<u8>(pi, op, matrixCast<u8>(sout), prng, chl, ole);
     }
@@ -256,7 +256,7 @@ namespace secJoin
         oc::MatrixView<u8> sout,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        OleGenerator& ole);
+        CorGenerator& ole);
 
     // Generic version of below method
     template <typename T>
@@ -267,7 +267,7 @@ namespace secJoin
         oc::MatrixView<T> sout,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        OleGenerator& ole)
+        CorGenerator& ole)
     {
         return apply<u8>(pi, op, matrixCast<const u8>(in), matrixCast<u8>(sout), prng, chl, ole);
     }
@@ -280,7 +280,7 @@ namespace secJoin
         oc::MatrixView<u8> sout,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        OleGenerator& ole);
+        CorGenerator& ole);
 
     // Generic version of below method
     template <typename T>
@@ -290,7 +290,7 @@ namespace secJoin
         oc::MatrixView<T> sout,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        OleGenerator& ole)
+        CorGenerator& ole)
     {
         return apply<u8>(op, matrixCast<const u8>(in), matrixCast<u8>(out), prng, chl, ole);
     }
@@ -302,7 +302,7 @@ namespace secJoin
         oc::MatrixView<u8> sout,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        OleGenerator& ole
+        CorGenerator& ole
         );
 
     // Generic version of below method
@@ -313,7 +313,7 @@ namespace secJoin
         oc::MatrixView<T> sout,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        OleGenerator& ole)
+        CorGenerator& ole)
     {
         return apply<u8>(op, matrixCast<const u8>(in), matrixCast<u8>(out), prng, chl, ole);
     }

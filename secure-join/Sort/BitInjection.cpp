@@ -46,26 +46,25 @@ namespace secJoin
     macoro::task<> BitInject::preprocess(
         u64 n,
         u64 inBitCount,
-        OleGenerator& gen,
+        CorGenerator& gen,
+        oc::PRNG& prng,
         coproto::Socket& sock)
     {
-        MC_BEGIN(macoro::task<>, this, n, inBitCount, &gen, &sock);
-
-
+        MC_BEGIN(macoro::task<>, this, n, inBitCount, &gen, &sock, &prng);
+        mHasPreprocessing = true;
         mRole = (int)gen.mRole;
         //if (n == 0 || inBitCount == 0)
         //    throw RTE_LOC;
 
-        if (gen.mRole == OleGenerator::Role::Receiver)
+        if (gen.mRole == CorGenerator::Role::Receiver)
         {
-            MC_AWAIT_SET(mRecvReq, gen.otRecvRequest(n * inBitCount));
+            MC_AWAIT(gen.otRecvRequest(mRecvReq, n * inBitCount, sock, prng));
         }
         else
         {
-            MC_AWAIT_SET(mSendReq, gen.otSendRequest(n * inBitCount));
+            MC_AWAIT(gen.otSendRequest(mSendReq, n * inBitCount, sock, prng));
         }
 
-        mHasPreprocessing = true;
         MC_END();
     }
 
@@ -79,15 +78,20 @@ namespace secJoin
         const oc::Matrix<u8>& in,
         u64 outBitCount,
         oc::Matrix<u32>& out,
-        OleGenerator& gen,
+        CorGenerator& gen,
+        oc::PRNG& prng,
         coproto::Socket& sock)
     {
-        MC_BEGIN(macoro::task<>, this, inBitCount, &in, outBitCount, &out, &gen, &sock);
+        MC_BEGIN(macoro::task<>, this, inBitCount, &in, outBitCount, &out, &gen, &sock, &prng, 
+            pre = macoro::eager_task<>{});
 
         if (hasPreprocessing() == false)
-            MC_AWAIT(preprocess(in.rows(), inBitCount, gen, sock));
+            pre = preprocess(in.rows(), inBitCount, gen, prng, sock) | macoro::make_eager();
 
         MC_AWAIT(bitInjection(inBitCount, in, outBitCount, out, sock));
+
+        if (pre.handle())
+            MC_AWAIT(pre);
 
         MC_END();
     }
@@ -131,7 +135,7 @@ namespace secJoin
             while (i < out.size())
             {
                 recvs.emplace_back();
-                MC_AWAIT_SET(recvs.back(), mRecvReq.get());
+                MC_AWAIT(mRecvReq.get(recvs.back()));
 
                 m = std::min<u64>(recvs.back().size(), out.size() - i);
                 recvs.back().mChoice.resize(m);
@@ -188,7 +192,7 @@ namespace secJoin
 
             while (i < out.size())
             {
-                MC_AWAIT_SET(send, mSendReq.get());
+                MC_AWAIT(mSendReq.get(send));
 
                 m = std::min<u64>(send.size(), out.size() - i);
                 diff.resize(m);

@@ -12,7 +12,7 @@ namespace secJoin
         Table mLTable, mRTable, mShareTable, mOutTable;
         oc::PRNG mPrng;
         OmJoin mJoin;
-        OleGenerator mOle;
+        CorGenerator mOle;
         coproto::BufferingSocket mSock;
         macoro::eager_task<void> mProtocol;
     };

@@ -33,9 +33,9 @@ namespace secJoin
         dm.setKey(kk);
         sender.setKey(kk);
 
-        OleGenerator ole0, ole1;
-        ole0.fakeInit(OleGenerator::Role::Sender);
-        ole1.fakeInit(OleGenerator::Role::Receiver);
+        CorGenerator ole0, ole1;
+        ole0.mock(CorGenerator::Role::Sender);
+        ole1.mock(CorGenerator::Role::Receiver);
 
 
         prng0.get(x.data(), x.size());
@@ -67,7 +67,7 @@ namespace secJoin
             std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "ms " <<
             sock[0].bytesSent() / double(n) << "+" << sock[0].bytesReceived() / double(n) << "=" <<
             (sock[0].bytesSent() + sock[0].bytesReceived()) / double(n) << " bytes/eval " << std::endl;
-        std::cout << ole0.mNumBinOle / double(n) << " " << ole1.mNumBinOle / double(n) << " binOle/per" << std::endl;;
+        //std::cout << ole0.mNumBinOle / double(n) << " " << ole1.mNumBinOle / double(n) << " binOle/per" << std::endl;;
         if (cmd.isSet("v"))
         {
             std::cout << timer << std::endl;

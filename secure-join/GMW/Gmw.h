@@ -14,7 +14,7 @@
 #include <list>
 #include <cryptoTools/Network/Channel.h>
 #include <cryptoTools/Common/Matrix.h>
-#include "secure-join/OleGenerator.h"
+#include "secure-join/CorGenerator/CorGenerator.h"
 #include "secure-join/Util/Matrix.h"
 
 namespace secJoin
@@ -80,7 +80,7 @@ namespace secJoin
         BetaCircuit::PrintIter mPrint;
 
         // the binary triples used in by the protocol.
-        Request<BinOle> mTriples;
+        BinOleGenerator mTriples;
 
         // initialize this gmw to eval n copies of the circuit cir.
         // use correlations provided by ole.
@@ -183,10 +183,10 @@ namespace secJoin
             }
         }
 
-        macoro::task<> preprocess(OleGenerator& gen, coproto::Socket& chl);
+        macoro::task<> preprocess(CorGenerator& gen, coproto::Socket& chl, oc::PRNG& prng);
 
         // run the gmw protocol.
-        coproto::task<> run(OleGenerator& gen, coproto::Socket& chl);
+        coproto::task<> run(CorGenerator& gen, coproto::Socket& chl, oc::PRNG& prng);
 
         coproto::task<> run(coproto::Socket& chl);
 

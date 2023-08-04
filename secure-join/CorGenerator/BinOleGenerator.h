@@ -11,6 +11,7 @@
 #include "macoro/task.h"
 #include "macoro/channel.h"
 #include "macoro/macros.h"
+#include "macoro/manual_reset_event.h"
 
 #include "libOTe/TwoChooseOne/Silent/SilentOtExtSender.h"
 #include "libOTe/TwoChooseOne/Silent/SilentOtExtReceiver.h"
@@ -39,6 +40,10 @@ namespace secJoin
 
     struct BinOleGenerator
     {
+        BinOleGenerator() = default;
+        BinOleGenerator(const BinOleGenerator&) = delete;
+        BinOleGenerator(BinOleGenerator&&) = default;
+        BinOleGenerator&operator=(BinOleGenerator&&) = default;
 
         struct Impl
         {
@@ -48,12 +53,15 @@ namespace secJoin
             oc::SilentOtExtSender mSender;
             oc::AlignedUnVector<oc::block> mMult, mAdd;
 
+            u64 mSize = 0;
             oc::BitVector mChoice;
             oc::AlignedUnVector<oc::block> mMsg;
             oc::AlignedUnVector<std::array<oc::block, 2>> mMsg2;
 
+            //macoro::async_manual_reset_event mDone;
             macoro::eager_task<> mTask;
             macoro::task<> mT;
+            macoro::async_manual_reset_event mDone;
 
             coproto::Socket mSock;
             oc::PRNG mPrng;
@@ -68,27 +76,53 @@ namespace secJoin
             void compressSender(span<std::array<oc::block, 2>> sendMsg, span<oc::block> add, span<oc::block> mult);
         };
         std::vector<Impl> mCorrelations;
-        u64 mIdx = 0;
-        macoro::eager_task<> mTask;
-
+        u64 mIdx = 0, mSize = 0, mRole = 0;
+        bool mMock = false;
         template<typename Base>
         void init(
             u64 n,
             u64 batchSize,
             coproto::Socket& sock,
             oc::PRNG& prng,
-            Base& base);
+            Base& base, 
+            bool mock);
 
 
-        void start()
+        macoro::task<> task()
         {
-            mTask = task() | macoro::make_eager();
+            MC_BEGIN(macoro::task<>, this, i = u64{});
+            if (mMock)
+                MC_RETURN_VOID();
+
+            TODO("ex handling");
+            for (i = 0; i < mCorrelations.size(); ++i)
+                mCorrelations[i].mTask = mCorrelations[i].task() | macoro::make_eager();
+
+
+            for (i = 0; i < mCorrelations.size(); ++i)
+            {
+                MC_AWAIT(mCorrelations[i].mTask);
+                mCorrelations[i].mDone.set();
+            }
+
+            MC_END();
         }
 
-        macoro::task<> task();
+        //macoro::task<> task();
         macoro::task<> get(BinOle& d);
 
-        macoro::eager_task<> close() { return std::move(mTask); }
+        macoro::task<> close() {
+            MC_BEGIN(macoro::task<>, this);
+
+            if (mMock)
+                MC_RETURN_VOID();
+
+            while (mIdx < mCorrelations.size())
+            {
+                MC_AWAIT(mCorrelations[mIdx++].mTask);
+            }
+            MC_END();
+        }
     };
 
 }

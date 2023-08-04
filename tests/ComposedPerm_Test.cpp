@@ -17,9 +17,9 @@ void ComposedPerm_basic_test()
 
 
     auto chls = coproto::LocalAsyncSocket::makePair();
-    OleGenerator ole0, ole1;
-    ole0.fakeInit(OleGenerator::Role::Sender);
-    ole1.fakeInit(OleGenerator::Role::Receiver);
+    CorGenerator ole0, ole1;
+    ole0.mock(CorGenerator::Role::Sender);
+    ole1.mock(CorGenerator::Role::Receiver);
     // std::vector<u64> pi0(n), pi1(n);
     prng.get(x.data(), x.size());
 
@@ -58,8 +58,8 @@ void ComposedPerm_basic_test()
         sout[0].resize(n, rowSize);
         sout[1].resize(n, rowSize);
 
-        auto proto0 = perm1.apply<u8>(invPerm, xShares[0], sout[0], chls[0], ole0);
-        auto proto1 = perm2.apply<u8>(invPerm, xShares[1], sout[1], chls[1], ole1);
+        auto proto0 = perm1.apply<u8>(invPerm, xShares[0], sout[0], chls[0], ole0, prng);
+        auto proto1 = perm2.apply<u8>(invPerm, xShares[1], sout[1], chls[1], ole1, prng);
 
         auto res = macoro::sync_wait(macoro::when_all_ready(std::move(proto0), std::move(proto1)));
         std::get<0>(res).result();
@@ -93,10 +93,10 @@ void ComposedPerm_shared_test()
 
     auto chls = coproto::LocalAsyncSocket::makePair();
      // Fake Setup
-    OleGenerator ole0, ole1;
+    CorGenerator ole0, ole1;
     // macoro::thread_pool tp;
-    ole0.fakeInit(OleGenerator::Role::Sender);
-    ole1.fakeInit(OleGenerator::Role::Receiver);
+    ole0.mock(CorGenerator::Role::Sender);
+    ole1.mock(CorGenerator::Role::Receiver);
 
     std::array<oc::Matrix<u8>, 2> sout;
     std::array<oc::Matrix<u8>, 2> xShares = share(x,prng0);
@@ -145,8 +145,8 @@ void ComposedPerm_shared_test()
         sout[1].resize(n, rowSize);
 
         auto res = macoro::sync_wait(macoro::when_all_ready(
-            perm1.apply<u8>(invPerm, xShares[0], sout[0], chls[0], ole0),
-            perm2.apply<u8>(invPerm, xShares[1], sout[1], chls[1], ole1)
+            perm1.apply<u8>(invPerm, xShares[0], sout[0], chls[0], ole0, prng0),
+            perm2.apply<u8>(invPerm, xShares[1], sout[1], chls[1], ole1, prng1)
             ));
         std::get<1>(res).result();
         std::get<0>(res).result();
@@ -181,10 +181,10 @@ void ComposedPerm_prepro_test()
 
     auto chls = coproto::LocalAsyncSocket::makePair();
     // Fake Setup
-    OleGenerator ole0, ole1;
+    CorGenerator ole0, ole1;
     // macoro::thread_pool tp;
-    ole0.fakeInit(OleGenerator::Role::Sender);
-    ole1.fakeInit(OleGenerator::Role::Receiver);
+    ole0.mock(CorGenerator::Role::Sender);
+    ole1.mock(CorGenerator::Role::Receiver);
 
     std::array<oc::Matrix<u8>, 2> sout;
     std::array<oc::Matrix<u8>, 2> xShares = share(x, prng0);
@@ -227,8 +227,8 @@ void ComposedPerm_prepro_test()
         sout[1].resize(n, rowSize);
 
         auto res = macoro::sync_wait(macoro::when_all_ready(
-            perm1.apply<u8>(invPerm, xShares[0], sout[0], chls[0], ole0),
-            perm2.apply<u8>(invPerm, xShares[1], sout[1], chls[1], ole1)
+            perm1.apply<u8>(invPerm, xShares[0], sout[0], chls[0], ole0, prng0),
+            perm2.apply<u8>(invPerm, xShares[1], sout[1], chls[1], ole1, prng1)
         ));
         std::get<1>(res).result();
         std::get<0>(res).result();

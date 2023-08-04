@@ -3,12 +3,47 @@
 namespace secJoin
 {
 
+
+    void fakeFill(u64 m, OtRecv& ole, coproto::SessionID sid)
+    {
+        //oc::PRNG prng(oc::block(mCurSize++));
+        ole.mMsg.resize(m);
+        ole.mChoice.resize(m);
+        memset(ole.mChoice.data(), 0b10101100, ole.mChoice.sizeBytes());
+
+        oc::block s;
+        memcpy(s.data(), sid.mVal, sizeof(oc::block));
+        for (u32 i = 0; i < ole.mMsg.size(); ++i)
+        {
+            oc::block m0 = std::array<u32, 4>{i, i, i, i};// prng.get();
+            oc::block m1 = std::array<u32, 4>{~i, ~i, ~i, ~i};//prng.get();
+
+            m0 = m0 ^ s;
+            m1 = m1 ^ s;
+            ole.mMsg[i] = ole.mChoice[i] ? m1 : m0;
+        }
+    }
+
+    void fakeFill(u64 m, OtSend& ole, coproto::SessionID sid)
+    {
+        ole.mMsg.resize(m);
+        oc::block s;
+        memcpy(s.data(), sid.mVal, sizeof(oc::block));
+        for (u32 i = 0; i < ole.mMsg.size(); ++i)
+        {
+            ole.mMsg[i][0] = std::array<u32, 4>{i, i, i, i};// prng.get();
+            ole.mMsg[i][1] = std::array<u32, 4>{~i, ~i, ~i, ~i};//prng.get();
+
+
+            ole.mMsg[i][0] = ole.mMsg[i][0] ^ s;
+            ole.mMsg[i][1] = ole.mMsg[i][1] ^ s;
+        }
+    }
+
     void OtRecvGenerator::Impl::init(u64 size, coproto::Socket& sock, oc::PRNG& prng, SendBase& base)
     {
         mSock = sock.fork();
         mPrng = prng.get<oc::block>();
-        mMsg.resize(size);
-        mChoice.resize(size);
         mReceiver.configure(size);
         mReceiver.setBaseOts(base.get());
     }
@@ -16,7 +51,16 @@ namespace secJoin
 
     macoro::task<> OtRecvGenerator::Impl::task()
     {
-        return mReceiver.silentReceive(mChoice, mMsg, mPrng, mSock);
+        //mMsg.resize(mReceiver.mRequestedNumOts);
+        //mChoice.resize(mReceiver.mRequestedNumOts);
+        //return mReceiver.silentReceive(mChoice, mMsg, mPrng, mSock);
+        TODO("just return inner");
+        MC_BEGIN(macoro::task<>, this);
+        mMsg.resize(mReceiver.mRequestedNumOts);
+        mChoice.resize(mReceiver.mRequestedNumOts);
+        MC_AWAIT(mReceiver.silentReceive(mChoice, mMsg, mPrng, mSock));
+        //std::cout << "mReceiver done " << mSock.mId << std::endl;
+        MC_END();
     }
 
 
@@ -26,9 +70,11 @@ namespace secJoin
         u64 batchSize,
         coproto::Socket& sock,
         oc::PRNG& prng,
-        SendBase& base)
+        SendBase& base,
+        bool mock)
     {
-
+        mMock = mock;
+        mSize = n;
         mCorrelations.reserve(oc::divCeil(n, batchSize));
         for (u64 i = 0; i < n; i += batchSize)
         {
@@ -38,19 +84,22 @@ namespace secJoin
         }
     }
 
-    macoro::task<> OtRecvGenerator::task()
-    {
-        MC_BEGIN(macoro::task<>, this, i = u64{});
+    //macoro::task<> OtRecvGenerator::task()
+    //{
 
-        TODO("ex handling");
+    //    if (!mCorrelations.size())
+    //        throw RTE_LOC;
+    //    MC_BEGIN(macoro::task<>, this, i = u64{});
 
-        for (i = 0; i < mCorrelations.size(); ++i)
-            mCorrelations[i].mTask = mCorrelations[i].task() | macoro::make_eager();
-        for (i = 0; i < mCorrelations.size(); ++i)
-            MC_AWAIT(mCorrelations[i].mTask);
+    //    TODO("ex handling");
 
-        MC_END();
-    }
+    //    for (i = 0; i < mCorrelations.size(); ++i)
+    //        mCorrelations[i].mTask = mCorrelations[i].task() | macoro::make_eager();
+    //    for (i = 0; i < mCorrelations.size(); ++i)
+    //        MC_AWAIT(mCorrelations[i].mTask);
+
+    //    MC_END();
+    //}
 
     macoro::task<> OtRecvGenerator::get(OtRecv& d)
     {
@@ -58,11 +107,18 @@ namespace secJoin
 
         if (mIdx >= mCorrelations.size())
             throw RTE_LOC;
+        if (mMock)
+        {
+            auto s = mCorrelations[mIdx].mReceiver.mRequestedNumOts;
+            fakeFill(s, d, mCorrelations[mIdx].mSock.mId);
+        }
+        else
+        {
+            MC_AWAIT(mCorrelations[mIdx].mDone);
 
-        MC_AWAIT(mCorrelations[mIdx].mTask);
-
-        d.mMsg = std::move(mCorrelations[mIdx].mMsg);
-        d.mChoice = std::move(mCorrelations[mIdx].mChoice);
+            d.mMsg = std::move(mCorrelations[mIdx].mMsg);
+            d.mChoice = std::move(mCorrelations[mIdx].mChoice);
+        }
         ++mIdx;
 
         MC_END();
@@ -74,14 +130,20 @@ namespace secJoin
     {
         mSock = sock.fork();
         mPrng = prng.get<oc::block>();
-        mMsg.resize(size);
         mSender.configure(size);
         mSender.setBaseOts(base.get(), base.mChoice);
     }
 
     macoro::task<> OtSendGenerator::Impl::task()
     {
-        return mSender.silentSend(mMsg, mPrng, mSock);
+        //mMsg.resize(mSender.mRequestNumOts);
+        //return mSender.silentSend(mMsg, mPrng, mSock);
+        MC_BEGIN(macoro::task<>, this);
+        TODO("just return inner");
+        mMsg.resize(mSender.mRequestNumOts);
+        MC_AWAIT(mSender.silentSend(mMsg, mPrng, mSock));
+        //std::cout << "mSender done " << mSock.mId << std::endl;
+        MC_END();
     }
 
 
@@ -90,8 +152,11 @@ namespace secJoin
         u64 batchSize,
         coproto::Socket& sock,
         oc::PRNG& prng,
-        RecvBase& base)
+        RecvBase& base,
+        bool mock)
     {
+        mMock = mock;
+        mSize = n;
         mCorrelations.reserve(oc::divCeil(n, batchSize));
         for (u64 i = 0; i < n; i += batchSize)
         {
@@ -101,30 +166,45 @@ namespace secJoin
         }
     }
 
-    macoro::task<> OtSendGenerator::task()
-    {
-        MC_BEGIN(macoro::task<>, this, i = u64{});
+    //macoro::task<> OtSendGenerator::task()
+    //{
+    //    if (!mCorrelations.size())
+    //        throw RTE_LOC;
 
-        TODO("ex handling");
-        for (i = 0; i < mCorrelations.size(); ++i)
-            mCorrelations[i].mTask = mCorrelations[i].task() | macoro::make_eager();
-        for (i = 0; i < mCorrelations.size(); ++i)
-            MC_AWAIT(mCorrelations[i].mTask);
+    //    MC_BEGIN(macoro::task<>, this, i = u64{});
 
-        MC_END();
-    }
+    //    TODO("ex handling");
+    //    for (i = 0; i < mCorrelations.size(); ++i)
+    //        mCorrelations[i].mTask = mCorrelations[i].task() | macoro::make_eager();
+    //    //for (i = 0; i < mCorrelations.size(); ++i)
+    //    //{
+    //    //    MC_AWAIT(mCorrelations[i].mTask);
+
+    //    //}
+
+    //    MC_END();
+    //}
 
 
     macoro::task<> OtSendGenerator::get(OtSend& d)
     {
         MC_BEGIN(macoro::task<>, this, &d);
 
-        if (mIdx >= mCorrelations.size())
-            throw RTE_LOC;
+        if (mMock)
+        {
+            auto s = mCorrelations[mIdx].mSender.mRequestNumOts;
+            fakeFill(s, d, mCorrelations[mIdx].mSock.mId);
+        }
+        else
+        {
 
-        MC_AWAIT(mCorrelations[mIdx].mTask);
+            if (mIdx >= mCorrelations.size())
+                throw RTE_LOC;
 
-        d.mMsg = std::move(mCorrelations[mIdx].mMsg);
+            MC_AWAIT(mCorrelations[mIdx].mDone);
+
+            d.mMsg = std::move(mCorrelations[mIdx].mMsg);
+        }
         ++mIdx;
 
         MC_END();

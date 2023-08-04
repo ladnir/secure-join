@@ -576,12 +576,16 @@ void DLpnPrf_mod2_test(const oc::CLP& cmd)
     auto sock = coproto::LocalAsyncSocket::makePair();
 
 
-    OleGenerator ole0, ole1;
-    ole0.fakeInit(OleGenerator::Role::Sender);
-    ole1.fakeInit(OleGenerator::Role::Receiver);
+    CorGenerator ole0, ole1;
+    ole0.mock(CorGenerator::Role::Sender);
+    ole1.mock(CorGenerator::Role::Receiver);
 
-    auto req0 = macoro::sync_wait(ole0.binOleRequest(2 * n * m));
-    auto req1 = macoro::sync_wait(ole1.binOleRequest(2 * n * m));
+
+    BinOleGenerator req0, req1;
+    macoro::sync_wait(macoro::when_all_ready(
+        ole0.binOleRequest(req0, 2 * n * m, sock[0], prng0),
+        ole1.binOleRequest(req1, 2 * n * m, sock[1], prng1)
+    ));
 
     macoro::sync_wait(macoro::when_all_ready(
         sender.mod2(u0s[0], u1s[0], outs[0], sock[0], req0),
@@ -850,9 +854,9 @@ void DLpnPrf_proto_test(const oc::CLP& cmd)
     dm.setKey(kk);
     sender.setKey(kk);
 
-    OleGenerator ole0, ole1;
-    ole0.fakeInit(OleGenerator::Role::Sender);
-    ole1.fakeInit(OleGenerator::Role::Receiver);
+    CorGenerator ole0, ole1;
+    ole0.mock(CorGenerator::Role::Sender);
+    ole1.mock(CorGenerator::Role::Receiver);
 
 
     prng0.get(x.data(), x.size());
@@ -876,10 +880,6 @@ void DLpnPrf_proto_test(const oc::CLP& cmd)
     std::get<0>(r).result();
     std::get<1>(r).result();
 
-    coproto::sync_wait(coproto::when_all_ready(
-        ole0.stop(),
-        ole1.stop()
-    ));
 
     if (cmd.isSet("v"))
     {

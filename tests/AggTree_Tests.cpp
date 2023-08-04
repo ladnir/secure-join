@@ -4,7 +4,7 @@
 #include "secure-join/AggTree/PerfectShuffle.h"
 #include "cryptoTools/Common/TestCollection.h"
 #include "coproto/Socket/LocalAsyncSock.h"
-#include "secure-join/OleGenerator.h"
+#include "secure-join/CorGenerator/CorGenerator.h"
 #include "secure-join/GMW/Gmw.h"
 #include "secure-join/Util/Util.h"
 #include "AggTree_Tests.h"
@@ -34,12 +34,13 @@ void eval(BetaCircuit& cir,
 
     for (u64 t = 0; t < numTrials; ++t)
     {
-        OleGenerator gen[2];
+        CorGenerator gen[2];
         Gmw bin[2];
+
 
         for (u64 i = 0; i < 2; ++i)
         {
-            gen[i].fakeInit((OleGenerator::Role)i);
+            gen[i].mock((CorGenerator::Role)i);
             bin[i].init(numShares, cir);
         }
 
@@ -65,8 +66,8 @@ void eval(BetaCircuit& cir,
         }
 
         auto mR = macoro::sync_wait(macoro::when_all_ready(
-            bin[0].run(gen[0], comm[0]),
-            bin[1].run(gen[1], comm[1])
+            bin[0].run(gen[0], comm[0], prng),
+            bin[1].run(gen[1], comm[1], prng)
         ));
 
         std::get<0>(mR).result();
@@ -981,14 +982,14 @@ void AggTree_xor_upstream_Test()
         tvs[0].resize(mLogn);
         tvs[1].resize(mLogn);
 
-        OleGenerator g0, g1;
+        CorGenerator g0, g1;
 
-        g0.fakeInit(OleGenerator::Role::Receiver);
-        g1.fakeInit(OleGenerator::Role::Sender);
+        g0.mock(CorGenerator::Role::Receiver);
+        g1.mock(CorGenerator::Role::Sender);
 
         macoro::sync_wait(macoro::when_all_ready(
-            t0.upstream(s[0], c[0], op, type, comm[0], g0, root[0], tvs[0]),
-            t1.upstream(s[1], c[1], op, type, comm[1], g1, root[1], tvs[1])
+            t0.upstream(s[0], c[0], op, type, comm[0], g0, prng, root[0], tvs[0]),
+            t1.upstream(s[1], c[1], op, type, comm[1], g1, prng, root[1], tvs[1])
         ));
 
         if (tvs[0].size() != mLogn)
@@ -1153,9 +1154,9 @@ void AggTree_xor_downstream_Test(Op op, OpCir opCir, u64 mN)
 
         u64 m = 32;
 
-        std::array<OleGenerator, 2> g;
-        g[0].fakeInit(OleGenerator::Role::Receiver);
-        g[1].fakeInit(OleGenerator::Role::Sender);
+        std::array<CorGenerator, 2> g;
+        g[0].mock(CorGenerator::Role::Receiver);
+        g[1].mock(CorGenerator::Role::Sender);
 
         AggTree t[2];
 
@@ -1185,15 +1186,15 @@ void AggTree_xor_downstream_Test(Op op, OpCir opCir, u64 mN)
         //t[1].mDebug = true;
 
         macoro::sync_wait(macoro::when_all_ready(
-            t[0].upstream(s[0], c[0], opCir, type, com[0], g[0], root[0], upLevels[0]),
-            t[1].upstream(s[1], c[1], opCir, type, com[1], g[1], root[1], upLevels[1])
+            t[0].upstream(s[0], c[0], opCir, type, com[0], g[0], prng, root[0], upLevels[0]),
+            t[1].upstream(s[1], c[1], opCir, type, com[1], g[1], prng, root[1], upLevels[1])
         ));
         root2[0] = root[0];
         root2[1] = root[1];
 
         macoro::sync_wait(macoro::when_all_ready(
-            t[0].downstream(s[0], opCir, root[0], upLevels[0], preSuf[0], type, com[0], g[0], &dwLevels[0]),
-            t[1].downstream(s[1], opCir, root[1], upLevels[1], preSuf[1], type, com[1], g[1], &dwLevels[1])
+            t[0].downstream(s[0], opCir, root[0], upLevels[0], preSuf[0], type, com[0], g[0],prng, &dwLevels[0]),
+            t[1].downstream(s[1], opCir, root[1], upLevels[1], preSuf[1], type, com[1], g[1],prng, &dwLevels[1])
         ));
 
         std::vector<PLevel> levels(mLogn);
@@ -1454,9 +1455,9 @@ void AggTree_full_Test(Op op, OpCir opCir)
         u64 mN = 311;
         u64 m = 32;
 
-        std::array<OleGenerator, 2> g;
-        g[0].fakeInit(OleGenerator::Role::Receiver);
-        g[1].fakeInit(OleGenerator::Role::Sender);
+        std::array<CorGenerator, 2> g;
+        g[0].mock(CorGenerator::Role::Receiver);
+        g[1].mock(CorGenerator::Role::Sender);
 
         AggTree t[2];
 
@@ -1471,8 +1472,8 @@ void AggTree_full_Test(Op op, OpCir opCir)
         BinMatrix d0(mN, m), d1(mN, m);
 
         macoro::sync_wait(macoro::when_all_ready(
-            t[0].apply(s[0], c[0], opCir, type, com[0], g[0], d0),
-            t[1].apply(s[1], c[1], opCir, type, com[1], g[1], d1)
+            t[0].apply(s[0], c[0], opCir, type, com[0], g[0], prng, d0),
+            t[1].apply(s[1], c[1], opCir, type, com[1], g[1], prng, d1)
         ));
 
 

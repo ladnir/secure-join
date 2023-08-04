@@ -2,7 +2,7 @@
 #include "macoro/macros.h"
 #include "coproto/coproto.h"
 #include "secure-join/Util/Matrix.h"
-#include "secure-join/OleGenerator.h"
+#include "secure-join/CorGenerator/CorGenerator.h"
 
 namespace secJoin
 {
@@ -10,8 +10,8 @@ namespace secJoin
     struct BitInject
     {
 
-        Request<OtRecv> mRecvReq;
-        Request<OtSend> mSendReq;
+        OtRecvGenerator mRecvReq;
+        OtSendGenerator mSendReq;
         bool mHasPreprocessing = false;
 
         u64 mRole = -1;
@@ -22,7 +22,8 @@ namespace secJoin
         macoro::task<> preprocess(
             u64 n,
             u64 inBitCount,
-            OleGenerator& gen,
+            CorGenerator& gen,
+            oc::PRNG& prng,
             coproto::Socket& sock
         );
 
@@ -36,7 +37,8 @@ namespace secJoin
             const oc::Matrix<u8>& in,
             u64 outBitCount,
             oc::Matrix<u32>& out,
-            OleGenerator& gen,
+            CorGenerator& gen,
+            oc::PRNG& prng,
             coproto::Socket& sock);
 
 
@@ -64,7 +66,7 @@ namespace secJoin
     //    const oc::Matrix<u8>& in,
     //    u64 outBitCount,
     //    oc::Matrix<u32>& out,
-    //    OleGenerator& gen,
+    //    CorGenerator& gen,
     //    coproto::Socket& sock);
 
 } // namespace secJoin

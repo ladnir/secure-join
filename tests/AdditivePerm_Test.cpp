@@ -28,9 +28,9 @@ void AdditivePerm_xor_test()
         vecPerm1(sShares[0], prng, 0),
         vecPerm2(sShares[1], prng, 1);
 
-    OleGenerator ole0, ole1;
-    ole0.fakeInit(OleGenerator::Role::Sender);
-    ole1.fakeInit(OleGenerator::Role::Receiver);
+    CorGenerator ole0, ole1;
+    ole0.mock(CorGenerator::Role::Sender);
+    ole1.mock(CorGenerator::Role::Receiver);
 
     // Setuping up the OT Keys
     oc::block kk = prng.get();
@@ -119,9 +119,9 @@ void AdditivePerm_prepro_test()
         vecPerm1(sShares[0], prng, 0),
         vecPerm2(sShares[1], prng, 1);
 
-    OleGenerator ole0, ole1;
-    ole0.fakeInit(OleGenerator::Role::Sender);
-    ole1.fakeInit(OleGenerator::Role::Receiver);
+    CorGenerator ole0, ole1;
+    ole0.mock(CorGenerator::Role::Sender);
+    ole1.mock(CorGenerator::Role::Receiver);
 
     auto res0 = macoro::sync_wait(macoro::when_all_ready(
         vecPerm1.preprocess(n, rowSize, chls[0], ole0, prng),

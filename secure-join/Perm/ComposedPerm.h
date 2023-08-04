@@ -39,7 +39,7 @@ namespace secJoin
             std::vector<oc::block>& rk,
             std::vector<std::array<oc::block, 2>>& sk);
 
-        macoro::task<> genKeyOts(OleGenerator& ole, coproto::Socket& chl);
+        macoro::task<> genKeyOts(CorGenerator& ole, coproto::Socket& chl, oc::PRNG& prng);
 
         u64 size() const { return mPi.size(); }
 
@@ -49,7 +49,7 @@ namespace secJoin
             u64 n,
             u64 bytesPer,
             coproto::Socket& chl,
-            OleGenerator& ole,
+            CorGenerator& ole,
             PRNG& prng);
 
         template<typename T>
@@ -58,7 +58,9 @@ namespace secJoin
             oc::MatrixView<const T> in,
             oc::MatrixView<T> out,
             coproto::Socket& chl,
-            OleGenerator& ole);
+            CorGenerator& ole,
+            oc::PRNG& prng
+        );
 
 
         void clear()
@@ -78,7 +80,8 @@ namespace secJoin
         oc::MatrixView<const u8> in,
         oc::MatrixView<u8> out,
         coproto::Socket& chl,
-        OleGenerator& ole);
+        CorGenerator& ole,
+        oc::PRNG& prng);
 
     template<typename T>
     macoro::task<> ComposedPerm::apply(
@@ -86,8 +89,9 @@ namespace secJoin
         oc::MatrixView<const T> in,
         oc::MatrixView<T> out,
         coproto::Socket& chl,
-        OleGenerator& ole)
+        CorGenerator& ole,
+        oc::PRNG& prng)
     {
-        return apply<u8>(op, matrixCast<const u8>(in), matrixCast<u8>(out), chl, ole);
+        return apply<u8>(op, matrixCast<const u8>(in), matrixCast<u8>(out), chl, ole, prng);
     }
 }

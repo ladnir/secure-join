@@ -9,7 +9,7 @@ namespace secJoin
 
     class CorGenerator
     {
-
+    public:
         enum class Role
         {
             Sender,
@@ -17,6 +17,24 @@ namespace secJoin
         };
 
         Role mRole;
+        bool mMock = false;
+
+        void mock(Role role)
+        {
+            mRole = role;
+            mMock = true;
+            oc::PRNG prng(oc::ZeroBlock);
+            mSBase.resize(128);
+            mRBase.resize(128);
+            mRBase.mChoice.randomize(prng);
+            for (u64 i = 0; i < 128; ++i)
+            {
+                mSBase.mBase[i][0] = prng.get<oc::block>();
+                mSBase.mBase[i][1] = prng.get<oc::block>();
+                mRBase.mBase[i] = mSBase.mBase[i][mRBase.mChoice[i]].getSeed();
+            }
+        }
+
 
 
 
@@ -66,37 +84,31 @@ namespace secJoin
         }
 
 
-        BinOleGenerator binOleRequest(coproto::Socket& sock, u64 numCorrelations, oc::PRNG& prng, u64 reservoirSize = 0)
+        macoro::task<> binOleRequest(BinOleGenerator& r , u64 numCorrelations, coproto::Socket& sock, oc::PRNG& prng, u64 reservoirSize = 0)
         {
             if (hasBase() == false)
                 throw RTE_LOC;
-            BinOleGenerator r;
             if (mRole == Role::Sender)
-                r.init(numCorrelations, 1 << 16, sock, prng, mRBase);
+                r.init(numCorrelations, 1 << 16, sock, prng, mRBase, mMock);
             else
-                r.init(numCorrelations, 1 << 16, sock, prng, mSBase);
-            r.start();
-            return r;
+                r.init(numCorrelations, 1 << 16, sock, prng, mSBase, mMock);
+            return r.task();
         }
 
-        OtRecvGenerator otRecvRequest(coproto::Socket& sock, u64 numCorrelations, oc::PRNG& prng, u64 reservoirSize = 0)
+        macoro::task<> otRecvRequest(OtRecvGenerator & r, u64 numCorrelations, coproto::Socket& sock, oc::PRNG& prng, u64 reservoirSize = 0)
         {
             if (hasBase() == false)
                 throw RTE_LOC;
-            OtRecvGenerator r;
-            r.init(numCorrelations, 1 << 16, sock, prng, mSBase);
-            r.start();
-            return r;
+            r.init(numCorrelations, 1 << 16, sock, prng, mSBase, mMock);
+            return r.task();
         }
 
-        OtSendGenerator otSendRequest(coproto::Socket& sock, u64 numCorrelations, oc::PRNG& prng, u64 reservoirSize = 0)
+        macoro::task<> otSendRequest(OtSendGenerator& r, u64 numCorrelations, coproto::Socket& sock, oc::PRNG& prng, u64 reservoirSize = 0)
         {
             if (hasBase() == false)
                 throw RTE_LOC;
-            OtSendGenerator r;
-            r.init(numCorrelations, 1 << 16, sock, prng, mRBase);
-            r.start();
-            return r;
+            r.init(numCorrelations, 1 << 16, sock, prng, mRBase, mMock);
+            return r.task();
         }
     };
 }

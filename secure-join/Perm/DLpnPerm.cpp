@@ -14,14 +14,14 @@ namespace secJoin
         mRecver.setKeyOts(sk);
     }
 
-    macoro::task<> DLpnPermReceiver::genKeyOts(OleGenerator& ole, coproto::Socket& chl)
+    macoro::task<> DLpnPermReceiver::genKeyOts(CorGenerator& ole, coproto::Socket& chl, oc::PRNG& prng)
     {
-        return mSender.genKeyOts(ole, chl);
+        return mSender.genKeyOts(ole, chl, prng);
     }
 
-    macoro::task<> DLpnPermSender::genKeyOts(OleGenerator& ole, coproto::Socket& chl)
+    macoro::task<> DLpnPermSender::genKeyOts(CorGenerator& ole, coproto::Socket& chl, oc::PRNG& prng)
     {
-        return mRecver.genKeyOts(ole, chl);
+        return mRecver.genKeyOts(ole, chl, prng);
     }
 
 
@@ -61,7 +61,7 @@ namespace secJoin
         u64 bytesPerRow,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        OleGenerator& ole)
+        CorGenerator& ole)
     {
         mHasPreprocess = true;
         mPrePerm.randomize(totElements, prng);
@@ -74,7 +74,7 @@ namespace secJoin
         u64 bytesPerRow,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        OleGenerator& ole)
+        CorGenerator& ole)
     {
         mHasPreprocess = true;
         return setup(totElements, bytesPerRow, prng, chl, ole);
@@ -88,7 +88,7 @@ namespace secJoin
         u64 bytesPerRow,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        OleGenerator& ole)
+        CorGenerator& ole)
     {
         MC_BEGIN(macoro::task<>, &pi, &chl, &prng, &ole, bytesPerRow, this,
             aesCipher = oc::Matrix<oc::block>(),
@@ -144,7 +144,7 @@ namespace secJoin
         u64 bytesPerRow,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        OleGenerator& ole)
+        CorGenerator& ole)
     {
 
         MC_BEGIN(macoro::task<>, &chl, &prng, &ole, totElements, bytesPerRow, this,
@@ -223,7 +223,7 @@ namespace secJoin
         oc::MatrixView<u8> sout,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        OleGenerator& ole)
+        CorGenerator& ole)
     {
         setPermutation(pi);
         return apply(op, sout, prng, chl, ole);
@@ -235,7 +235,7 @@ namespace secJoin
         oc::MatrixView<u8> sout,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        OleGenerator& ole)
+        CorGenerator& ole)
     {
         MC_BEGIN(macoro::task<>, &chl, &prng, &ole, this, sout, op,
             xEncrypted = oc::Matrix<u8>(),
@@ -307,7 +307,7 @@ namespace secJoin
         oc::MatrixView<u8> sout,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        OleGenerator& ole)
+        CorGenerator& ole)
     {
         setPermutation(pi);
         return apply(op, in, sout, prng, chl, ole);
@@ -323,7 +323,7 @@ namespace secJoin
         oc::MatrixView<u8> sout,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        OleGenerator& ole)
+        CorGenerator& ole)
     {
         MC_BEGIN(macoro::task<>, &chl, &prng, &ole, this, sout, in, op,
             xPermuted = oc::Matrix<u8>());
@@ -347,7 +347,7 @@ namespace secJoin
         oc::MatrixView<u8> sout,
         oc::PRNG& prng,
         coproto::Socket& chl,
-        OleGenerator& ole)
+        CorGenerator& ole)
     {
         MC_BEGIN(macoro::task<>, &chl, &prng, &ole, this, input, sout, op,
             totElements = u64(),

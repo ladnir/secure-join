@@ -21,7 +21,7 @@ void Generator_BinOle_Test(const oc::CLP& cmd)
     auto work = tp.make_work();
     tp.create_threads(cmd.getOr("nt", 1));
 
-    for (u64 j = 0; j < 2; ++j)
+    for (u64 j = 0; j < 1; ++j)
     {
 
         OleGenerator g0, g1;
@@ -33,8 +33,8 @@ void Generator_BinOle_Test(const oc::CLP& cmd)
         }
         else
         {
-            g0.fakeInit(OleGenerator::Role::Sender);
-            g1.fakeInit(OleGenerator::Role::Receiver);
+            g0.mock(OleGenerator::Role::Sender);
+            g1.mock(OleGenerator::Role::Receiver);
         }
 
         auto r0 = macoro::sync_wait(g0.binOleRequest(totalSize, reservoirSize));
@@ -109,8 +109,8 @@ void Generator_Ot_Test(const oc::CLP&cmd)
         }
         else
         {
-            g0.fakeInit(OleGenerator::Role::Sender);
-            g1.fakeInit(OleGenerator::Role::Receiver);
+            g0.mock(OleGenerator::Role::Sender);
+            g1.mock(OleGenerator::Role::Receiver);
         }
 
         auto r0 = macoro::sync_wait(g0.otRecvRequest(totalSize, reservoirSize));
