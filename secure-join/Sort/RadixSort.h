@@ -60,7 +60,8 @@ namespace secJoin
             u64 bitCount,
             CorGenerator& gen,
             coproto::Socket& comm,
-            oc::PRNG& prng);
+            oc::PRNG& prng,
+            u64 bytesPerElem);
 
         using Matrix32 = oc::Matrix<u32>;
 

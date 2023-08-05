@@ -35,6 +35,19 @@ namespace secJoin
         {
             mBase.resize(n);
         }
+
+        SendBase fork()
+        {
+            SendBase s;
+            s.resize(mBase.size());
+            for (u64 i = 0;i < mBase.size();++i)
+            {
+                s.mBase[i][0].SetSeed(mBase[i][0].get<oc::block>());
+                s.mBase[i][1].SetSeed(mBase[i][1].get<oc::block>());
+            }
+
+            return s;
+        }
     };
 
     struct RecvBase
@@ -58,6 +71,19 @@ namespace secJoin
         {
             mBase.resize(n);
             mChoice.resize(n);
+        }
+        
+        RecvBase fork()
+        {
+            RecvBase s;
+            s.resize(mBase.size());
+            for (u64 i = 0;i < mBase.size();++i)
+            {
+                s.mBase[i].SetSeed(mBase[i].get<oc::block>());
+            }
+
+            s.mChoice = mChoice;
+            return s;
         }
     };
 

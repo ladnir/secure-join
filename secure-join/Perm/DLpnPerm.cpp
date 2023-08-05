@@ -268,7 +268,7 @@ namespace secJoin
                 mPi->inverse().compose(mPrePerm)
                 ;
             MC_AWAIT(chl.send(std::move(delta.mPi)));
-            MC_AWAIT(validateShares(chl, /*mInverse  ? mPi->inverse() : */*mPi));
+            //MC_AWAIT(validateShares(chl, /*mInverse  ? mPi->inverse() : */*mPi));
 
             mHasPreprocess = false;
         }
@@ -391,8 +391,7 @@ namespace secJoin
                 delta.apply<oc::block>(mA, AA);
                 std::swap(mA, AA);
             }
-            TODO("REMOVE ME");
-            MC_AWAIT(validateShares(chl));
+            //MC_AWAIT(validateShares(chl));
             mHasPreprocess = false;
         }
 

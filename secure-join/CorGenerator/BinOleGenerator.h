@@ -88,27 +88,7 @@ namespace secJoin
             bool mock);
 
 
-        macoro::task<> task()
-        {
-            MC_BEGIN(macoro::task<>, this, i = u64{});
-            if (mMock)
-                MC_RETURN_VOID();
-
-            TODO("ex handling");
-            for (i = 0; i < mCorrelations.size(); ++i)
-                mCorrelations[i].mTask = mCorrelations[i].task() | macoro::make_eager();
-
-
-            for (i = 0; i < mCorrelations.size(); ++i)
-            {
-                MC_AWAIT(mCorrelations[i].mTask);
-                mCorrelations[i].mDone.set();
-            }
-
-            MC_END();
-        }
-
-        //macoro::task<> task();
+        macoro::task<> task();
         macoro::task<> get(BinOle& d);
 
         macoro::task<> close() {

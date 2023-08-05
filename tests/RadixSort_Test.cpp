@@ -91,8 +91,8 @@ void RadixSort_hadamardSum_test()
 
 
     macoro::sync_wait(macoro::when_all_ready(
-        s0.preprocess(rows, s0.mL, g0, comm[0], prng),
-        s1.preprocess(rows, s0.mL, g1, comm[1], prng)
+        s0.preprocess(rows, s0.mL, g0, comm[0], prng, 0),
+        s1.preprocess(rows, s0.mL, g1, comm[1], prng, 0)
     ));
     //s0.initArith2BinCircuit(rows);
     //s1.initArith2BinCircuit(rows);
@@ -282,8 +282,8 @@ void RadixSort_genValMasks2_test()
             //s0.mIndexToOneHotGmw.resize(1);
             //s1.mIndexToOneHotGmw.resize(1);
             macoro::sync_wait(macoro::when_all_ready(
-                s0.preprocess(n, L, g0, comm[0], prng),
-                s1.preprocess(n, L, g1, comm[1], prng)
+                s0.preprocess(n, L, g0, comm[0], prng, 0),
+                s1.preprocess(n, L, g1, comm[1], prng, 0)
             ));
             macoro::sync_wait(macoro::when_all_ready(
                 s0.genValMasks2(0, L, k0, f0, fBin0, comm[0]),

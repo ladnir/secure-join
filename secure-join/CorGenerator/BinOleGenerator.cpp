@@ -363,20 +363,26 @@ namespace secJoin
     template void BinOleGenerator::init<SendBase>(u64, u64, coproto::Socket&, oc::PRNG&, SendBase&, bool);
     template void BinOleGenerator::init<RecvBase>(u64, u64, coproto::Socket&, oc::PRNG&, RecvBase&, bool);
 
-    //macoro::task<> BinOleGenerator::task()
-    //{
-    //    MC_BEGIN(macoro::task<>, this, i = u64{});
 
-    //    TODO("ex handling");
-    //    for (i = 0; i < mCorrelations.size(); ++i)
-    //        mCorrelations[i].mTask = mCorrelations[i].task() | macoro::make_eager();
-    //    //for (i = 0; i < mCorrelations.size(); ++i)
-    //    //{
-    //    //    MC_AWAIT(mCorrelations[i].mTask);
-    //    //    mCorrelations[i].mDone.set();
-    //    //}
-    //    MC_END();
-    //}
+    macoro::task<> BinOleGenerator::task()
+    {
+        MC_BEGIN(macoro::task<>, this, i = u64{});
+        if (mMock)
+            MC_RETURN_VOID();
+
+        TODO("ex handling");
+        for (i = 0; i < mCorrelations.size(); ++i)
+            mCorrelations[i].mTask = mCorrelations[i].task() | macoro::make_eager();
+
+
+        for (i = 0; i < mCorrelations.size(); ++i)
+        {
+            MC_AWAIT(mCorrelations[i].mTask);
+            mCorrelations[i].mDone.set();
+        }
+
+        MC_END();
+    }
 
     macoro::task<> BinOleGenerator::get(BinOle& d)
     {

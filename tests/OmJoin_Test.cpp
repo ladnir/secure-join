@@ -297,7 +297,7 @@ void OmJoin_join_Test(const oc::CLP& cmd)
 
     for (u64 i = 0; i < nR; ++i)
     {
-        auto ii = i / 2 * 4;
+        auto ii = i / 2 * 4 % mod;
         memcpy(&R.mColumns[0].mData.mData(i, 0), &ii, R.mColumns[0].mData.bytesPerEntry());
         // R.mColumns[0].mData.mData(i, 0) = i * 2;
         R.mColumns[1].mData.mData(i) = i % 3;
@@ -322,7 +322,7 @@ void OmJoin_join_Test(const oc::CLP& cmd)
     join0.mInsecureMockSubroutines = mock;
     join1.mInsecureMockSubroutines = mock;
 
-    CorGenerator ole0, ole1;    
+    CorGenerator ole0, ole1;
     ole0.mock(CorGenerator::Role::Sender);
     ole1.mock(CorGenerator::Role::Receiver);
     ole0.mMock = mock;
@@ -357,9 +357,14 @@ void OmJoin_join_Test(const oc::CLP& cmd)
 
     if (res != exp)
     {
-        std::cout << "exp \n" << exp << std::endl;
-        std::cout << "act \n" << res << std::endl;
-        std::cout << "ful \n" << reveal(out[0], out[1], false) << std::endl;
+
+        if (printSteps)
+        {
+
+            std::cout << "exp \n" << exp << std::endl;
+            std::cout << "act \n" << res << std::endl;
+            std::cout << "ful \n" << reveal(out[0], out[1], false) << std::endl;
+        }
         throw RTE_LOC;
     }
 

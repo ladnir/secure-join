@@ -43,6 +43,7 @@
         "SECUREJOIN_ENABLE_FAKE_GEN": true,
         "SECUREJOIN_ENABLE_BOOST": false,
         "SECUREJOIN_STATIC_WRAPPER": true,
+        "SECUREJOIN_DEV": true,
         "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}"
       },
       "vendor": {
@@ -70,6 +71,7 @@
         "SECUREJOIN_ENABLE_FAKE_GEN": true,
         "SECUREJOIN_ENABLE_BOOST": false,
         "SECUREJOIN_STATIC_WRAPPER": true,
+        "SECUREJOIN_DEV": true,
         "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}"
       },
       "vendor": {

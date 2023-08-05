@@ -52,7 +52,11 @@ namespace secJoin
                 base = oc::DefaultBaseOT{},
                 msg2 = std::vector<std::array<oc::block, 2>>{},
                 msg = std::vector<oc::block>{},
-                choice = oc::BitVector{});
+                choice = oc::BitVector{},
+                t0 = macoro::task<>{},
+                t1 = macoro::task<>{},
+                sock2 = sock.fork(),
+                prng2 = prng.fork());
 
             mRole = role;
             msg2.resize(128);
@@ -60,15 +64,16 @@ namespace secJoin
             choice.resize(128);
             if (mRole == Role::Sender)
             {
-                TODO("parallel");
-                MC_AWAIT(base.send(msg2, prng, sock));
-                MC_AWAIT(base.receive(choice, msg, prng, sock));
+                t0 = base.send(msg2, prng, sock);
+                t1 = base.receive(choice, msg, prng2, sock2);
             }
             else
             {
-                MC_AWAIT(base.receive(choice, msg, prng, sock));
-                MC_AWAIT(base.send(msg2, prng, sock));
+                t0 = base.receive(choice, msg, prng, sock);
+                t1 = base.send(msg2, prng2, sock2);
             }
+
+            MC_AWAIT(macoro::when_all_ready(std::move(t0), std::move(t1)));
 
             mSBase.resize(128);
             mRBase.resize(128);
@@ -109,6 +114,17 @@ namespace secJoin
                 throw RTE_LOC;
             r.init(numCorrelations, 1 << 16, sock, prng, mRBase, mMock);
             return r.task();
+        }
+
+        CorGenerator fork()
+        {
+            CorGenerator r;
+            r.mMock = mMock;
+            r.mRole = mRole;
+
+            r.mRBase = mRBase.fork();
+            r.mSBase = mSBase.fork();
+            return r;
         }
     };
 }

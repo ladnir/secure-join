@@ -39,39 +39,40 @@ namespace secJoin
         mPartyIdx = partyIdx;
         mPi.randomize(n, prng);
     }
-    macoro::task<> ComposedPerm::preprocess(u64 n, u64 bytesPer, coproto::Socket& chl, CorGenerator& ole, PRNG& prng)
+    macoro::task<> ComposedPerm::preprocess(u64 n, u64 bytesPer, 
+        coproto::Socket& chl_, CorGenerator& ole_, PRNG& prng_)
     {
-        MC_BEGIN(macoro::task<>, this, &ole, &chl, &prng, n, bytesPer,
-            chl2 = coproto::Socket{ }
+        MC_BEGIN(macoro::task<>, this, n, bytesPer,
+            ole = ole_.fork(),
+            chl = chl_.fork(), 
+            prng = oc::PRNG(prng_.get<oc::block>()),
+            ole2 = CorGenerator{},
+            chl2 = coproto::Socket{ },
+            prng2 = prng_.fork(),
+            t0 = macoro::task<>{},
+            t1 = macoro::task<>{}
         );
 
         if (mPi.size() != n)
             throw RTE_LOC;
 
         mSender.setPermutation(mPi);
-        //chl2 = chl.fork();
-        TODO("parallel");
+        chl2 = chl.fork();
+        ole2 = ole.fork();
+
         if ((int)ole.mRole)
         {
-            //MC_AWAIT(
-            //    macoro::when_all_ready(
-            //        mSender.preprocess(n, bytesPer, prng, chl, ole),
-            //        mReceiver.preprocess(n, bytesPer, prng, chl2, ole))
-            //);
-            MC_AWAIT(mSender.setup(mPi, bytesPer, prng, chl, ole));
-            MC_AWAIT(mReceiver.setup(n, bytesPer, prng, chl, ole));
+            t0 = mSender.setup(mPi, bytesPer, prng, chl, ole);
+            t1 = mReceiver.setup(n, bytesPer, prng2, chl2, ole2);
         }
         else
         {
-            //MC_AWAIT(
-            //    macoro::when_all_ready(
-            //        mReceiver.preprocess(n, bytesPer, prng, chl, ole),
-            //        mSender.preprocess(n, bytesPer, prng, chl2, ole))
-            //);
-
-            MC_AWAIT(mReceiver.setup(n, bytesPer, prng, chl, ole));
-            MC_AWAIT(mSender.setup(mPi, bytesPer, prng, chl, ole));
+            t0 = mReceiver.setup(n, bytesPer, prng, chl, ole);
+            t1 = mSender.setup(mPi, bytesPer, prng2, chl2, ole2);
         }
+
+        MC_AWAIT(macoro::when_all_ready(std::move(t0), std::move(t1)));
+
         MC_END();
     }
 

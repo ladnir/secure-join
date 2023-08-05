@@ -63,29 +63,35 @@ namespace secJoin
 
     macoro::task<> RadixSort::hadamardSumPreprocess(
         u64 size,
-        CorGenerator& gen,
-        coproto::Socket&sock, 
+        CorGenerator& gen_,
+        coproto::Socket&sock_, 
         OtRecvGenerator&recv, 
         OtSendGenerator&send,
-        oc::PRNG&prng)
+        oc::PRNG&prng_)
     {
         //std::cout << (int)gen.mRole << " had pre" << std::endl;
-        MC_BEGIN(macoro::task<>, this, &gen, &sock, &recv, &send, size, &prng);
+        MC_BEGIN(macoro::task<>, this, &recv, &send, size,
+            gen = gen_.fork(), 
+            sock = sock_.fork(), 
+            prng = prng_.fork(),
+            t0 = macoro::task<>{},
+            t1 = macoro::task<>{});
 
         //std::cout << (int)gen.mRole << " had start" << std::endl;
         if (gen.mRole == CorGenerator::Role::Sender)
         {
-            TODO("parallel");
-            MC_AWAIT(gen.otRecvRequest(recv, size, sock, prng));
-            MC_AWAIT(gen.otSendRequest(send, size, sock.fork(), prng));
+            t0 = gen.otRecvRequest(recv, size, sock, prng);
+            t1 = gen.otSendRequest(send, size, sock.fork(), prng);
         }
         else
         {
-            MC_AWAIT(gen.otSendRequest(send, size, sock, prng));
-            MC_AWAIT(gen.otRecvRequest(recv, size, sock.fork(), prng));
+            t0 = gen.otSendRequest(send, size, sock, prng);
+            t1 = gen.otRecvRequest(recv, size, sock.fork(), prng);
         }
 
-        //std::cout << (int)gen.mRole << " had finished" << std::endl;
+        MC_AWAIT(
+            macoro::when_all_ready(std::move(t0), std::move(t1))
+        );
 
         MC_END();
     }
@@ -959,101 +965,84 @@ namespace secJoin
     }
 
 
+    //struct Session
+    //{
+
+    //    Session(coproto::Socket& s, oc::PRNG& prng, CorGenerator& gen, macoro::eager_task<>&& t)
+    //        : mSock(s.fork())
+    //        , mPrng(prng.get<oc::block>())
+    //        , mGen(gen.fork())
+    //        , mTask(std::forward<macoro::eager_task<>>(t))
+    //    {
+    //    }
+
+    //    coproto::Socket mSock;
+    //    oc::PRNG mPrng;
+    //    CorGenerator mGen;
+    //    macoro::eager_task<> mTask;
+    //};
+
 
     macoro::task<> RadixSort::preprocess(
         u64 n,
         u64 bitCount,
         CorGenerator& gen,
         coproto::Socket& comm,
-        oc::PRNG& prng)
+        oc::PRNG& prng,
+        u64 bytesPerElem)
     {
-        MC_BEGIN(macoro::task<>, this, n, bitCount, &gen, &comm, &prng,
+        MC_BEGIN(macoro::task<>, this, n, bitCount, &gen, &comm, &prng, bytesPerElem,
             ll = u64{},
             pow2L = u64{},
-            i = u64{},
+            i = u64{}, j = u64{},
             byteCount = u64{},
-            tasks = std::vector<macoro::eager_task<>>{},
-            socks = std::vector<coproto::Socket>{},
-            parallel = false);
-
-
+            tasks = std::vector<macoro::eager_task<>>{});
 
         mRole = (int)gen.mRole;
         ll = oc::divCeil(bitCount, mL);
         mPerms.resize(ll);
-        byteCount = oc::divCeil(std::min<u64>(mL, bitCount - i * mL), 8) + 2 * sizeof(u32);
-        socks.reserve(ll * 5);
+        tasks.resize(ll * 5 - !bool(bytesPerElem > 0));
 
+        byteCount = oc::divCeil(std::min<u64>(mL, bitCount - i * mL), 8) + 2 * sizeof(u32);
         pow2L = 1ull << mL;
-        mArithToBinGmw.reserve(ll);
-        mIndexToOneHotGmw.reserve(ll);
-        mBitInjects.reserve(ll);
+        mArithToBinGmw.resize(ll);
+        mIndexToOneHotGmw.resize(ll);
+        mBitInjects.resize(ll);
+        mHadamardSumRecvOts.resize(ll);
+        mHadamardSumSendOts.resize(ll);
         initIndexToOneHotCircuit(mL);
         initArith2BinCircuit(n);
         assert(mIndexToOneHotCircuit.mOutputs[0].size() == pow2L);
-        for (i = 0; i < ll; ++i)
+        for (i = 0, j = 0; i < ll; ++i)
         {
-            if (i != ll-1)
-            {
-                assert(socks.capacity() > socks.size());
-                socks.emplace_back(comm.fork());
-                tasks.emplace_back(mPerms[i].preprocess(
-                    n, byteCount,
-                    socks.back(), gen, prng) | macoro::make_eager());
+            // for the last one, we use the requested number of bytes
+            if (i == ll - 1)
+                byteCount = bytesPerElem;
 
-                if (!parallel)
-                    MC_AWAIT(tasks.back());
-            }
+            if(byteCount)
+                tasks[j++] = mPerms[i].preprocess(n, byteCount, comm, gen, prng) 
+                    | macoro::make_eager();
 
-            mBitInjects.emplace_back();
-            assert(socks.capacity() > socks.size());
-            socks.emplace_back(comm.fork());
-            tasks.emplace_back(
-                mBitInjects[i].preprocess(n, pow2L, gen, prng, socks.back()) | macoro::make_eager()
-            );
-            if (!parallel)
-                MC_AWAIT(tasks.back());
-
-            mIndexToOneHotGmw.emplace_back();
-            mIndexToOneHotGmw.back().init(n, mIndexToOneHotCircuit);
-            assert(socks.capacity() > socks.size());
-            socks.emplace_back(comm.fork());
-            tasks.emplace_back(
-                mIndexToOneHotGmw.back().preprocess(gen, socks.back(),prng) | macoro::make_eager()
-            );
-            if (!parallel)
-                MC_AWAIT(tasks.back());
-
-            mArithToBinGmw.emplace_back();
-            mArithToBinGmw.back().init(n, mArith2BinCir);
-            assert(socks.capacity() > socks.size());
-            socks.emplace_back(comm.fork());
-            tasks.emplace_back(
-                mArithToBinGmw.back().preprocess(gen, socks.back(), prng) | macoro::make_eager()
-            );
-            if (!parallel)
-                MC_AWAIT(tasks.back());
+            tasks[j++] = mBitInjects[i].preprocess(n, pow2L, gen, prng, comm) 
+                | macoro::make_eager();
 
 
-            mHadamardSumRecvOts.emplace_back();
-            mHadamardSumSendOts.emplace_back();
-            assert(socks.capacity() > socks.size());
-            socks.emplace_back(comm.fork());
-            tasks.emplace_back(
-                hadamardSumPreprocess(n * pow2L ,gen, socks.back(), mHadamardSumRecvOts.back(), mHadamardSumSendOts.back(), prng) | macoro::make_eager()
-            );
-            if (!parallel)
-                MC_AWAIT(tasks.back());
+            mIndexToOneHotGmw[i].init(n, mIndexToOneHotCircuit);
+            tasks[j++] = mIndexToOneHotGmw[i].preprocess(gen, comm,prng)
+                | macoro::make_eager();
 
-            //mHadamardSumRecvOts.back()
+            
+            mArithToBinGmw[i].init(n, mArith2BinCir);
+            tasks[j++] = mArithToBinGmw[i].preprocess(gen, comm, prng)
+                | macoro::make_eager();
+
+            tasks[j++] = hadamardSumPreprocess(n * pow2L ,gen, comm, 
+                    mHadamardSumRecvOts[i], mHadamardSumSendOts[i], prng) 
+                | macoro::make_eager();
         }
 
-        if (parallel)
-        {
-
-            for (i = 0; i < tasks.size(); ++i)
-                MC_AWAIT(tasks[i]);
-        }
+        for (i = 0; i < tasks.size(); ++i)
+            MC_AWAIT(tasks[i]);
 
         mHasPreprocessing = true;
         MC_END();
@@ -1082,7 +1071,7 @@ namespace secJoin
         if (hasPreprocessing() == false)
         {
             MC_AWAIT(preprocess(
-                k.rows(), k.bitsPerEntry(), gen, comm, prng));
+                k.rows(), k.bitsPerEntry(), gen, comm, prng, 0));
         }
 
         setTimePoint("genPerm begin");

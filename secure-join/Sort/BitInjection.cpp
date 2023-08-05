@@ -46,11 +46,14 @@ namespace secJoin
     macoro::task<> BitInject::preprocess(
         u64 n,
         u64 inBitCount,
-        CorGenerator& gen,
-        oc::PRNG& prng,
-        coproto::Socket& sock)
+        CorGenerator& gen_,
+        oc::PRNG& prng_,
+        coproto::Socket& sock_)
     {
-        MC_BEGIN(macoro::task<>, this, n, inBitCount, &gen, &sock, &prng);
+        MC_BEGIN(macoro::task<>, this, n, inBitCount, 
+            gen = gen_.fork(), 
+            sock = sock_.fork(), 
+            prng = prng_.fork());
         mHasPreprocessing = true;
         mRole = (int)gen.mRole;
         //if (n == 0 || inBitCount == 0)

@@ -140,9 +140,15 @@ namespace secJoin
         return memView;
     }
 
-    macoro::task<> Gmw::preprocess(CorGenerator& gen, coproto::Socket& chl, oc::PRNG& prng)
+    macoro::task<> Gmw::preprocess(
+        CorGenerator& gen_, 
+        coproto::Socket& chl_, 
+        oc::PRNG& prng_)
     {
-        MC_BEGIN(macoro::task<>, this, &gen, &chl, &prng);
+        MC_BEGIN(macoro::task<>, this, 
+            gen = gen_.fork(), 
+            chl = chl_.fork(), 
+            prng = prng_.fork());
 
         if (mCir.mGates.size() == 0)
             throw std::runtime_error("init(...) must be called first. " LOCATION);

@@ -49,13 +49,35 @@ macro(FIND_LIBOTE)
     endif()
 endmacro()
 
-if(FETCH_LIBOTE_AUTO)
-    FIND_LIBOTE(QUIET)
-    include(${CMAKE_CURRENT_LIST_DIR}/../thirdparty/getLibOTe.cmake)
+if(SECUREJOIN_DEV)
+    set(ENABLE_CIRCUITS true)
+    set(ENABLE_CIRCUITS true)
+    set(ENABLE_MRR true)
+    set(ENABLE_IKNP true)
+    set(ENABLE_SOFTSPOKEN_OT true)
+    set(ENABLE_SILENTOT true)
+    set(ENABLE_SILENT_VOLE true)
+    if(APPLE)
+        set(ENABLE_RELIC true)
+    else()
+        set(ENABLE_SODIUM true)
+        set(ENABLE_MRR_TWIST true)
+    endif()
+    set(ENABLE_SSE ${SECUREJOIN_ENABLE_SSE})
+    set(OC_THIRDPARTY_CLONE_DIR ${SECUREJOIN_THIRDPARTY_CLONE_DIR})
+    set(ENABLE_ASAN ${SECUREJOIN_ENABLE_ASAN})
+    set(ENABLE_BOOST ${SECUREJOIN_ENABLE_BOOST})
+    set(OC_THIRDPARTY_INSTALL_PREFIX ${SECUREJOIN_THIRDPARTY_DIR})
+    add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/../out/libOTe")
+else()
+
+    #if(FETCH_LIBOTE_AUTO)
+    #    FIND_LIBOTE(QUIET)
+    #    include(${CMAKE_CURRENT_LIST_DIR}/../thirdparty/getLibOTe.cmake)
+    #endif()
+    #
+    #FIND_LIBOTE(REQUIRED)
 endif()
-
-FIND_LIBOTE(REQUIRED)
-
 
 
 

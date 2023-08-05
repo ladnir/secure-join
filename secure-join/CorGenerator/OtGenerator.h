@@ -87,40 +87,8 @@ namespace secJoin
 
         macoro::task<> get(OtRecv& d);
 
-        macoro::task<> task()
-        {
-            MC_BEGIN(macoro::task<>, this,
-                i = u64{});
+        macoro::task<> task();
 
-            if (mMock)
-                MC_RETURN_VOID();
-
-            for (i = 0; i < mCorrelations.size(); ++i)
-            {
-                //std::cout << "start ot recv " << mCorrelations[i].mSock.mId << std::endl;
-                mCorrelations[i].mTask = mCorrelations[i].task() | macoro::make_eager();
-            }
-
-            for (i = 0; i < mCorrelations.size(); ++i)
-            {
-                MC_AWAIT(mCorrelations[i].mTask);
-                mCorrelations[i].mDone.set();
-            }
-
-            MC_END();
-        }
-
-        //macoro::task<> close() {
-        //    MC_BEGIN(macoro::task<>, this);
-        //    if (mMock)
-        //        MC_RETURN_VOID();
-
-        //    while (mIdx < mCorrelations.size())
-        //    {
-        //        MC_AWAIT(mCorrelations[mIdx++].mTask);
-        //    }
-        //    MC_END();
-        //}
     };
 
 
@@ -158,40 +126,10 @@ namespace secJoin
 
         //macoro::task<> task();
 
-        macoro::task<> task()
-        {
-            MC_BEGIN(macoro::task<>, this, i = u64{});
-            if (mMock)
-                MC_RETURN_VOID();
-
-            for (i = 0; i < mCorrelations.size(); ++i)
-            {
-                //std::cout << "start ot send " << mCorrelations[i].mSock.mId << std::endl;
-                mCorrelations[i].mTask = mCorrelations[i].task() | macoro::make_eager();
-            }
-
-            for (i = 0; i < mCorrelations.size(); ++i)
-            {
-                MC_AWAIT(mCorrelations[i].mTask);
-                mCorrelations[i].mDone.set();
-            }
-
-            MC_END();
-        }
+        macoro::task<> task();
 
         macoro::task<> get(OtSend& d);
 
-        macoro::task<> close() {
-            MC_BEGIN(macoro::task<>, this);
-            if (mMock)
-                MC_RETURN_VOID();
-
-            while (mIdx < mCorrelations.size())
-            {
-                MC_AWAIT(mCorrelations[mIdx++].mTask);
-            }
-            MC_END();
-        }
 
     };
 }

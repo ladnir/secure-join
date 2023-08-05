@@ -51,16 +51,15 @@ namespace secJoin
 
     macoro::task<> OtRecvGenerator::Impl::task()
     {
-        //mMsg.resize(mReceiver.mRequestedNumOts);
-        //mChoice.resize(mReceiver.mRequestedNumOts);
-        //return mReceiver.silentReceive(mChoice, mMsg, mPrng, mSock);
-        TODO("just return inner");
-        MC_BEGIN(macoro::task<>, this);
         mMsg.resize(mReceiver.mRequestedNumOts);
         mChoice.resize(mReceiver.mRequestedNumOts);
-        MC_AWAIT(mReceiver.silentReceive(mChoice, mMsg, mPrng, mSock));
-        //std::cout << "mReceiver done " << mSock.mId << std::endl;
-        MC_END();
+        return mReceiver.silentReceive(mChoice, mMsg, mPrng, mSock);
+        //MC_BEGIN(macoro::task<>, this);
+        //mMsg.resize(mReceiver.mRequestedNumOts);
+        //mChoice.resize(mReceiver.mRequestedNumOts);
+        //MC_AWAIT(mReceiver.silentReceive(mChoice, mMsg, mPrng, mSock));
+        ////std::cout << "mReceiver done " << mSock.mId << std::endl;
+        //MC_END();
     }
 
 
@@ -84,22 +83,31 @@ namespace secJoin
         }
     }
 
-    //macoro::task<> OtRecvGenerator::task()
-    //{
 
-    //    if (!mCorrelations.size())
-    //        throw RTE_LOC;
-    //    MC_BEGIN(macoro::task<>, this, i = u64{});
+    macoro::task<> OtRecvGenerator::task()
+    {
+        MC_BEGIN(macoro::task<>, this,
+            i = u64{});
 
-    //    TODO("ex handling");
+        if (mMock)
+            MC_RETURN_VOID();
 
-    //    for (i = 0; i < mCorrelations.size(); ++i)
-    //        mCorrelations[i].mTask = mCorrelations[i].task() | macoro::make_eager();
-    //    for (i = 0; i < mCorrelations.size(); ++i)
-    //        MC_AWAIT(mCorrelations[i].mTask);
+        TODO("Ex handle");
+        for (i = 0; i < mCorrelations.size(); ++i)
+        {
+            //std::cout << "start ot recv " << mCorrelations[i].mSock.mId << std::endl;
+            mCorrelations[i].mTask = mCorrelations[i].task() | macoro::make_eager();
+        }
 
-    //    MC_END();
-    //}
+        for (i = 0; i < mCorrelations.size(); ++i)
+        {
+            MC_AWAIT(mCorrelations[i].mTask);
+            mCorrelations[i].mDone.set();
+        }
+
+        MC_END();
+    }
+
 
     macoro::task<> OtRecvGenerator::get(OtRecv& d)
     {
@@ -136,14 +144,13 @@ namespace secJoin
 
     macoro::task<> OtSendGenerator::Impl::task()
     {
-        //mMsg.resize(mSender.mRequestNumOts);
-        //return mSender.silentSend(mMsg, mPrng, mSock);
-        MC_BEGIN(macoro::task<>, this);
-        TODO("just return inner");
         mMsg.resize(mSender.mRequestNumOts);
-        MC_AWAIT(mSender.silentSend(mMsg, mPrng, mSock));
-        //std::cout << "mSender done " << mSock.mId << std::endl;
-        MC_END();
+        return mSender.silentSend(mMsg, mPrng, mSock);
+        //MC_BEGIN(macoro::task<>, this);
+        //mMsg.resize(mSender.mRequestNumOts);
+        //MC_AWAIT(mSender.silentSend(mMsg, mPrng, mSock));
+        ////std::cout << "mSender done " << mSock.mId << std::endl;
+        //MC_END();
     }
 
 
@@ -166,24 +173,29 @@ namespace secJoin
         }
     }
 
-    //macoro::task<> OtSendGenerator::task()
-    //{
-    //    if (!mCorrelations.size())
-    //        throw RTE_LOC;
+    macoro::task<> OtSendGenerator::task()
+    {
+        MC_BEGIN(macoro::task<>, this, i = u64{});
+        if (mMock)
+            MC_RETURN_VOID();
 
-    //    MC_BEGIN(macoro::task<>, this, i = u64{});
+        TODO("Ex handle");
+        for (i = 0; i < mCorrelations.size(); ++i)
+        {
+            //std::cout << "start ot send " << mCorrelations[i].mSock.mId << std::endl;
+            mCorrelations[i].mTask = mCorrelations[i].task() | macoro::make_eager();
+        }
 
-    //    TODO("ex handling");
-    //    for (i = 0; i < mCorrelations.size(); ++i)
-    //        mCorrelations[i].mTask = mCorrelations[i].task() | macoro::make_eager();
-    //    //for (i = 0; i < mCorrelations.size(); ++i)
-    //    //{
-    //    //    MC_AWAIT(mCorrelations[i].mTask);
+        for (i = 0; i < mCorrelations.size(); ++i)
+        {
+            MC_AWAIT(mCorrelations[i].mTask);
+            mCorrelations[i].mDone.set();
+        }
 
-    //    //}
+        MC_END();
+    }
 
-    //    MC_END();
-    //}
+
 
 
     macoro::task<> OtSendGenerator::get(OtSend& d)
