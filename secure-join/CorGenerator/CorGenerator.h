@@ -35,7 +35,22 @@ namespace secJoin
             }
         }
 
+        //struct Session
+        //{
+        //    SendBase mSBase;
+        //    RecvBase mRBase;
 
+        //    enum Type
+        //    {
+        //        BinOle, SendOt, RecvOt
+        //    };
+        //    Type mType;
+        //    struct Request
+        //    {
+        //        u64 mSize;
+        //    };
+        //    std::vector<Request> mRequests;
+        //};
 
 
         SendBase mSBase;
@@ -89,15 +104,33 @@ namespace secJoin
         }
 
 
-        macoro::task<> binOleRequest(BinOleGenerator& r , u64 numCorrelations, coproto::Socket& sock, oc::PRNG& prng, u64 reservoirSize = 0)
+
+        //void binOleRequest(BinOleRequest& r, u64 numCorrelations)
+        //{
+
+        //    //if (hasBase() == false)
+        //    //    throw RTE_LOC;
+        //    //if (mRole == Role::Sender)
+        //    //    r.init(numCorrelations, 1 << 16, sock, prng, mRBase, mMock);
+        //    //else
+        //    //    r.init(numCorrelations, 1 << 16, sock, prng, mSBase, mMock);
+        //    //return r.task();
+        //}
+        macoro::task<> binOleRequest(BinOleRequest& r , u64 numCorrelations, coproto::Socket& sock, oc::PRNG& prng, u64 reservoirSize = 0)
         {
             if (hasBase() == false)
                 throw RTE_LOC;
+            BinOleGenerator gen;
+
             if (mRole == Role::Sender)
-                r.init(numCorrelations, 1 << 16, sock, prng, mRBase, mMock);
+                gen.init(1ull << 16, sock, prng, mRBase, mMock);
             else
-                r.init(numCorrelations, 1 << 16, sock, prng, mSBase, mMock);
-            return r.task();
+                gen.init(1 << 16, sock, prng, mSBase, mMock);
+
+            r = gen.request(numCorrelations);
+            MC_BEGIN(macoro::task<>, gen, &r);
+            MC_AWAIT(r.start());
+            MC_END();
         }
 
         macoro::task<> otRecvRequest(OtRecvGenerator & r, u64 numCorrelations, coproto::Socket& sock, oc::PRNG& prng, u64 reservoirSize = 0)

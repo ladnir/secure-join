@@ -80,7 +80,9 @@ namespace secJoin
         BetaCircuit::PrintIter mPrint;
 
         // the binary triples used in by the protocol.
-        BinOleGenerator mTriples;
+        BinOleRequest mTriples;
+
+        macoro::task<> mPreproTask;
 
         // initialize this gmw to eval n copies of the circuit cir.
         // use correlations provided by ole.
@@ -88,9 +90,17 @@ namespace secJoin
             u64 n,
             const BetaCircuit& cir);
 
+        void init(
+            u64 n,
+            const BetaCircuit& cir,
+            CorGenerator& gen);
+
+        void init(CorGenerator& gen);
+
+
         bool hasPreprocessing() const
         {
-            return mCir.mNonlinearGateCount == 0 || mTriples.mSize;
+            return mCir.mNonlinearGateCount == 0 || mTriples.mState.get();
         }
 
         // set the i'th input. There should be mN rows of `input`, each row holding
@@ -183,7 +193,9 @@ namespace secJoin
             }
         }
 
-        macoro::task<> preprocess(CorGenerator& gen, coproto::Socket& chl, oc::PRNG& prng);
+
+
+        macoro::task<> preprocess(coproto::Socket& chl, oc::PRNG& prng);
 
         // run the gmw protocol.
         coproto::task<> run(CorGenerator& gen, coproto::Socket& chl, oc::PRNG& prng);

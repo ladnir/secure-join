@@ -95,8 +95,8 @@ void CorGenerator_BinOle_Test(const oc::CLP&)
         }
 
         auto sock = coproto::LocalAsyncSocket::makePair();
-        BinOleGenerator send;
-        BinOleGenerator recv;
+        BinOleRequest send;
+        BinOleRequest recv;
         send.init(n, 1 << 14, sock[0], prng, rBase, mock);
         recv.init(n, 1 << 14, sock[1], prng, sBase, mock);
 

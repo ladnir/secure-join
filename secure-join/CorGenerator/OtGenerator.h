@@ -57,10 +57,10 @@ namespace secJoin
     struct OtRecvGenerator
     {
 
-        struct Impl
+        struct Batch
         {
-            Impl() = default;
-            Impl(Impl&&) { throw RTE_LOC; };
+            Batch() = default;
+            Batch(Batch&&) { throw RTE_LOC; };
             oc::SilentOtExtReceiver mReceiver;
             oc::BitVector mChoice;
             oc::AlignedUnVector<oc::block> mMsg;
@@ -73,7 +73,7 @@ namespace secJoin
             macoro::task<> task();
         };
 
-        std::vector<Impl> mCorrelations;
+        std::vector<Batch> mCorrelations;
         u64 mIdx = 0, mSize = 0;
         bool mMock = false;
 
@@ -95,10 +95,10 @@ namespace secJoin
     struct OtSendGenerator
     {
 
-        struct Impl
+        struct Batch
         {
-            Impl() = default;
-            Impl(Impl&&) { throw RTE_LOC; };
+            Batch() = default;
+            Batch(Batch&&) { throw RTE_LOC; };
             oc::SilentOtExtSender mSender;
             oc::AlignedUnVector<std::array<oc::block, 2>> mMsg;
             macoro::eager_task<> mTask;
@@ -112,7 +112,7 @@ namespace secJoin
             macoro::task<> task();
         };
 
-        std::vector<Impl> mCorrelations;
+        std::vector<Batch> mCorrelations;
         u64 mIdx = 0, mSize = 0;
         bool mMock = false;
 

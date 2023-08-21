@@ -983,6 +983,124 @@ namespace secJoin
     //};
 
 
+
+    void RadixSort::configure(
+        u64 n,
+        u64 bitCount,
+        CorGenerator& gen,
+        u64 bytesPerElem)
+    {
+        mConfigured = true;
+        mRole = (int)gen.mRole;
+        u64 ll = oc::divCeil(bitCount, mL);
+        mRounds.resize(ll);
+        //tasks.resize(ll * 5 - !bool(bytesPerElem > 0));
+
+        TODO("Minimize")
+        auto byteCount = oc::divCeil(std::min<u64>(mL, bitCount), 8) + 2 * sizeof(u32);
+        auto pow2L = 1ull << mL;
+
+        initIndexToOneHotCircuit(mL);
+        initArith2BinCircuit(n);
+
+        assert(mIndexToOneHotCircuit.mOutputs[0].size() == pow2L);
+        for (u64 i = 0, j = 0; i < ll; ++i)
+        {
+            // for the last one, we use the requested number of bytes
+            if (i == ll - 1)
+                byteCount = bytesPerElem;
+
+            if (byteCount)
+                mRounds[i].mPerm.init(n, byteCount, gen);
+
+            mRounds[i].mBitInject.init(n, pow2L, gen);
+
+
+            mRounds[i].mIndexToOneHotGmw.init(n, mIndexToOneHotCircuit, gen);
+            tasks[j++] = mIndexToOneHotGmw[i].preprocess(comm, prng)
+                | macoro::make_eager();
+
+
+            mArithToBinGmw[i].init(n, mArith2BinCir);
+            tasks[j++] = mArithToBinGmw[i].preprocess(gen, comm, prng)
+                | macoro::make_eager();
+
+            tasks[j++] = hadamardSumPreprocess(n * pow2L, gen, comm,
+                mHadamardSumRecvOts[i], mHadamardSumSendOts[i], prng)
+                | macoro::make_eager();
+        }
+
+        for (i = 0; i < tasks.size(); ++i)
+            MC_AWAIT(tasks[i]);
+
+        mHasPreprocessing = true;
+    }
+
+    macoro::task<> RadixSort::preprocess(
+        u64 n,
+        u64 bitCount,
+        CorGenerator& gen,
+        coproto::Socket& comm,
+        oc::PRNG& prng,
+        u64 bytesPerElem)
+    {
+        MC_BEGIN(macoro::task<>, this, n, bitCount, &gen, &comm, &prng, bytesPerElem,
+            ll = u64{},
+            pow2L = u64{},
+            i = u64{}, j = u64{},
+            byteCount = u64{},
+            tasks = std::vector<macoro::eager_task<>>{});
+
+        mRole = (int)gen.mRole;
+        ll = oc::divCeil(bitCount, mL);
+        mPerms.resize(ll);
+        tasks.resize(ll * 5 - !bool(bytesPerElem > 0));
+
+        byteCount = oc::divCeil(std::min<u64>(mL, bitCount - i * mL), 8) + 2 * sizeof(u32);
+        pow2L = 1ull << mL;
+        mArithToBinGmw.resize(ll);
+        mIndexToOneHotGmw.resize(ll);
+        mBitInjects.resize(ll);
+        mHadamardSumRecvOts.resize(ll);
+        mHadamardSumSendOts.resize(ll);
+        initIndexToOneHotCircuit(mL);
+        initArith2BinCircuit(n);
+        assert(mIndexToOneHotCircuit.mOutputs[0].size() == pow2L);
+        for (i = 0, j = 0; i < ll; ++i)
+        {
+            // for the last one, we use the requested number of bytes
+            if (i == ll - 1)
+                byteCount = bytesPerElem;
+
+            if (byteCount)
+                tasks[j++] = mPerms[i].preprocess(n, byteCount, comm, gen, prng)
+                | macoro::make_eager();
+
+            tasks[j++] = mBitInjects[i].preprocess(n, pow2L, gen, prng, comm)
+                | macoro::make_eager();
+
+
+            mIndexToOneHotGmw[i].init(n, mIndexToOneHotCircuit);
+            tasks[j++] = mIndexToOneHotGmw[i].preprocess(gen, comm, prng)
+                | macoro::make_eager();
+
+
+            mArithToBinGmw[i].init(n, mArith2BinCir);
+            tasks[j++] = mArithToBinGmw[i].preprocess(gen, comm, prng)
+                | macoro::make_eager();
+
+            tasks[j++] = hadamardSumPreprocess(n * pow2L, gen, comm,
+                mHadamardSumRecvOts[i], mHadamardSumSendOts[i], prng)
+                | macoro::make_eager();
+        }
+
+        for (i = 0; i < tasks.size(); ++i)
+            MC_AWAIT(tasks[i]);
+
+        mHasPreprocessing = true;
+        MC_END();
+    }
+
     macoro::task<> RadixSort::preprocess(
         u64 n,
         u64 bitCount,

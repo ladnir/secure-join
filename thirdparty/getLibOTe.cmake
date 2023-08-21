@@ -36,14 +36,10 @@ if(NOT ${DEP_NAME}_FOUND OR LIBOTE_DEV)
                        -DENABLE_MRR=ON
                        -DENABLE_IKNP=ON
                        -DENABLE_SOFTSPOKEN_OT=ON
-                       #-DENABLE_BITPOLYMUL=${LIBOTE_ENABLE_BITPOLYMUL}
                        -DENABLE_SILENTOT=ON
                        -DENABLE_SILENT_VOLE=ON
                        ${LIBOTE_OS_ARGS}
                        -DENABLE_SSE=${SECUREJOIN_ENABLE_SSE}
-                       #-DCOPROTO_ENABLE_BOOST=${COPROTO_ENABLE_BOOST}
-                       #-DCOPROTO_ENABLE_OPENSSL=${COPROTO_ENABLE_OPENSSL}
-                       #-DOC_PIC=${SECUREJOIN_PIC}
                        -DOC_THIRDPARTY_CLONE_DIR=${SECUREJOIN_THIRDPARTY_CLONE_DIR}
                        -DENABLE_ASAN=${SECUREJOIN_ENABLE_ASAN}
                        -DENABLE_BOOST=${SECUREJOIN_ENABLE_BOOST}

@@ -3,7 +3,7 @@
 namespace secJoin
 {
 
-    void fakeFill(u64 m, BinOle& ole, bool sender, coproto::SessionID sid)
+    void fakeFill(u64 m, BinOleGenerator::Batch& ole, bool sender, oc::block sid)
     {
         //mNumBinOle += m;
         assert(m % 128 == 0);
@@ -17,8 +17,8 @@ namespace secJoin
 
         auto m8 = m / 8 * 8;
         oc::block mm8(4532453452, 43254534);
-        oc::block mm;
-        memcpy(mm.data(), sid.mVal, sizeof(oc::block));
+        oc::block mm = sid;
+        //memcpy(mm.data(), sid.mVal, sizeof(oc::block));
         //oc::block mm(2342314, 213423);
 
         if (sender)
@@ -97,30 +97,45 @@ namespace secJoin
         }
     }
 
-    void BinOleGenerator::Impl::init(u64 size, coproto::Socket& sock, oc::PRNG& prng)
+    void BinOleGenerator::Batch::init(std::shared_ptr<State>& state)
     {
-        mSize = size;
-        mSock = sock.fork();
-        mPrng = prng.get<oc::block>();
+        mState = state;
+        mSock = state->mSock.fork();
+        mPrng = state->mPrng.fork();
+        mStarted = false;
+
+        if (state->mRole)
+        {
+            mSender.setBaseOts(state->mRecvBase.get(), state->mRecvBase.mChoice);
+            mT = sendTask();
+        }
+        else
+        {
+            mReceiver.setBaseOts(state->mSendBase.get());
+            mT = sendTask();
+        }
+        //mSize = size;
+        //mSock = sock.fork();
+        //mPrng = prng.get<oc::block>();
     }
 
-    void BinOleGenerator::Impl::init(u64 size, coproto::Socket& sock, oc::PRNG& prng, SendBase& base)
-    {
-        init(size, sock, prng);
-        mReceiver.setBaseOts(base.get());
-        mReceiver.configure(size);
-        mT = recvTask();
-    }
+    //void BinOleGenerator::Batch::init(u64 size, coproto::Socket& sock, oc::PRNG& prng, SendBase& base)
+    //{
+    //    init(size, sock, prng);
+    //    mReceiver.setBaseOts(base.get());
+    //    mReceiver.configure(size);
+    //    mT = recvTask();
+    //}
 
-    void BinOleGenerator::Impl::init(u64 size, coproto::Socket& sock, oc::PRNG& prng, RecvBase& base)
-    {
-        init(size, sock, prng);
-        mSender.configure(size);
-        mSender.setBaseOts(base.get(), base.mChoice);
-        mT = sendTask();
-    }
+    //void BinOleGenerator::Batch::init(u64 size, coproto::Socket& sock, oc::PRNG& prng, RecvBase& base)
+    //{
+    //    init(size, sock, prng);
+    //    mSender.configure(size);
+    //    mSender.setBaseOts(base.get(), base.mChoice);
+    //    mT = sendTask();
+    //}
 
-    macoro::task<> BinOleGenerator::Impl::recvTask()
+    macoro::task<> BinOleGenerator::Batch::recvTask()
     {
         MC_BEGIN(macoro::task<>, this);
         mChoice.resize(mReceiver.mRequestedNumOts);
@@ -133,7 +148,7 @@ namespace secJoin
         MC_END();
     }
 
-    macoro::task<> BinOleGenerator::Impl::sendTask()
+    macoro::task<> BinOleGenerator::Batch::sendTask()
     {
         MC_BEGIN(macoro::task<>, this);
 
@@ -146,13 +161,13 @@ namespace secJoin
         MC_END();
     }
 
-    macoro::task<> BinOleGenerator::Impl::task() {
+    macoro::task<> BinOleGenerator::Batch::task() {
         if (!mT.handle())
             throw RTE_LOC;
         return std::move(mT);
     }
 
-    void BinOleGenerator::Impl::compressRecver(oc::BitVector& bv, span<oc::block> recvMsg, span<oc::block> add, span<oc::block> mult)
+    void BinOleGenerator::Batch::compressRecver(oc::BitVector& bv, span<oc::block> recvMsg, span<oc::block> add, span<oc::block> mult)
     {
         auto aIter16 = (u16*)add.data();
         auto bIter16 = (u16*)mult.data();
@@ -233,7 +248,7 @@ namespace secJoin
     }
 
 
-    void BinOleGenerator::Impl::compressSender(span<std::array<oc::block, 2>> sendMsg, span<oc::block> add, span<oc::block> mult)
+    void BinOleGenerator::Batch::compressSender(span<std::array<oc::block, 2>> sendMsg, span<oc::block> add, span<oc::block> mult)
     {
 
         auto bIter16 = (u16*)add.data();
@@ -340,76 +355,109 @@ namespace secJoin
 
     template<typename Base>
     void BinOleGenerator::init(
-        u64 n,
         u64 batchSize,
         coproto::Socket& sock,
         oc::PRNG& prng,
         Base& base,
         bool mock)
     {
-        mMock = mock;
-        mSize = n;
-        mCorrelations.reserve(oc::divCeil(n, batchSize));
-        for (u64 i = 0; i < n; i += batchSize)
-        {
-            u64 size = std::min(n - i * batchSize, batchSize);
-            mCorrelations.emplace_back();
-            mCorrelations.back().init(size, sock, prng, base);
-        }
-
-        mRole = std::is_same_v<Base, SendBase>;
+        mState = std::make_shared<State>();
+        mState->mBatchSize = batchSize;
+        mState->mMock = mock;
+        mState->mSock = sock;
+        mState->mPrng = prng.get<oc::block>();
+        mState->mRole = std::is_same_v<Base, SendBase>;
+        mState->set(base);
+        //mState->mCorrelations.reserve(oc::divCeil(n, batchSize));
+        //for (u64 i = 0; i < n; i += batchSize)
+        //{
+        //    u64 size = std::min(n - i * batchSize, batchSize);
+        //    mState->mCorrelations.emplace_back();
+        //    mState->mCorrelations.back().init(size, sock, prng, base);
+        //}
     }
 
-    template void BinOleGenerator::init<SendBase>(u64, u64, coproto::Socket&, oc::PRNG&, SendBase&, bool);
-    template void BinOleGenerator::init<RecvBase>(u64, u64, coproto::Socket&, oc::PRNG&, RecvBase&, bool);
+    template void BinOleGenerator::init<SendBase>(u64, coproto::Socket&, oc::PRNG&, SendBase&, bool);
+    template void BinOleGenerator::init<RecvBase>(u64, coproto::Socket&, oc::PRNG&, RecvBase&, bool);
 
 
-    macoro::task<> BinOleGenerator::task()
+    macoro::task<> BinOleGenerator::Request::start()
     {
+        if (!mState)
+            throw RTE_LOC;
         MC_BEGIN(macoro::task<>, this, i = u64{});
-        if (mMock)
+        if (mState->mMock)
             MC_RETURN_VOID();
 
-        TODO("ex handling");
-        for (i = 0; i < mCorrelations.size(); ++i)
-            mCorrelations[i].mTask = mCorrelations[i].task() | macoro::make_eager();
 
+        for (i = 0; i < mOffsets.size(); ++i)
+            mOffsets[i].mBatch->start();
 
-        for (i = 0; i < mCorrelations.size(); ++i)
+        for (i = 0; i < mOffsets.size(); ++i)
         {
-            MC_AWAIT(mCorrelations[i].mTask);
-            mCorrelations[i].mDone.set();
+            MC_AWAIT(mOffsets[i].mBatch->mDone);
         }
 
         MC_END();
     }
 
-    macoro::task<> BinOleGenerator::get(BinOle& d)
+    macoro::task<> BinOleGenerator::Request::get(BinOle& d)
     {
         MC_BEGIN(macoro::task<>, this, &d);
 
-        if (mIdx >= mCorrelations.size())
+        if (mIdx >= mOffsets.size())
             throw RTE_LOC;
 
 
-        if (mMock)
+        if (mState->mMock)
         {
-            auto s = mCorrelations[mIdx].mSize;
-            auto r = mRole;
-            fakeFill(s, d, r,  mCorrelations[mIdx].mSock.mId);
-        }
-        else
-        {
+            auto s = mOffsets[mIdx].mSize;
+            auto r = mState->mRole;
+            d.mBatch = std::make_shared<Batch>();
 
-            MC_AWAIT(mCorrelations[mIdx].mDone);
-
-            d.mMult = std::move(mCorrelations[mIdx].mMult);
-            d.mAdd = std::move(mCorrelations[mIdx].mAdd);
+            oc::block sid;
+            memcpy(&sid, &mOffsets[mIdx].mBatch->mSock.mId, sizeof(oc::block));
+            fakeFill(s, *d.mBatch, r, sid);
+            d.mBatch->mDone.set();
         }
+
+
+        MC_AWAIT(mOffsets[mIdx].mBatch->mDone);
+        d.mMult = std::move(mOffsets[mIdx].mBatch->mMult.subspan(mOffsets[mIdx].mOffset, mOffsets[mIdx].mSize));
+        d.mAdd = std::move(mOffsets[mIdx].mBatch->mAdd.subspan(mOffsets[mIdx].mOffset, mOffsets[mIdx].mSize));
         ++mIdx;
 
         MC_END();
     }
 
+
+    BinOleGenerator::Request BinOleGenerator::request(u64 n)
+    {
+        Request r;
+        r.mState = mState;
+        if (mState->mStarted)
+            throw RTE_LOC;
+
+        // we internally measure in multiple of 128;
+        n = oc::divCeil(n, 128);
+        while (n)
+        {
+
+            if (mState->mCorrelations.size() == 0 || mState->mCorrelations.back()->mSize == mState->mBatchSize)
+            {
+                mState->mCorrelations.emplace_back(std::make_shared<Batch>());
+                mState->mCorrelations.back()->init(mState);
+            }
+             
+            r.mOffsets.emplace_back();
+            auto rem = mState->mBatchSize - mState->mCorrelations.back()->mSize;
+
+            r.mOffsets.back().mOffset = mState->mCorrelations.back()->mSize;
+            r.mOffsets.back().mSize = rem;
+            r.mOffsets.back().mBatch = mState->mCorrelations.back();
+
+            mState->mCorrelations.back()->mSize += mState->mBatchSize;
+        }
+    }
 
 }

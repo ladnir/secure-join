@@ -141,7 +141,7 @@ namespace secJoin
             oc::MatrixView<oc::block> u1,
             oc::MatrixView<oc::block> out,
             coproto::Socket& sock,
-            BinOleGenerator& ole);
+            BinOleRequest& ole);
 
         // re-randomize the OTs seeds with the tweak.
         void tweakKeyOts(oc::block tweak)
@@ -216,7 +216,7 @@ namespace secJoin
             oc::MatrixView<oc::block> u1,
             oc::MatrixView<oc::block> out,
             coproto::Socket& sock,
-            BinOleGenerator& ole);
+            BinOleRequest& ole);
 
         // re-randomize the OTs seeds with the tweak.
         void tweakKeyOts(oc::block tweak)

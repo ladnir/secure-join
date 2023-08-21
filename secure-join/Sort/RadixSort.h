@@ -40,6 +40,8 @@ namespace secJoin
 
         bool mHasPreprocessing = false;
 
+        bool mConfigured = false;
+
         u64 mL = 2;
 
         u64 mRole = -1;
@@ -48,20 +50,26 @@ namespace secJoin
         oc::BetaCircuit mIndexToOneHotCircuit;
         oc::BetaCircuit mArith2BinCir;
 
+        struct Round
+        {
+            AdditivePerm mPerm;
+            BitInject mBitInject;
+            Gmw mIndexToOneHotGmw, mArithToBinGmw;
+            OtRecvGenerator mHadamardSumRecvOts;
+            OtSendGenerator mHadamardSumSendOts;
+        };
+        std::vector<Round> mRounds;
 
-        std::vector<AdditivePerm> mPerms;
-        std::vector<BitInject> mBitInjects;
-        std::vector<Gmw> mIndexToOneHotGmw, mArithToBinGmw;
-        std::vector<OtRecvGenerator> mHadamardSumRecvOts;
-        std::vector<OtSendGenerator> mHadamardSumSendOts;
 
-        macoro::task<> preprocess(
-            u64 n, 
+        void configure(
+            u64 n,
             u64 bitCount,
             CorGenerator& gen,
-            coproto::Socket& comm,
-            oc::PRNG& prng,
             u64 bytesPerElem);
+
+        macoro::task<> preprocess(
+            coproto::Socket& comm,
+            oc::PRNG& prng);
 
         using Matrix32 = oc::Matrix<u32>;
 
@@ -114,7 +122,7 @@ namespace secJoin
             const BinMatrix& k,
             AdditivePerm& dst,
             CorGenerator& gen,
-            coproto::Socket& comm, 
+            coproto::Socket& comm,
             oc::PRNG& prng);
 
         //// sort `src` based on the key `k`. The sorted values are written to `dst`

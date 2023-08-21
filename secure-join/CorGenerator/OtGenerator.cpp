@@ -40,7 +40,7 @@ namespace secJoin
         }
     }
 
-    void OtRecvGenerator::Impl::init(u64 size, coproto::Socket& sock, oc::PRNG& prng, SendBase& base)
+    void OtRecvGenerator::Batch::init(u64 size, coproto::Socket& sock, oc::PRNG& prng, SendBase& base)
     {
         mSock = sock.fork();
         mPrng = prng.get<oc::block>();
@@ -49,7 +49,7 @@ namespace secJoin
     }
 
 
-    macoro::task<> OtRecvGenerator::Impl::task()
+    macoro::task<> OtRecvGenerator::Batch::task()
     {
         mMsg.resize(mReceiver.mRequestedNumOts);
         mChoice.resize(mReceiver.mRequestedNumOts);
@@ -134,7 +134,7 @@ namespace secJoin
 
 
 
-    void OtSendGenerator::Impl::init(u64 size, coproto::Socket& sock, oc::PRNG& prng, RecvBase& base)
+    void OtSendGenerator::Batch::init(u64 size, coproto::Socket& sock, oc::PRNG& prng, RecvBase& base)
     {
         mSock = sock.fork();
         mPrng = prng.get<oc::block>();
@@ -142,7 +142,7 @@ namespace secJoin
         mSender.setBaseOts(base.get(), base.mChoice);
     }
 
-    macoro::task<> OtSendGenerator::Impl::task()
+    macoro::task<> OtSendGenerator::Batch::task()
     {
         mMsg.resize(mSender.mRequestNumOts);
         return mSender.silentSend(mMsg, mPrng, mSock);

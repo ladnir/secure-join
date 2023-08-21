@@ -581,7 +581,7 @@ void DLpnPrf_mod2_test(const oc::CLP& cmd)
     ole1.mock(CorGenerator::Role::Receiver);
 
 
-    BinOleGenerator req0, req1;
+    BinOleRequest req0, req1;
     macoro::sync_wait(macoro::when_all_ready(
         ole0.binOleRequest(req0, 2 * n * m, sock[0], prng0),
         ole1.binOleRequest(req1, 2 * n * m, sock[1], prng1)

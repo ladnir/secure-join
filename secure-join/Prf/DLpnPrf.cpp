@@ -829,7 +829,7 @@ namespace secJoin
             diff = oc::BitVector{},
             ots = oc::AlignedUnVector<std::array<oc::block, 2>>{},
             i = u64{},
-            ole = BinOleGenerator{},
+            ole = BinOleRequest{},
             u0 = oc::Matrix<oc::block>{},
             u1 = oc::Matrix<oc::block>{},
             uu0 = oc::Matrix<oc::block>{},
@@ -944,7 +944,7 @@ namespace secJoin
             gx = oc::AlignedUnVector<u16>{},
             i = u64{},
             baseOts = oc::AlignedUnVector<std::array<oc::block, 2>>{},
-            ole = BinOleGenerator{},
+            ole = BinOleRequest{},
             u0 = oc::Matrix<oc::block>{},
             u1 = oc::Matrix<oc::block>{},
             uu0 = oc::Matrix<oc::block>{},
@@ -1185,7 +1185,7 @@ namespace secJoin
         oc::MatrixView<oc::block> u1,
         oc::MatrixView<oc::block> out,
         coproto::Socket& sock,
-        BinOleGenerator& ole)
+        BinOleRequest& ole)
     {
         MC_BEGIN(macoro::task<>, this, u0, u1, out, &sock, &ole,
             triple = BinOle{},
@@ -1321,7 +1321,7 @@ namespace secJoin
         oc::MatrixView<oc::block> u1,
         oc::MatrixView<oc::block> out,
         coproto::Socket& sock,
-        BinOleGenerator& ole)
+        BinOleRequest& ole)
     {
         MC_BEGIN(macoro::task<>, this, u0, u1, out, &sock, &ole,
             triple = std::vector<BinOle>{},
