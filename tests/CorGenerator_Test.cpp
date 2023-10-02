@@ -25,11 +25,13 @@ void CorGenerator_Ot_Test(const oc::CLP&)
         auto sock = coproto::LocalAsyncSocket::makePair();
         OtSendGenerator send;
         OtRecvGenerator recv;
-        send.init(n, 1 << 14, sock[0], prng, rBase, mock);
-        recv.init(n, 1 << 14, sock[1], prng, sBase, mock);
+        send.init(1 << 14, sock[0], prng, rBase, mock);
+        recv.init(1 << 14, sock[1], prng, sBase, mock);
 
-        auto p0 = send.task() | macoro::make_eager();
-        auto p1 = recv.task() | macoro::make_eager();
+        auto sReq = send.request(n);
+        auto rReq = recv.request(n);
+        auto p0 = sReq.start() | macoro::make_eager();
+        auto p1 = rReq.start() | macoro::make_eager();
 
 
         u64 s = 0;
@@ -39,8 +41,8 @@ void CorGenerator_Ot_Test(const oc::CLP&)
             OtRecv rot;
 
             auto r = macoro::sync_wait(macoro::when_all_ready(
-                send.get(sot),
-                recv.get(rot)
+                sReq.get(sot),
+                rReq.get(rot)
             ));
 
             std::get<0>(r).result();
@@ -95,13 +97,16 @@ void CorGenerator_BinOle_Test(const oc::CLP&)
         }
 
         auto sock = coproto::LocalAsyncSocket::makePair();
-        BinOleRequest send;
-        BinOleRequest recv;
-        send.init(n, 1 << 14, sock[0], prng, rBase, mock);
-        recv.init(n, 1 << 14, sock[1], prng, sBase, mock);
+        BinOleGenerator send;
+        BinOleGenerator recv;
+        send.init(1 << 14, sock[0], prng, rBase, mock);
+        recv.init(1 << 14, sock[1], prng, sBase, mock);
 
-        auto p0 = send.task() | macoro::make_eager();
-        auto p1 = recv.task() | macoro::make_eager();
+
+        auto sReq = send.request(n);
+        auto rReq = send.request(n);
+        auto p0 = sReq.start() | macoro::make_eager();
+        auto p1 = rReq.start() | macoro::make_eager();
 
 
         u64 s = 0;
@@ -111,8 +116,8 @@ void CorGenerator_BinOle_Test(const oc::CLP&)
             BinOle rot;
 
             auto r = macoro::sync_wait(macoro::when_all_ready(
-                send.get(sot),
-                recv.get(rot)
+                sReq.get(sot),
+                rReq.get(rot)
             ));
 
             std::get<0>(r).result();

@@ -32,9 +32,14 @@ namespace secJoin
         mPrint = mCir.mPrints.begin();
     }
 
-    void Gmw::init(CorGenerator& gen)
+    void Gmw::request(CorGenerator& gen)
     {
-        mPreproTask = gen.binOleRequest(mTriples, 2 * mCir.mNonlinearGateCount * oc::roundUpTo(mN, 128), chl, prng);
+        if (mCir.mGates.size() == 0)
+            throw std::runtime_error("inint was not been called." LOCATION);
+
+        mHasRequest = true;
+        if(mCir.mNonlinearGateCount)
+            mTriples = gen.binOleRequest(2 * mCir.mNonlinearGateCount * oc::roundUpTo(mN, 128));
     }
 
     void Gmw::implSetInput(u64 i, oc::MatrixView<u8> input, u64 alignment)
@@ -143,17 +148,23 @@ namespace secJoin
         return memView;
     }
 
-    macoro::task<> Gmw::preprocess(
-        coproto::Socket& chl_, 
-        oc::PRNG& prng_)
+    macoro::task<> Gmw::preprocess()
     {
         if (mCir.mGates.size() == 0)
             throw std::runtime_error("init(...) must be called first. " LOCATION);
-        if (mPreproTask.handle() == nullptr)
-            throw std::runtime_error("init(gen) not called. " LOCATION);
-        return std::move(mPreproTask);
-        //MC_AWAIT(gen.binOleRequest(mTriples, 2 * mCir.mNonlinearGateCount * oc::roundUpTo(mN, 128), chl, prng));
-        //MC_END();
+
+        mHasPreprocessing = true;
+
+        if (mCir.mNonlinearGateCount == 0)
+        {
+            MC_BEGIN(macoro::task<>);
+            MC_END();
+        }
+
+        if (mTriples.mState == nullptr)
+            throw std::runtime_error("request(gen) not called. " LOCATION);
+
+        return mTriples.start();
     }
 
     // The basic protocol where the inputs are not shared:
@@ -162,15 +173,15 @@ namespace secJoin
     //   > rand  a, b
     // Recver has
     //   > input y
-    //   > rand  z, d = ac + b
+    //   > rand  c, d = ac + b
     //
     // Sender sends u = a + x
-    // Recver sends w = z + y
+    // Recver sends w = c + y
     //
     // Sender outputs z1 = wx     = cx + yx
     // Recver outputs z2 = uc + d = cx + ca + ca + b
     //                            = cx + b
-    // Observer z1 + z2 = xy
+    // Observe z1 + z2 = xy
     //
     // The full protocol where the inputs are shared:
     // Sender has 
@@ -194,21 +205,10 @@ namespace secJoin
     //                    = x2y2 + r
     coproto::task<> Gmw::run(CorGenerator& gen, coproto::Socket& chl, oc::PRNG& prng)
     {
-        MC_BEGIN(coproto::task<>, this, &chl, &gen, &prng,
-            pre = macoro::eager_task<>{});
+        if(hasRequest() == false)
+            request(gen);
 
-        if (hasPreprocessing() == false)
-        {
-            init(gen);
-            pre = preprocess(chl, prng) | macoro::make_eager();
-        }
-
-        MC_AWAIT(run(chl));
-
-        if (pre.handle())
-            MC_AWAIT(pre);
-
-        MC_END();
+        return run(chl);
     }
 
     coproto::task<> Gmw::run(coproto::Socket& chl)
@@ -234,14 +234,17 @@ namespace secJoin
             j = u64{},
             roundIdx = u64{},
             roundRem = u64{},
-            batchSize = 1ull << 14
+            batchSize = 1ull << 14,
+            pre = macoro::eager_task<>{}
         );
 
         if (mCir.mGates.size() == 0ull)
             throw std::runtime_error("Gmw::init(...) was not called");
 
         if (hasPreprocessing() == false)
-            throw std::runtime_error("Gmw::run was called with no preprocessing or CorGenerator. " LOCATION);
+        {
+            pre = preprocess() | macoro::make_eager();
+        }
 
         finalizeMapping();
         if (mO.mDebug)
@@ -576,9 +579,14 @@ namespace secJoin
 
         }
 
-        if (mTriples.mSize)
-            MC_AWAIT(mTriples.close());
+        if (mTriples.mState)
+            mTriples.clear();
         mTriples = {};
+        mHasPreprocessing = 0;
+        mHasRequest = 0;
+
+        if (pre.handle())
+            MC_AWAIT(pre);
 
         MC_END();
     }

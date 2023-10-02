@@ -58,8 +58,13 @@ void ComposedPerm_basic_test()
         sout[0].resize(n, rowSize);
         sout[1].resize(n, rowSize);
 
-        auto proto0 = perm1.apply<u8>(invPerm, xShares[0], sout[0], chls[0], ole0, prng);
-        auto proto1 = perm2.apply<u8>(invPerm, xShares[1], sout[1], chls[1], ole1, prng);
+        perm1.init2(0, n, rowSize);
+        perm2.init2(1, n, rowSize);
+        perm1.request(ole0);
+        perm2.request(ole1);
+
+        auto proto0 = perm1.apply<u8>(invPerm, xShares[0], sout[0], chls[0], prng);
+        auto proto1 = perm2.apply<u8>(invPerm, xShares[1], sout[1], chls[1], prng);
 
         auto res = macoro::sync_wait(macoro::when_all_ready(std::move(proto0), std::move(proto1)));
         std::get<0>(res).result();
@@ -125,7 +130,12 @@ void ComposedPerm_shared_test()
 
     for(auto invPerm : { PermOp::Regular,PermOp::Inverse })
     {
-    
+
+        perm1.init2(0, n, rowSize);
+        perm2.init2(1, n, rowSize);
+        perm1.request(ole0);
+        perm2.request(ole1);
+
         if(invPerm == PermOp::Inverse)
         {
             p1.apply<u8>(x, t, invPerm);
@@ -145,8 +155,8 @@ void ComposedPerm_shared_test()
         sout[1].resize(n, rowSize);
 
         auto res = macoro::sync_wait(macoro::when_all_ready(
-            perm1.apply<u8>(invPerm, xShares[0], sout[0], chls[0], ole0, prng0),
-            perm2.apply<u8>(invPerm, xShares[1], sout[1], chls[1], ole1, prng1)
+            perm1.apply<u8>(invPerm, xShares[0], sout[0], chls[0], prng0),
+            perm2.apply<u8>(invPerm, xShares[1], sout[1], chls[1], prng1)
             ));
         std::get<1>(res).result();
         std::get<0>(res).result();
@@ -213,9 +223,15 @@ void ComposedPerm_prepro_test()
 
     for (auto invPerm : { PermOp::Regular,PermOp::Inverse })
     {
+
+        perm1.init2(0, n, rowSize);
+        perm2.init2(1, n, rowSize);
+        perm1.request(ole0);
+        perm2.request(ole1);
+
         auto res0 = macoro::sync_wait(macoro::when_all_ready(
-            perm1.preprocess(n, rowSize, chls[0], ole0, prng0),
-            perm2.preprocess(n, rowSize, chls[1], ole1, prng1)
+            perm1.preprocess(chls[0], prng0),
+            perm2.preprocess(chls[1], prng1)
         ));
         std::get<1>(res0).result();
         std::get<0>(res0).result();
@@ -227,8 +243,8 @@ void ComposedPerm_prepro_test()
         sout[1].resize(n, rowSize);
 
         auto res = macoro::sync_wait(macoro::when_all_ready(
-            perm1.apply<u8>(invPerm, xShares[0], sout[0], chls[0], ole0, prng0),
-            perm2.apply<u8>(invPerm, xShares[1], sout[1], chls[1], ole1, prng1)
+            perm1.apply<u8>(invPerm, xShares[0], sout[0], chls[0], prng0),
+            perm2.apply<u8>(invPerm, xShares[1], sout[1], chls[1], prng1)
         ));
         std::get<1>(res).result();
         std::get<0>(res).result();

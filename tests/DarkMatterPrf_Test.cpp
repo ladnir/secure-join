@@ -520,10 +520,10 @@ void DLpnPrf_mod2_test(const oc::CLP& cmd)
     DLpnPrfSender sender;
     DLpnPrfReceiver recver;
 
-    sender.mPrintI = printI;
-    sender.mPrintJ = printJ;
-    recver.mPrintI = printI;
-    recver.mPrintJ = printJ;
+    //sender.mPrintI = printI;
+    //sender.mPrintJ = printJ;
+    //recver.mPrintI = printI;
+    //recver.mPrintJ = printJ;
 
     sender.setTimer(timer);
     recver.setTimer(timer);
@@ -581,15 +581,19 @@ void DLpnPrf_mod2_test(const oc::CLP& cmd)
     ole1.mock(CorGenerator::Role::Receiver);
 
 
-    BinOleRequest req0, req1;
-    macoro::sync_wait(macoro::when_all_ready(
-        ole0.binOleRequest(req0, 2 * n * m, sock[0], prng0),
-        ole1.binOleRequest(req1, 2 * n * m, sock[1], prng1)
-    ));
+    //BinOleRequest req0, req1;
+    //macoro::sync_wait(macoro::when_all_ready(
+    //    ole0.binOleRequest(req0, 2 * n * m, sock[0], prng0),
+    //    ole1.binOleRequest(req1, 2 * n * m, sock[1], prng1)
+    //));
+    sender.init(n);
+    recver.init(n);
+    sender.request(ole0);
+    recver.request(ole1);
 
     macoro::sync_wait(macoro::when_all_ready(
-        sender.mod2(u0s[0], u1s[0], outs[0], sock[0], req0),
-        recver.mod2(u0s[1], u1s[1], outs[1], sock[1], req1)
+        sender.mod2(u0s[0], u1s[0], outs[0], sock[0]),
+        recver.mod2(u0s[1], u1s[1], outs[1], sock[1])
     ));
 
     auto out = reveal(outs);
@@ -852,7 +856,7 @@ void DLpnPrf_proto_test(const oc::CLP& cmd)
     oc::block kk;
     kk = prng0.get();
     dm.setKey(kk);
-    sender.setKey(kk);
+    //sender.setKey(kk);
 
     CorGenerator ole0, ole1;
     ole0.mock(CorGenerator::Role::Sender);
@@ -869,7 +873,7 @@ void DLpnPrf_proto_test(const oc::CLP& cmd)
         sk[i][1] = oc::block(i, 1);
         rk[i] = oc::block(i, *oc::BitIterator((u8*)&sender.mPrf.mKey, i));
     }
-    sender.setKeyOts(rk);
+    sender.setKeyOts(kk,rk);
     recver.setKeyOts(sk);
 
     auto r = coproto::sync_wait(coproto::when_all_ready(

@@ -250,6 +250,7 @@ namespace secJoin
                 prng.mAes.ecbEncCounterMode(prng.mBlockIdx, 8, m);
                 prng.mBlockIdx += 8;
 
+
                 for (u64 j = 0; j < 8; ++j)
                 {
                     if (j)
@@ -335,6 +336,8 @@ namespace secJoin
         for (u64 i = 0; i < msb.size(); ++i)
         {
             auto bb = (oc::block*)&b.data()[i * 128];
+            assert((u64)bb % 16 == 0);
+
             oc::block tt[8];
             tt[0] = bb[0] & block1;
             tt[1] = bb[1] & block1;
@@ -700,51 +703,20 @@ namespace secJoin
     }
 
 
-
-
-    macoro::task<> DLpnPrfSender::genKeyOts(CorGenerator& ole, coproto::Socket& sock, oc::PRNG& prng)
+    void DLpnPrfSender::setKeyOts(oc::block k, span<oc::block> ots)
     {
-        MC_BEGIN(macoro::task<>, this, &ole, &sock, &prng,
-            totalSize = u64(),
-
-            ots = OtRecv(),
-            req = OtRecvGenerator(),
-            keyBlock = oc::block());
-
-        totalSize = 128;
-
-        MC_AWAIT(ole.otRecvRequest(req, totalSize, sock, prng));
-
-        MC_AWAIT(req.get(ots));
-
-        assert(ots.size() == totalSize);
-
-        keyBlock = ots.mChoice.getSpan<oc::block>()[0];
-        setKey(keyBlock);
-        setKeyOts(ots.mMsg);
-
-        MC_END();
-    }
-
-    void DLpnPrfSender::setKeyOts(span<oc::block> ots)
-    {
-        if (ots.size() != mPrf.KeySize)
+        if (ots.size() != DLpnPrf::KeySize)
             throw RTE_LOC;
-        mKeyOTs.resize(mPrf.KeySize);
-        for (u64 i = 0; i < mPrf.KeySize; ++i)
+
+        mPrf.setKey(k);
+        mKeyOTs.resize(DLpnPrf::KeySize);
+        for (u64 i = 0; i < DLpnPrf::KeySize; ++i)
         {
             mKeyOTs[i].SetSeed(ots[i]);
         }
-        mIsKeyOTsSet = true;
+        mHasKeyOts = true;
+        mDoKeyGen = false;
     }
-
-    void DLpnPrfSender::setKey(oc::block k)
-    {
-        mPrf.setKey(k);
-        mIsKeySet = true;
-    }
-
-
 
     void mod3BitDecompostion(oc::MatrixView<u16> u, oc::MatrixView<oc::block> u0, oc::MatrixView<oc::block> u1)
     {
@@ -794,26 +766,8 @@ namespace secJoin
                     throw RTE_LOC;
             }
 #endif
-            //// even bits in perfect shuffled order
-            //// eg: 0 128 2 130 4 132 6 134 ... 126 254
-            //packedU[0] =
-            //    (t[0] & mask0) |
-            //    ((t[2] & mask0) << 1);
-            //packedU[1] =
-            //    (t[1] & mask0) |
-            //    ((t[3] & mask0) << 1);
-
-            //// odd bits in perfect shuffled order
-            //// eg: 1 9 3 11 5 13 7 15
-            //packedU[2] =
-            //    ((t[0] & mask1) >> 1) |
-            //    (t[2] & mask1);
-            //packedU[3] =
-            //    ((t[1] & mask1) >> 1) |
-            //    (t[3] & mask1);
         }
     }
-
 
 
     coproto::task<> DLpnPrfSender::evaluate(
@@ -822,8 +776,26 @@ namespace secJoin
         oc::PRNG& prng,
         CorGenerator& gen)
     {
+        // init has not been called, call it
+        if (mInputSize == 0)
+            init(y.size());
 
-        MC_BEGIN(coproto::task<>, y, this, &sock, &gen, &prng,
+        // request the required correlated randomness if needed.
+        if (mOleReq.size() == 0)
+            request(gen);
+
+        // perform the main protocol.
+        return evaluate(y, sock, prng);
+    }
+
+
+    coproto::task<> DLpnPrfSender::evaluate(
+        span<oc::block> y,
+        coproto::Socket& sock,
+        oc::PRNG& prng)
+    {
+
+        MC_BEGIN(coproto::task<>, y, this, &sock, &prng,
             buffer = oc::AlignedUnVector<u8>{},
             f = oc::BitVector{},
             diff = oc::BitVector{},
@@ -835,14 +807,32 @@ namespace secJoin
             uu0 = oc::Matrix<oc::block>{},
             uu1 = oc::Matrix<oc::block>{},
             v = oc::Matrix<oc::block>{},
-            H2 = oc::Matrix<oc::block>{},
+            xkShares = oc::Matrix<oc::block>{},
             msg = oc::Matrix<oc::block>{},
-            pre = macoro::eager_task<>{}
+            pre = macoro::eager_task<>{},
+            otRecv = OtRecv{}
         );
 
-        if (!mIsKeyOTsSet)
-            MC_AWAIT(genKeyOts(gen, sock, prng));
+        if (mOleReq.size() != oc::roundUpTo(y.size(), 128) * DLpnPrf::MidSize * 2)
+            throw std::runtime_error("do not have enough preprocessing. Call request(...) first. " LOCATION);
 
+        // If no one has started the preprocessing, then lets start it.
+        if (mHasPrepro == false)
+            pre = preprocess() | macoro::make_eager();
+
+        // if we are doing the key gen, get the results.
+        if (mKeyReq.size())
+        {
+            MC_AWAIT(mKeyReq.get(otRecv));
+            auto k = otRecv.mChoice.getSpan<oc::block>()[0];
+            setKeyOts(k, otRecv.mMsg);
+        }
+
+        // make sure we have a key.
+        if (!mHasKeyOts)
+            throw std::runtime_error("dlpn was called without a key and keyGen was not requested. " LOCATION);
+
+        // debugging, make sure we have the correct key OTs.
         if (mDebug)
         {
             ots.resize(mKeyOTs.size());
@@ -861,74 +851,73 @@ namespace secJoin
 
         setTimePoint("DarkMatter.sender.begin");
 
-        pre = gen.binOleRequest(ole, oc::roundUpTo(y.size(), 128) * m * 2, sock, prng) | macoro::make_eager();
-        H2.resize(2 * mPrf.KeySize, oc::divCeil(y.size(), 128));
-
-        for (i = 0; i < mPrf.KeySize;)
+        // for each bit of the key, perform an OT derandomization where we get a share
+        // of the input x times the key mod 3. We store the LSB and MSB of the share separately.
+        // Hence we need 2 * DLpnPrf::KeySize rows in xkShares
+        xkShares.resize(2 * DLpnPrf::KeySize, oc::divCeil(y.size(), 128));
+        for (i = 0; i < DLpnPrf::KeySize;)
         {
-            msg.resize(StepSize, H2.cols() * 2); // y.size() * 256 * 2 bits
+            msg.resize(StepSize, xkShares.cols() * 2); // y.size() * 256 * 2 bits
             MC_AWAIT(sock.recv(msg));
             for (u64 k = 0; k < StepSize; ++i, ++k)
             {
                 u8 ki = *oc::BitIterator((u8*)&mPrf.mKey, i);
+
+                auto msbShare = xkShares[i * 2 + 1];
+                auto lsbShare = xkShares[i * 2 + 0];
                 if (ki)
                 {
+                    auto shares = span<oc::block>(lsbShare.data(), lsbShare.size() * 2);
+                    assert(shares.data() + shares.size() == msbShare.data() + msbShare.size());
+
                     // ui = (hi1,hi0)                                   ^ G(OT(i,1))
                     //    = { [ G(OT(i,0))  + x  mod 3 ] ^ G(OT(i,1)) } ^ G(OT(i,1))
                     //    =     G(OT(i,0))  + x  mod 3 
-                    xorVector({ H2[i * 2].data(), H2.cols() * 2 }, msg[k], mKeyOTs[i]);
+                    xorVector(shares, msg[k], mKeyOTs[i]);
                 }
                 else
                 {
                     // ui = (hi1,hi0)         
                     //    = G(OT(i,0))  mod 3 
-                    auto hh1 = H2[i * 2 + 1];
-                    auto hh0 = H2[i * 2 + 0];
-                    sampleMod3(mKeyOTs[i], hh1, hh0, buffer);
+                    sampleMod3(mKeyOTs[i], msbShare, lsbShare, buffer);
                 }
             }
         }
 
+        // Compute u = H * xkShare mod 3
         buffer = {};
+        u0.resize(DLpnPrf::MidSize, oc::divCeil(y.size(), 128), oc::AllocType::Uninitialized);
+        u1.resize(DLpnPrf::MidSize, oc::divCeil(y.size(), 128), oc::AllocType::Uninitialized);
+        compressH2(std::move(xkShares), u1, u0);
 
-        u0.resize(m, oc::divCeil(y.size(), 128), oc::AllocType::Uninitialized);
-        u1.resize(m, oc::divCeil(y.size(), 128), oc::AllocType::Uninitialized);
-        compressH2(std::move(H2), u1, u0);
+        // Compute v = u mod 2
+        v.resize(DLpnPrf::MidSize, u0.cols());
+        MC_AWAIT(mod2(u0, u1, v, sock));
 
-        v.resize(m, u0.cols());
-        MC_AWAIT(mod2(u0, u1, v, sock, ole));
-        MC_AWAIT(pre);
-
+        // Compute y = B * v
         compressB(v, y);
 
-        MC_END();
-    }
+        // cleanup
+        if (pre.handle())
+            MC_AWAIT(pre);
+        mHasPrepro = false;
+        mInputSize = 0;
 
-    macoro::task<> DLpnPrfReceiver::genKeyOts(CorGenerator& ole, coproto::Socket& sock, oc::PRNG& prng)
-    {
-        MC_BEGIN(macoro::task<>, this, &ole, &sock, &prng,
-            totalSize = u64(),
-            ots = OtSend(),
-            req = OtSendGenerator());
-        totalSize = 128;
-        MC_AWAIT(ole.otSendRequest(req, totalSize, sock, prng));
-        MC_AWAIT(req.get(ots));
-        assert(ots.size() == totalSize);
-        setKeyOts(ots.mMsg);
         MC_END();
     }
 
     void DLpnPrfReceiver::setKeyOts(span<std::array<oc::block, 2>> ots)
     {
-        if (ots.size() != mPrf.KeySize)
+        if (ots.size() != DLpnPrf::KeySize)
             throw RTE_LOC;
-        mKeyOTs.resize(mPrf.KeySize);
-        for (u64 i = 0; i < mPrf.KeySize; ++i)
+        mKeyOTs.resize(DLpnPrf::KeySize);
+        for (u64 i = 0; i < DLpnPrf::KeySize; ++i)
         {
             mKeyOTs[i][0].SetSeed(ots[i][0]);
             mKeyOTs[i][1].SetSeed(ots[i][1]);
         }
-        mIsKeyOTsSet = true;
+        mHasKeyOts = true;
+        mDoKeyGen = false;
     }
 
     coproto::task<> DLpnPrfReceiver::evaluate(
@@ -938,28 +927,63 @@ namespace secJoin
         oc::PRNG& prng,
         CorGenerator& gen)
     {
-        MC_BEGIN(coproto::task<>, x, y, this, &sock, &gen, &prng,
+        // init has not been called, call it
+        if (mInputSize == 0)
+            init(y.size());
+
+        // request the required correlated randomness if needed.
+        if (mOleReq.size() == 0)
+            request(gen);
+
+        // perform the main protocol.
+        return evaluate(x, y, sock, prng);
+    }
+
+    coproto::task<> DLpnPrfReceiver::evaluate(
+        span<oc::block> x,
+        span<oc::block> y,
+        coproto::Socket& sock,
+        oc::PRNG& prng)
+    {
+        MC_BEGIN(coproto::task<>, x, y, this, &sock, &prng,
             xt = oc::Matrix<oc::block>{},
             buffer = oc::AlignedUnVector<u8>{},
             gx = oc::AlignedUnVector<u16>{},
             i = u64{},
             baseOts = oc::AlignedUnVector<std::array<oc::block, 2>>{},
-            ole = BinOleRequest{},
             u0 = oc::Matrix<oc::block>{},
             u1 = oc::Matrix<oc::block>{},
             uu0 = oc::Matrix<oc::block>{},
             uu1 = oc::Matrix<oc::block>{},
-            H2 = oc::Matrix<oc::block>{},
+            xkShares = oc::Matrix<oc::block>{},
             msg = oc::Matrix<oc::block>{},
             v = oc::Matrix<oc::block>{},
-            pre = macoro::eager_task<>{}
+            pre = macoro::eager_task<>{},
+            otSend = OtSend{}
         );
-        if (!mIsKeyOTsSet)
-            MC_AWAIT(genKeyOts(gen, sock, prng));
 
         if (x.size() != y.size())
-            throw RTE_LOC;
+            throw std::runtime_error("input output lengths do not match. " LOCATION);
 
+        if (mOleReq.size() != oc::roundUpTo(y.size(), 128) * DLpnPrf::MidSize * 2)
+            throw std::runtime_error("do not have enough preprocessing. Call request(...) first. " LOCATION);
+
+        // If no one has started the preprocessing, then lets start it.
+        if (mHasPrepro == false)
+            pre = preprocess() | macoro::make_eager();
+
+        // if we are doing the key gen, get the results.
+        if (mKeyReq.size())
+        {
+            MC_AWAIT(mKeyReq.get(otSend));
+            setKeyOts(otSend.mMsg);
+        }
+
+        // make sure we have a key.
+        if (!mHasKeyOts)
+            throw std::runtime_error("dlpn was called without a key and keyGen was not requested. " LOCATION);
+
+        // debugging, make sure we have the correct key OTs.
         if (mDebug)
         {
             baseOts.resize(mKeyOTs.size());
@@ -973,9 +997,7 @@ namespace secJoin
 
         setTimePoint("DarkMatter.recver.begin");
 
-        TODO("is the round up a good idea ? ");
-        pre = gen.binOleRequest(ole, oc::roundUpTo(y.size(), 128) * m * 2, sock, prng) | macoro::make_eager();
-
+        // we need x in a transformed format so that we can do SIMD operations.
         xt.resize(128, oc::divCeil(y.size(), 128));
         for (u64 i = 0, k = 0; i < y.size(); ++k)
         {
@@ -998,26 +1020,29 @@ namespace secJoin
             }
         }
 
-        assert(mPrf.KeySize % StepSize == 0);
-        H2.resize(2 * mPrf.KeySize, oc::divCeil(x.size(), 128));
+        static_assert(DLpnPrf::KeySize % StepSize == 0, "we dont handle remainders. Should be true.");
 
-        for (i = 0; i < mPrf.KeySize;)
+        // for each bit of the key, perform an OT derandomization where we get a share
+        // of the input x times the key mod 3. We store the LSB and MSB of the share separately.
+        // Hence we need 2 * DLpnPrf::KeySize rows in xkShares
+        xkShares.resize(2 * DLpnPrf::KeySize, oc::divCeil(x.size(), 128));
+        for (i = 0; i < DLpnPrf::KeySize;)
         {
-            assert(mPrf.KeySize % StepSize == 0);
-            msg.resize(StepSize, H2.cols() * 2);
+            assert(DLpnPrf::KeySize % StepSize == 0);
+            msg.resize(StepSize, xkShares.cols() * 2);
 
             for (u64 k = 0; k < StepSize; ++i, ++k)
             {
                 // we store them in swapped order to negate the value.
-                auto hi1 = H2[i * 2];
-                auto hi0 = H2[i * 2 + 1];
-                sampleMod3(mKeyOTs[i][0], hi1, hi0, buffer);
+                auto msbShare = xkShares[i * 2];
+                auto lsbShare = xkShares[i * 2 + 1];
+                sampleMod3(mKeyOTs[i][0], msbShare, lsbShare, buffer);
 
                 // # hi = G(OT(i,0)) + x mod 3
                 mod3Add(
-                    msg[k].subspan(hi1.size()),
-                    msg[k].subspan(0, hi1.size()),
-                    hi1, hi0,
+                    msg[k].subspan(msbShare.size()),
+                    msg[k].subspan(0, msbShare.size()),
+                    msbShare, lsbShare,
                     xt[i]);
 
                 // ## msg = m ^ G(OT(i,1))
@@ -1026,23 +1051,28 @@ namespace secJoin
 
             MC_AWAIT(sock.send(std::move(msg)));
         }
+
+        // Compute u = H * xkShare mod 3
         buffer = {};
+        u0.resize(DLpnPrf::MidSize, oc::divCeil(x.size(), 128));
+        u1.resize(DLpnPrf::MidSize, oc::divCeil(x.size(), 128));
+        compressH2(std::move(xkShares), u1, u0);
 
-        u0.resize(m, oc::divCeil(x.size(), 128));
-        u1.resize(m, oc::divCeil(x.size(), 128));
-        compressH2(std::move(H2), u1, u0);
+        // Compute v = u mod 2
+        v.resize(DLpnPrf::MidSize, u0.cols());
+        MC_AWAIT(mod2(u0, u1, v, sock));
 
-        v.resize(m, u0.cols());
-        MC_AWAIT(mod2(u0, u1, v, sock, ole));
-        MC_AWAIT(pre);
-
+        // Compute y = B * v
         compressB(v, y);
+
+        // cleanup
+        if (pre.handle())
+            MC_AWAIT(pre);
+        mHasPrepro = false;
+        mInputSize = 0;
 
         MC_END();
     }
-
-
-
 
 
 
@@ -1088,22 +1118,26 @@ namespace secJoin
     //     x1, y1
     // 
     // such that (x0+x1) = (y0*y1). We will partially derandomize these
-    // by allowing the PrfSender to change their y0 to be a chosen
-    // value, x0. This is done by sending
+    // by allowing the PrfReceiver to change their y1 to be a chosen
+    // value, c. That is, the parties want to hold correlation
     // 
-    //   d = (y1+x0)
+    //    (x0',y0',x1', c)
+    // 
+    // where x0,x1,y0 are random and c is chosen. This is done by sending
+    // 
+    //   d = (y1+c)
     // 
     // and the PrfSender updates their share as
     // 
     //   x0' = x0 + y0 * d
     // 
-    // It is now the case that the parties hold the correlation
+    // The parties output (x0',y0,x1,c). Observe parties hold the correlation
     // 
-    //   x1 + x0'                   = y0 * x0
-    //   x1 + x0 + y0 * d           = y0 * x0
-    //   x1 + x0 + y0 * (y1+x0)      = y0 * x0
-    //   x1 + x0 + y0 * y1 + y0 * x0 = y0 * x0
-    //                       y0 * x0 = y0 * x0
+    //   x1 + x0'                   = y0 * c
+    //   x1 + x0 + y0 * d           = y0 * c
+    //   x1 + x0 + y0 * (y1+c)      = y0 * c
+    //   x1 + x0 + y0 * y1 + y0 * c = y0 * c
+    //                       y0 * c = y0 * c
     //
     // Ok, now let us perform the mod 2 operations. As state, this 
     // will consume 2 OLEs. Let these be denoted as
@@ -1112,7 +1146,7 @@ namespace secJoin
     //
     // These have not been derandomized yet. To get an 1-out-of-3 OT, we
     // will derandomize them using the PrfReceiver's u1. This value is 
-    // represented using two bits (u00,u01) such that u1 = u10 + 2 * u11
+    // represented using two bits (u10,u11) such that u1 = u10 + 2 * u11
     // 
     // We will derandomize (x0,x1,y0,y1) using u10 and (x0',x1',y0',y1') 
     // using u11. Let us redefine these correlations as 
@@ -1121,19 +1155,19 @@ namespace secJoin
     // 
     // That is, we also redefined x0,x0' accordingly.
     // 
-    // We will define the random OT strings (in this case x1 single bit)
+    // We will define the random OT strings (in tms case x1 single bit)
     // as 
     //    
-    //    hi0 = x0      + x0'
-    //    hi1 = x0 + y0 + x0'
+    //    m0 = x0      + x0'
+    //    m1 = x0 + y0 + x0'
     //    m2 = x0      + x0' + y0'
     // 
     // Note that 
     //  - when u10 = u11 = 0, then x1=x0, x1'=x0' and therefore
-    //    the PrfReceiver knows hi0. hi1,m2 is uniform due to y0, y0' being 
+    //    the PrfReceiver knows m0. m1,m2 is uniform due to y0, y0' being 
     //    uniform, respectively. 
     // - When u10 = 1, u11 = 0, then x1 = x0 + y0 and x1' = x0 and therefore 
-    //   PrfReceiver knows hi1 = x1 + x1' = (x0 + y0) + x0'. hi0 is uniform because 
+    //   PrfReceiver knows m1 = x1 + x1' = (x0 + y0) + x0'. m0 is uniform because 
     //   x0 = x1 + y0 and y0 is uniform given x1. m2 is uniform because y0' 
     //   is uniform given x1. 
     // - Finally, when u10 = 0, u11 = 1, the same basic case as above applies.
@@ -1142,8 +1176,8 @@ namespace secJoin
     // these will be used to mask the truth table T. That is, the PrfSender
     // will sample x1 mask r and send
     // 
-    //   t0 = hi0 + T[u0, 0] + r
-    //   t1 = hi1 + T[u0, 1] + r
+    //   t0 = m0 + T[u0, 0] + r
+    //   t1 = m1 + T[u0, 1] + r
     //   t2 = m2 + T[u0, 2] + r
     // 
     // The PrfReceiver can therefore compute
@@ -1160,18 +1194,18 @@ namespace secJoin
     // 
     // As an optimization, we dont need to send t0. The idea is that if
     // the receiver want to learn T[u0, 0], then they can set their share
-    // as hi0. That is,
+    // as m0. That is,
     // 
-    //   z1 = (u1 == 0) ? hi0 : t_u1 + m_u1
+    //   z1 = (u1 == 0) ? m0 : t_u1 + m_u1
     //      = u10 * t_u1 + mu1
     // 
     // The sender now needs to define r appropriately. In particular, 
     // 
-    //   r = hi0 + T[u0, 0]
+    //   r = m0 + T[u0, 0]
     // 
-    // In the case of u1 = 0, z1 = hi0, z0 = r + T[u0,0], and therefore we 
+    // In the case of u1 = 0, z1 = m0, z0 = r + T[u0,0], and therefore we 
     // get the right result. The other cases are the same with the randomness
-    // of the mast r coming from hi0.
+    // of the mast r coming from m0.
     // 
     //
     // u has 256 rows
@@ -1184,10 +1218,9 @@ namespace secJoin
         oc::MatrixView<oc::block> u0,
         oc::MatrixView<oc::block> u1,
         oc::MatrixView<oc::block> out,
-        coproto::Socket& sock,
-        BinOleRequest& ole)
+        coproto::Socket& sock)
     {
-        MC_BEGIN(macoro::task<>, this, u0, u1, out, &sock, &ole,
+        MC_BEGIN(macoro::task<>, this, u0, u1, out, &sock,
             triple = BinOle{},
             tIter = std::vector<BinOle>::iterator{},
             tIdx = u64{},
@@ -1228,7 +1261,7 @@ namespace secJoin
 
                 if (tIdx == tSize)
                 {
-                    MC_AWAIT(ole.get(triple));
+                    MC_AWAIT(mOleReq.get(triple));
 
                     tSize = triple.mAdd.size();
                     tIdx = 0;
@@ -1284,8 +1317,9 @@ namespace secJoin
                     ++u0Iter;
                     ++u1Iter;
 
-                    if (mDebug && i == mPrintI && (j == (mPrintJ / 128)))
+                    if (mDebug)// && i == mPrintI && (j == (mPrintJ / 128)))
                     {
+                        auto mPrintJ = 0;
                         auto bitIdx = mPrintJ % 128;
                         std::cout << j << " m  " << bit(m0, bitIdx) << " " << bit(m1, bitIdx) << " " << bit(m2, bitIdx) << std::endl;
                         std::cout << j << " u " << bit(u1(i, j), bitIdx) << bit(u0(i, j), bitIdx) << " = " <<
@@ -1320,10 +1354,9 @@ namespace secJoin
         oc::MatrixView<oc::block> u0,
         oc::MatrixView<oc::block> u1,
         oc::MatrixView<oc::block> out,
-        coproto::Socket& sock,
-        BinOleRequest& ole)
+        coproto::Socket& sock)
     {
-        MC_BEGIN(macoro::task<>, this, u0, u1, out, &sock, &ole,
+        MC_BEGIN(macoro::task<>, this, u0, u1, out, &sock,
             triple = std::vector<BinOle>{},
             tIter = std::vector<BinOle>::iterator{},
             tIdx = u64{},
@@ -1336,8 +1369,6 @@ namespace secJoin
             cols = u64{},
             buff = oc::AlignedUnVector<oc::block>{},
             ww = oc::AlignedUnVector<block256>{},
-            mask0 = oc::block{},
-            mask1 = oc::block{},
             add = span<oc::block>{},
             mlt = span<oc::block>{},
             outIter = (oc::block*)nullptr,
@@ -1345,14 +1376,12 @@ namespace secJoin
             u1Iter = (oc::block*)nullptr
         );
 
-        memset(&mask0, 0b01010101, sizeof(mask0));
-        memset(&mask1, 0b10101010, sizeof(mask1));
-        triple.reserve(ole.mCorrelations.size());
+        triple.reserve(mOleReq.batchCount());
         tIdx = 0;
         tSize = 0;
         rows = u0.rows();
         cols = u0.cols();
-        assert(ole.mSize == rows * cols * 128 * 2);
+        assert(mOleReq.size() == rows * cols * 128 * 2);
 
         u0Iter = u0.data();
         u1Iter = u1.data();
@@ -1365,7 +1394,7 @@ namespace secJoin
                 {
 
                     triple.emplace_back();
-                    MC_AWAIT(ole.get(triple.back()));
+                    MC_AWAIT(mOleReq.get(triple.back()));
 
                     tSize = triple.back().mAdd.size();
                     tIdx = 0;
@@ -1391,7 +1420,8 @@ namespace secJoin
                 if (tSize == tIdx)
                 {
                     MC_AWAIT(sock.send(std::move(buff)));
-                    triple.back().mMult.clear();
+                    TODO("clear mult");
+                    //triple.back().clear();
                 }
             }
         }
@@ -1439,8 +1469,9 @@ namespace secJoin
                         (*u1Iter++ & buff.data()[tIdx + 1]) ^ // t2
                         add.data()[tIdx + 0] ^ add.data()[tIdx + 1];// m_u
 
-                    if (mDebug && i == mPrintI && (j == (mPrintJ / 128)))
+                    if (mDebug)// && i == mPrintI && (j == (mPrintJ / 128)))
                     {
+                        auto mPrintJ = 0;
                         auto bitIdx = mPrintJ % 128;
                         std::cout << j << " u " << bit(u1(i, j), bitIdx) << bit(u0(i, j), bitIdx) << " = " <<
                             (bit(u1(i, j), bitIdx) * 2 + bit(u0(i, j), bitIdx)) << std::endl;
@@ -1450,7 +1481,6 @@ namespace secJoin
 
                     assert(outIter == &out(i, j));
                     *outIter++ = w;
-                    //out(i, j) = w;
                 }
             }
         }

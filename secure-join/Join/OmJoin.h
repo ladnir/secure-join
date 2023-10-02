@@ -17,6 +17,33 @@ namespace secJoin
 		// statical security parameter.
 		u64 mStatSecParam = 40;
 
+		//RadixSort mSorter;
+
+		//AggTree mAggTree;
+
+		//AdditivePerm mSortingPerm;
+
+		//void init(
+		//	ColRef leftJoinCol,
+		//	ColRef rightJoinCol,
+		//	std::vector<ColRef> selects)
+		//{
+		//	std::vector<u64> leftSizes, rightSizes;
+		//	for (auto s : selects)
+		//	{
+		//		if (&s.mTable == &leftJoinCol.mTable)
+		//			leftSizes.emplace_back(s.mCol.getBitCount());
+		//		else if (&s.mTable == &rightJoinCol.mTable)
+		//			rightSizes.emplace_back(s.mCol.getBitCount());
+		//		else
+		//			throw std::runtime_error("select statement does not match left right join cols. "LOCATION);
+		//	}
+
+		//	init(leftJoinCol.mTable.rows(), rightJoinCol.mTable.rows(), leftSizes, rightSizes);
+		//}
+
+		//void init(u64 leftSize, u64 rightSize, std::vector<u64> leftSelSizes, std::vector<u64> rightSelSize);
+
 		struct Offset
 		{
 			u64 mStart = 0, mSize = 0;

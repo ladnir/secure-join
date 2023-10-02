@@ -7,16 +7,36 @@
 
 namespace secJoin
 {
-
+    // A protocol for being able to permute an input vector x by and XOR 
+    // secret sharing of a permutation pi. This will be done by secret sharing
+    // pi as mRandPi^-1 o mRho. mRandPi will be random and represented as a
+    // ComposedPerm. mRho will be public. We can therefore we can first (locally)
+    // permute by mRho and then permute by mRandPi^-1. The effect will be to 
+    // permute by pi.
+    // 
+    // We will compute mRho by permuting mShare (the XOR shares of pi) by mRandPi
+    // and reveal the result as mRho.
     class AdditivePerm final : public oc::TimerAdapter
     {
     public:
+
+        // The XOR shares of the permutation pi.
         std::vector<u32> mShare;
-        ComposedPerm mPi;
+
+        // A random permutation that will be used to mask "mShare". pi = mRandPi^-1 o mRho.
+        ComposedPerm mRandPi;
+
+        // The public share of the secret shared permutation pi = mRandPi^-1 o mRho.
         Perm mRho;
+
+        // True if mRho has been computed.
         bool mIsSetup = false;
+
+        // When true and insecure but faster version of the protocol is used.
         bool mInsecureMock = false;
 
+        // returns true if the preprocessing has been run for a chosen permutation.
+        // In particular, if the public share mRho has been computed.
         bool isSetup() const { return mIsSetup; }
 
         AdditivePerm() = default;
@@ -25,35 +45,52 @@ namespace secJoin
         AdditivePerm& operator=(const AdditivePerm&) = default;
         AdditivePerm& operator=(AdditivePerm&&) noexcept = default;
 
-        AdditivePerm(span<u32> shares, PRNG& prng, u8 partyIdx);
-        void init(u64 size);
 
+        // initialize the permutation to be the given size. partyIdx should be in {0,1}.
+        // bytesPer can be set to the number of bytes you will want to permute. This can
+        // later be set using setBytePerRow(). dlpnKeyGen can be set if you want to explicitly 
+        // control of the DLpn keygen should be performed.
+        void init2(u8 partyIdx, u64 size, u64 bytesPer = 0, macoro::optional<bool> dlpnKeyGen = {});
+
+        // Set the XOR shared of the permutation.
+        void setShares(span<u32> shares)
+        {
+            if (shares.size() != size())
+                throw RTE_LOC;
+            mShare.resize(size());
+            memcpy<u32,u32>(mShare, shares);
+        }
+
+        // set the dlpn permutation protocol key OTs. These should be DLpn::KeySize OTs in both directions.
         void setKeyOts(
             oc::block& key,
             std::vector<oc::block>& rk,
             std::vector<std::array<oc::block, 2>>& sk)
         {
-            mPi.setKeyOts(key, rk, sk);
+            mRandPi.setKeyOts(key, rk, sk);
         }
 
-        // generate the masking (replicated) permutation mPi
-        // and then reveal mRhoPP = mPi(mShares).
+        // Set the number of bytes we will be permuting. This will cause any correlated randomness
+        // to be thrown out.
+        void setBytePerRow(u64 bytesPer) { mRandPi.setBytePerRow(bytesPer); }
+
+        // generate the masking (replicated) permutation mRandPi
+        // and then reveal mRhoPP = mRandPi(mShares).
         //
         // We can then apply our main permutation (mShares)
         // or an input vector x by computing
         //
         // t = mRho(x)
-        // y = mPi^-1(t)
+        // y = mRandPi^-1(t)
         //
-        // mRho is public and mPi is replicated so we
+        // mRho is public and mRandPi is replicated so we
         // have protocols for both.
         //
         macoro::task<> setup(
             coproto::Socket& chl,
-            CorGenerator& ole,
             PRNG& prng);
 
-        u64 size() const { return mShare.size(); }
+        u64 size() const { return mRandPi.size(); }
 
         template <typename T>
         macoro::task<> apply(
@@ -61,8 +98,7 @@ namespace secJoin
             oc::span<const T> in,
             oc::span<T> out,
             oc::PRNG& prng,
-            coproto::Socket& chl,
-            CorGenerator& ole);
+            coproto::Socket& chl);
 
         template <typename T>
         macoro::task<> apply(
@@ -70,8 +106,7 @@ namespace secJoin
             oc::MatrixView<const T> in,
             oc::MatrixView<T> out,
             oc::PRNG& prng,
-            coproto::Socket& chl,
-            CorGenerator& ole);
+            coproto::Socket& chl);
 
 
         macoro::task<> apply(
@@ -79,23 +114,20 @@ namespace secJoin
             BinMatrix& in,
             BinMatrix& out,
             oc::PRNG& prng,
-            coproto::Socket& chl,
-            CorGenerator& ole);
+            coproto::Socket& chl);
 
-        macoro::task<> composeSwap(
-            AdditivePerm& pi,
-            AdditivePerm& dst,
-            oc::PRNG& prng,
-            coproto::Socket& chl,
-            CorGenerator& gen);
+        //macoro::task<> composeSwap(
+        //    AdditivePerm& pi,
+        //    AdditivePerm& dst,
+        //    oc::PRNG& prng,
+        //    coproto::Socket& chl);
 
 
         macoro::task<> compose(
             AdditivePerm& pi,
             AdditivePerm& dst,
             oc::PRNG& prng,
-            coproto::Socket& chl,
-            CorGenerator& gen);
+            coproto::Socket& chl);
 
 
         template <typename T>
@@ -104,27 +136,42 @@ namespace secJoin
             oc::MatrixView<const T> in,
             oc::MatrixView<T> out,
             oc::PRNG& prng,
-            coproto::Socket& chl,
-            CorGenerator& ole);
+            coproto::Socket& chl);
 
+        void request(CorGenerator& ole);
 
         macoro::task<> preprocess(
-            u64 n, 
-            u64 bytesPer, 
             coproto::Socket& chl,
-            CorGenerator& ole,
             oc::PRNG& prng);
+
+        void clearPermutation()
+        {
+            mRandPi.clearPermutation();
+        }
+
+        //returns true if we have requested correlated randomness
+        bool hasRequest()
+        {
+            return mRandPi.hasRequest();
+        }
+
+        // return true if we have preprocessing that has not been derandomized.
+        bool hasPreprocessing()
+        {
+            return mRandPi.hasPreprocessing();
+        }
 
         bool hasSetup(u64 bytes) const
         {
-            return mPi.mSender.hasSetup(bytes + sizeof(u32) * !mIsSetup);
+            return mRandPi.mSender.hasSetup(bytes + sizeof(u32) * !mIsSetup);
         }
 
         void clear()
         {
-            mPi.clear();
+            mRandPi.clear();
             mRho.clear();
             mShare.clear();
+            mIsSetup = false;
         }
     };
 
@@ -136,14 +183,13 @@ namespace secJoin
         oc::span<const T> in,
         oc::span<T> out,
         oc::PRNG& prng,
-        coproto::Socket& chl,
-        CorGenerator& ole)
+        coproto::Socket& chl)
     {
         return apply<T>(
             op,
             oc::MatrixView<const T>(in.data(), in.size(), 1),
             oc::MatrixView<T>(out.data(), out.size(), 1),
-            prng, chl, ole);
+            prng, chl);
     }
 
 
@@ -153,8 +199,7 @@ namespace secJoin
         oc::MatrixView<const T> in,
         oc::MatrixView<T> out,
         oc::PRNG& prng,
-        coproto::Socket& chl,
-        CorGenerator& ole)
+        coproto::Socket& chl)
     {
         if (out.rows() != in.rows())
             throw RTE_LOC;
@@ -163,19 +208,19 @@ namespace secJoin
         if (out.rows() != size())
             throw RTE_LOC;
 
-        MC_BEGIN(macoro::task<>, this, in, out, &prng, &chl, &ole, op,
+        MC_BEGIN(macoro::task<>, this, in, out, &prng, &chl, op,
             temp = oc::Matrix<T>{},
             soutInv = oc::Matrix<T>{},
             tt = char{});
 
         if (mInsecureMock)
         {
-            MC_AWAIT(mockApply<T>(op, in, out, prng, chl, ole));
+            MC_AWAIT(mockApply<T>(op, in, out, prng, chl));
             MC_RETURN_VOID();
         }
 
         if (isSetup() == false)
-            MC_AWAIT(setup(chl, ole, prng));
+            MC_AWAIT(setup(chl, prng));
 
 
         MC_AWAIT(chl.send(std::move(tt)));
@@ -184,7 +229,7 @@ namespace secJoin
         if (op == PermOp::Inverse)
         {
             temp.resize(in.rows(), in.cols());
-            MC_AWAIT(mPi.apply<T>(PermOp::Regular, in, temp, chl, ole, prng));
+            MC_AWAIT(mRandPi.apply<T>(PermOp::Regular, in, temp, chl, prng));
             mRho.apply<T>(temp, out, PermOp::Inverse);
         }
         else
@@ -192,7 +237,7 @@ namespace secJoin
             // Local Permutation of [x]
             temp.resize(in.rows(), in.cols());
             mRho.apply<T>(in, temp, PermOp::Regular);
-            MC_AWAIT(mPi.apply<T>(PermOp::Inverse, temp, out, chl, ole, prng));
+            MC_AWAIT(mRandPi.apply<T>(PermOp::Inverse, temp, out, chl, prng));
         }
 
         MC_END();
@@ -205,8 +250,7 @@ namespace secJoin
         oc::MatrixView<const T> in,
         oc::MatrixView<T> out,
         oc::PRNG& prng,
-        coproto::Socket& chl,
-        CorGenerator& ole)
+        coproto::Socket& chl)
     {
         if (mInsecureMock == false)
             throw RTE_LOC;
@@ -217,12 +261,12 @@ namespace secJoin
         if (out.rows() != size())
             throw RTE_LOC;
 
-        MC_BEGIN(macoro::task<>, this, in, out, &prng, &chl, &ole, op,
+        MC_BEGIN(macoro::task<>, this, in, out, &prng, &chl, op,
             temp = oc::Matrix<T>{},
             soutInv = oc::Matrix<T>{});
 
         if (mIsSetup == false)
-            MC_AWAIT(setup(chl, ole, prng));
+            MC_AWAIT(setup(chl, prng));
 
         mRho.apply<T>(in, out, op);
 

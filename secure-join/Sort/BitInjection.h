@@ -10,38 +10,46 @@ namespace secJoin
     struct BitInject
     {
 
-        OtRecvGenerator mRecvReq;
-        OtSendGenerator mSendReq;
+        // The correlated randomness used when the receiver.
+        OtRecvRequest mRecvReq;
+
+        // The correlated randomness used when the sender.
+        OtSendRequest mSendReq;
+
+        // True if preprocess has been called.
         bool mHasPreprocessing = false;
 
+        // True if request has been called.
+        bool mRequested = false;
+
+        // The number of rows the input will have
+        u64 mRowCount = 0;
+
+        // The bit count of each input row.
+        u64 mInBitCount = 0;
+
+        // Should be zero or one. Controls the role of this party.
         u64 mRole = -1;
 
+        // True if preprocess has been called.
         bool hasPreprocessing() { return mHasPreprocessing; }
 
+        // True if request has been called.
+        bool hasRequest() { return mRequested; }
 
-        macoro::task<> preprocess(
-            u64 n,
-            u64 inBitCount,
-            CorGenerator& gen,
-            oc::PRNG& prng,
-            coproto::Socket& sock
-        );
+        // n =  the number of rows the input will have.
+        // inBitCount = the number of bit injections per row.
+        void init(u64 n, u64 inBitCount)
+        {
+            mRowCount = n;
+            mInBitCount = inBitCount;
+        }
 
-        // convert each bit of the binary secret sharing `in`
-        // to integer Z_{2^outBitCount} arithmetic sharings.
-        // Each row of `in` should have `inBitCount` bits.
-        // out will therefore have dimension `in.rows()` rows 
-        // and `inBitCount` columns.
-        macoro::task<> bitInjection(
-            u64 inBitCount,
-            const oc::Matrix<u8>& in,
-            u64 outBitCount,
-            oc::Matrix<u32>& out,
-            CorGenerator& gen,
-            oc::PRNG& prng,
-            coproto::Socket& sock);
+        // request the correlated randomness. Call preprocess to start the generation.
+        void request(CorGenerator& gen);
 
 
+        macoro::task<> preprocess();
 
         // convert each bit of the binary secret sharing `in`
         // to integer Z_{2^outBitCount} arithmetic sharings.
@@ -49,24 +57,11 @@ namespace secJoin
         // out will therefore have dimension `in.rows()` rows 
         // and `inBitCount` columns.
         macoro::task<> bitInjection(
-            u64 inBitCount,
             const oc::Matrix<u8>& in,
             u64 outBitCount,
             oc::Matrix<u32>& out,
             coproto::Socket& sock);
     };
 
-    // convert each bit of the binary secret sharing `in`
-    // to integer Z_{2^outBitCount} arithmetic sharings.
-    // Each row of `in` should have `inBitCount` bits.
-    // out will therefore have dimension `in.rows()` rows 
-    // and `inBitCount` columns.
-    //macoro::task<> bitInjection(
-    //    u64 inBitCount,
-    //    const oc::Matrix<u8>& in,
-    //    u64 outBitCount,
-    //    oc::Matrix<u32>& out,
-    //    CorGenerator& gen,
-    //    coproto::Socket& sock);
 
 } // namespace secJoin

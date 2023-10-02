@@ -38,35 +38,72 @@ namespace secJoin
         // mock the sorting protocol (insecure).
         bool mInsecureMock = false;
 
-        bool mHasPreprocessing = false;
+        // has request been called.
+        bool mHasRequest = false;
 
-        bool mConfigured = false;
+        // has preprocess been called.
+        bool mHasPrepro = false;
 
+        // The number of item we are sorting.
+        u64 mSize = 0;
+
+        // The bit count of the items we are sorting.
+        u64 mBitCount = 0;
+
+        // The requested amount of preprocessing that the output permutation should have.
+        u64 mBytesPerElem = 0;
+
+        // The bit step size of the genBitPerm protocol.
         u64 mL = 2;
 
+        // A zero one flag denoting the party index.
         u64 mRole = -1;
 
+        // The current size of the one hot circuit.
         u64 mIndexToOneHotCircuitBitCount = 0;
+
+        // A circuit that maps an index x into a unit vector x s.t. v_x=1.
         oc::BetaCircuit mIndexToOneHotCircuit;
+
+        // A circuit that takes an input two values x0,x1 and return y=x0+x1.
         oc::BetaCircuit mArith2BinCir;
 
+        // This will hold the correlated randomness for each round of the radix sort 
+        // protocol. We will preprocess the correlated randomness on demand so its ready
+        // just in time.
         struct Round
         {
+            Round() = default;
+            Round(const Round&) = delete;
+            Round(Round&&) = default;
+            Round&operator=(Round&&) = default;
+
+
             AdditivePerm mPerm;
             BitInject mBitInject;
             Gmw mIndexToOneHotGmw, mArithToBinGmw;
-            OtRecvGenerator mHadamardSumRecvOts;
-            OtSendGenerator mHadamardSumSendOts;
+            OtRecvRequest mHadamardSumRecvOts;
+            OtSendRequest mHadamardSumSendOts;
         };
+
+        // The correlated randomness for each round.
         std::vector<Round> mRounds;
 
-
-        void configure(
+        // Sets various parameters for the protocol. role should be 0,1. n is the list size, bitCount is
+        // the number of bits per element. bytesPerElem is an optional parameter
+        // that will initialize the output permutation with enough correlated
+        // randomness to permute elements with bytesPerElem bytes.
+        void init(
+            u64 role,
             u64 n,
             u64 bitCount,
-            CorGenerator& gen,
-            u64 bytesPerElem);
+            u64 bytesPerElem = 0);
 
+        // Once init it called, this will request the required correlated randomness
+        // from CorGenerator. To start the generation of the randomness, call preprocess().
+        void request(CorGenerator& gen);
+
+        // Start the generation of the requested correlated randomness.
         macoro::task<> preprocess(
             coproto::Socket& comm,
             oc::PRNG& prng);
@@ -76,25 +113,32 @@ namespace secJoin
         RadixSort() = default;
         RadixSort(RadixSort&&) = default;
 
+        // returns true if request() has been called.
+        bool hasRequest()
+        {
+            return mHasRequest;
+        }
+
         bool hasPreprocessing()
         {
-            return mHasPreprocessing;
+            return mHasPrepro;
         }
 
         // compute dst = sum_i f.col(i) * s.col(i) where * 
         // is the hadamard (component-wise) product. 
         macoro::task<> hadamardSum(
-            u64 round,
+            Round& round,
             BinMatrix& f,
             Matrix32& s,
             AdditivePerm& dst,
             coproto::Socket& comm);
+
         // from each row, we generate a series of sharing flag bits
         // f.col(0) ,..., f.col(n) where f.col(i) is one if k=i.
         // Computes the same function as genValMask but is more efficient
         // due to the use a binary secret sharing.
         macoro::task<> genValMasks2(
-            u64 round,
+            Round& round,
             u64 bitCount,
             const BinMatrix& k,
             Matrix32& f,
@@ -105,7 +149,7 @@ namespace secJoin
         // Generate a permutation dst which will be the inverse of the
         // permutation that permutes the keys k into sorted order. 
         macoro::task<> genBitPerm(
-            u64 round,
+            Round& round,
             u64 keyBitCount,
             const BinMatrix& k,
             AdditivePerm& dst,
@@ -154,14 +198,6 @@ namespace secJoin
         // compute a running sum. replace each element f(i,j) with the sum all previous 
         // columns f(*,1),...,f(*,j-1) plus the elements of f(0,j)+....+f(i-1,j).
         static void aggregateSum(const Matrix32& f, Matrix32& s, u64 partyIdx);
-
-        macoro::task<> hadamardSumPreprocess(
-            u64 size,
-            CorGenerator& gen,
-            coproto::Socket&,
-            OtRecvGenerator&,
-            OtSendGenerator&,
-            oc::PRNG& prng);
 
         macoro::task<> mockSort(
             const BinMatrix& k,

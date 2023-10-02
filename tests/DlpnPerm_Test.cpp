@@ -19,8 +19,8 @@ void DlpnPerm_setup_test(const oc::CLP& cmd)
     oc::PRNG prng0(oc::ZeroBlock);
     oc::PRNG prng1(oc::OneBlock);
 
-    secJoin::DLpnPermSender dlpnPerm1;
-    secJoin::DLpnPermReceiver dlpnPerm2;
+    secJoin::DLpnPermSender dlpnPerm0;
+    secJoin::DLpnPermReceiver dlpnPerm1;
 
     oc::Matrix<oc::block>
         aExp(n, oc::divCeil(rowSize, 16));
@@ -44,23 +44,29 @@ void DlpnPerm_setup_test(const oc::CLP& cmd)
         sk[i][1] = oc::block(i, 1);
         rk[i] = oc::block(i, *oc::BitIterator((u8*)&kk, i));
     }
-    dlpnPerm1.setKeyOts(sk);
-    dlpnPerm2.setKeyOts(kk, rk);
+    dlpnPerm0.setKeyOts(sk);
+    dlpnPerm1.setKeyOts(kk, rk);
 
     auto sock = coproto::LocalAsyncSocket::makePair();
 
     //for (auto invPerm : { PermOp::Regular,PermOp::Inverse })
     {
+        dlpnPerm0.init(n, rowSize);
+        dlpnPerm1.init(n, rowSize);
+        dlpnPerm0.request(ole0);
+        dlpnPerm1.request(ole1);
+
+        dlpnPerm0.setPermutation(pi);
 
         // the preprocessing phase
         auto res = coproto::sync_wait(coproto::when_all_ready(
-            dlpnPerm1.setup(pi, rowSize, prng0, sock[0], ole1),
-            dlpnPerm2.setup(n, rowSize, prng1, sock[1], ole0)
+            dlpnPerm0.setup(prng0, sock[0]),
+            dlpnPerm1.setup(prng1, sock[1])
         ));
 
-        oc::Matrix<oc::block>  permPiA = reveal(dlpnPerm1.mDelta, dlpnPerm2.mB);
+        oc::Matrix<oc::block>  permPiA = reveal(dlpnPerm0.mDelta, dlpnPerm1.mB);
 
-        pi.apply<oc::block>(dlpnPerm2.mA, aExp);
+        pi.apply<oc::block>(dlpnPerm1.mA, aExp);
 
         if (eq(aExp, permPiA) == false)
         {
@@ -89,8 +95,8 @@ void DlpnPerm_apply_test(const oc::CLP& cmd)
 
 
 
-    secJoin::DLpnPermSender dlpnPerm1;
-    secJoin::DLpnPermReceiver dlpnPerm2;
+    secJoin::DLpnPermSender dlpnPerm0;
+    secJoin::DLpnPermReceiver dlpnPerm1;
 
 
     oc::Matrix<u8> x(n, rowSize),
@@ -108,8 +114,8 @@ void DlpnPerm_apply_test(const oc::CLP& cmd)
     ole1.mock(CorGenerator::Role::Receiver);
 
     // auto res = coproto::sync_wait(coproto::when_all_ready(
-    //     dlpnPerm1.receiverSetup(ole0),
-    //     dlpnPerm2.senderSetup(ole1)
+    //     dlpnPerm0.receiverSetup(ole0),
+    //     dlpnPerm1.senderSetup(ole1)
     // ));
     // std::get<0>(res).result();
     // std::get<1>(res).result();
@@ -118,11 +124,18 @@ void DlpnPerm_apply_test(const oc::CLP& cmd)
 
     for (auto invPerm : { PermOp::Regular,PermOp::Inverse })
     {
-        dlpnPerm2.clearPermutation();
+        dlpnPerm0.init(n, rowSize);
+        dlpnPerm1.init(n, rowSize);
+        dlpnPerm0.request(ole0);
+        dlpnPerm1.request(ole1);
+
+        dlpnPerm0.setPermutation(pi);
+        dlpnPerm1.clearPermutation();
+
 
         auto res1 = coproto::sync_wait(coproto::when_all_ready(
-            dlpnPerm1.apply<u8>(pi, invPerm, sout1, prng0, sock[0], ole0),
-            dlpnPerm2.apply<u8>(invPerm, x, sout2, prng1, sock[1], ole1)
+            dlpnPerm0.apply<u8>(invPerm, sout1, prng0, sock[0]),
+            dlpnPerm1.apply<u8>(invPerm, x, sout2, prng1, sock[1])
         ));
 
 
@@ -152,8 +165,8 @@ void DlpnPerm_sharedApply_test(const oc::CLP& cmd)
     oc::PRNG prng1(oc::OneBlock);
 
 
-    secJoin::DLpnPermSender dlpnPerm1;
-    secJoin::DLpnPermReceiver dlpnPerm2;
+    secJoin::DLpnPermSender dlpnPerm0;
+    secJoin::DLpnPermReceiver dlpnPerm1;
 
 
     oc::Matrix<u8> x(n, rowSize),
@@ -171,23 +184,29 @@ void DlpnPerm_sharedApply_test(const oc::CLP& cmd)
     ole1.mock(CorGenerator::Role::Receiver);
 
     auto sock = coproto::LocalAsyncSocket::makePair();
-    auto res = coproto::sync_wait(coproto::when_all_ready(
-        dlpnPerm1.genKeyOts(ole0, sock[0], prng0),
-        dlpnPerm2.genKeyOts(ole1, sock[1], prng0)
-    ));
+    //auto res = coproto::sync_wait(coproto::when_all_ready(
+    //    dlpnPerm0.genKeyOts(ole0, sock[0], prng0),
+    //    dlpnPerm1.genKeyOts(ole1, sock[1], prng0)
+    //));
 
-    std::get<0>(res).result();
-    std::get<1>(res).result();
+    //std::get<0>(res).result();
+    //std::get<1>(res).result();
 
     std::array<oc::Matrix<u8>, 2> xShares = share(x, prng0);
 
 
     for (auto invPerm : { PermOp::Regular,PermOp::Inverse })
     {
-        dlpnPerm2.clearPermutation();
+        dlpnPerm0.init(n, rowSize);
+        dlpnPerm1.init(n, rowSize);
+        dlpnPerm0.request(ole0);
+        dlpnPerm1.request(ole1);
+        dlpnPerm0.setPermutation(pi);
+        dlpnPerm1.clearPermutation();
+
         auto res1 = coproto::sync_wait(coproto::when_all_ready(
-            dlpnPerm1.apply<u8>(pi, invPerm, xShares[0], sout1, prng0, sock[0], ole1),
-            dlpnPerm2.apply<u8>(invPerm, xShares[1], sout2, prng1, sock[1], ole0)
+            dlpnPerm0.apply<u8>(invPerm, xShares[0], sout1, prng0, sock[0]),
+            dlpnPerm1.apply<u8>(invPerm, xShares[1], sout2, prng1, sock[1])
         ));
 
 
@@ -218,8 +237,8 @@ void DlpnPerm_prepro_test(const oc::CLP& cmd)
     oc::PRNG prng0(oc::ZeroBlock);
     oc::PRNG prng1(oc::OneBlock);
 
-    secJoin::DLpnPermSender dlpnPerm1;
-    secJoin::DLpnPermReceiver dlpnPerm2;
+    secJoin::DLpnPermSender dlpnPerm0;
+    secJoin::DLpnPermReceiver dlpnPerm1;
 
     oc::Matrix<u8> x(n, rowSize / 2),
         yExp(n, rowSize / 2),
@@ -236,37 +255,43 @@ void DlpnPerm_prepro_test(const oc::CLP& cmd)
     ole1.mock(CorGenerator::Role::Receiver);
 
     auto sock = coproto::LocalAsyncSocket::makePair();
-    auto res = coproto::sync_wait(coproto::when_all_ready(
-        dlpnPerm1.genKeyOts(ole0, sock[0], prng0),
-        dlpnPerm2.genKeyOts(ole1, sock[1], prng1)
-    ));
+    //auto res = coproto::sync_wait(coproto::when_all_ready(
+    //    dlpnPerm0.genKeyOts(ole0, sock[0], prng0),
+    //    dlpnPerm1.genKeyOts(ole1, sock[1], prng1)
+    //));
 
-    std::get<0>(res).result();
-    std::get<1>(res).result();
+    //std::get<0>(res).result();
+    //std::get<1>(res).result();
 
     std::array<oc::Matrix<u8>, 2> xShares = share(x, prng0);
 
 
     for (auto invPerm : { PermOp::Regular, PermOp::Inverse })
     {
-        dlpnPerm2.clearPermutation();
+
+        dlpnPerm0.init(n, rowSize);
+        dlpnPerm1.init(n, rowSize);
+        dlpnPerm0.request(ole0);
+        dlpnPerm1.request(ole1);
+        dlpnPerm0.clearPermutation();
+        dlpnPerm1.clearPermutation();
         auto res0 = coproto::sync_wait(coproto::when_all_ready(
-            dlpnPerm1.preprocess(n, rowSize, prng0, sock[0], ole1),
-            dlpnPerm2.preprocess(n, rowSize, prng1, sock[1], ole0)
+            dlpnPerm0.setup(prng0, sock[0]),
+            dlpnPerm1.setup(prng1, sock[1])
         ));
         std::get<0>(res0).result();
         std::get<1>(res0).result();
 
         {
             oc::PRNG prng(oc::ZeroBlock);
-            auto A = dlpnPerm2.mA;
+            auto A = dlpnPerm1.mA;
             //std::vector<u64> A(n);
             //std::iota(A.begin(), A.end(), 0);
 
-            auto pre = dlpnPerm1.mPrePerm;
+            auto pre = dlpnPerm0.mPrePerm;
             for (u64 i = 0; i < n; ++i)
                 for (u64 j = 0;j < A.cols(); ++j)
-                    if ((dlpnPerm1.mDelta(i, j) ^ dlpnPerm2.mB(i, j)) != A(pre[i], j))
+                    if ((dlpnPerm0.mDelta(i, j) ^ dlpnPerm1.mB(i, j)) != A(pre[i], j))
                         throw RTE_LOC;
             //Perm pre(n, prng);
             //Perm pi(n, prng);
@@ -306,15 +331,15 @@ void DlpnPerm_prepro_test(const oc::CLP& cmd)
 
         }
 
-        dlpnPerm1.setPermutation(pi);
+        dlpnPerm0.setPermutation(pi);
 
         for (i64 i = 0; i < 2; ++i)
         {
 
 
             auto res1 = coproto::sync_wait(coproto::when_all_ready(
-                dlpnPerm1.apply<u8>(invPerm, xShares[0], sout1, prng0, sock[0], ole1),
-                dlpnPerm2.apply<u8>(invPerm, xShares[1], sout2, prng1, sock[1], ole0)
+                dlpnPerm0.apply<u8>(invPerm, xShares[0], sout1, prng0, sock[0]),
+                dlpnPerm1.apply<u8>(invPerm, xShares[1], sout2, prng1, sock[1])
             ));
             std::get<0>(res1).result();
             std::get<1>(res1).result();

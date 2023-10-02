@@ -21,8 +21,7 @@ namespace secJoin
             oc::MatrixView<const T> x1,
             oc::MatrixView<T> sout,
             oc::PRNG& prng,
-            coproto::Socket& chl,
-            CorGenerator& ole);
+            coproto::Socket& chl);
 
         template<typename T>
         static macoro::task<> apply(
@@ -31,8 +30,7 @@ namespace secJoin
             oc::MatrixView<const T> x2,
             oc::MatrixView<T> sout,
             oc::PRNG& prng,
-            coproto::Socket& chl,
-            CorGenerator& ole);
+            coproto::Socket& chl);
 
         template<typename T>
         static macoro::task<> apply(
@@ -40,8 +38,7 @@ namespace secJoin
             PermOp op,
             oc::MatrixView<T> sout,
             oc::PRNG& prng,
-            coproto::Socket& chl,
-            CorGenerator& ole);
+            coproto::Socket& chl);
     };
 
 
@@ -51,10 +48,9 @@ namespace secJoin
         oc::MatrixView<const T> x1,
         oc::MatrixView<T> sout,
         oc::PRNG& prng,
-        coproto::Socket& chl,
-        CorGenerator& ole)
+        coproto::Socket& chl)
     {
-        return apply<u8>(matrixCast<u8>(x1), matrixCast<u8>(sout), prng, chl, ole);
+        return apply<u8>(matrixCast<u8>(x1), matrixCast<u8>(sout), prng, chl);
     }
 
     template<>
@@ -62,8 +58,7 @@ namespace secJoin
         oc::MatrixView<const u8> x1,
         oc::MatrixView<u8> sout,
         oc::PRNG&,
-        coproto::Socket& chl,
-        CorGenerator&)
+        coproto::Socket& chl)
     {
         MC_BEGIN(macoro::task<>, x1, &chl, sout
         );
@@ -88,10 +83,9 @@ namespace secJoin
         PermOp op,
         oc::MatrixView<T> sout,
         oc::PRNG& prng,
-        coproto::Socket& chl,
-        CorGenerator& ole)
+        coproto::Socket& chl)
     {
-        return apply<u8>(pi, op, matrixCast<u8>(sout), prng, chl, ole);
+        return apply<u8>(pi, op, matrixCast<u8>(sout), prng, chl);
     }
 
     template<>
@@ -100,8 +94,7 @@ namespace secJoin
         PermOp op,
         oc::MatrixView<u8> sout,
         oc::PRNG&,
-        coproto::Socket& chl,
-        CorGenerator&)
+        coproto::Socket& chl)
     {
         MC_BEGIN(macoro::task<>, &pi, &chl, sout,  op,
             o = oc::Matrix<u8>{}
@@ -132,10 +125,9 @@ namespace secJoin
         oc::MatrixView<const T> x2,
         oc::MatrixView<T> sout,
         oc::PRNG& prng,
-        coproto::Socket& chl,
-        CorGenerator& ole)
+        coproto::Socket& chl)
     {
-        return apply<u8>(pi, op, matrixCast<u8>(x2), matrixCast<u8>(sout), prng, chl, invPerm, ole);
+        return apply<u8>(pi, op, matrixCast<u8>(x2), matrixCast<u8>(sout), prng, chl, invPerm);
     }
 
     template<>
@@ -145,17 +137,16 @@ namespace secJoin
         oc::MatrixView<const u8> x2,
         oc::MatrixView<u8> sout,
         oc::PRNG& prng,
-        coproto::Socket& chl,
-        CorGenerator& ole)
+        coproto::Socket& chl)
     {
 
-        MC_BEGIN(macoro::task<>, x2, &pi, &chl, sout, &prng, op, &ole,
+        MC_BEGIN(macoro::task<>, x2, &pi, &chl, sout, &prng, op,
             n = u64(x2.rows()),
             bytesPerRow = u64(x2.cols()),
             x2Perm = oc::Matrix<u8>{}
         );
 
-        MC_AWAIT(InsecurePerm::apply<u8>(pi, op, sout, prng, chl, ole));
+        MC_AWAIT(InsecurePerm::apply<u8>(pi, op, sout, prng, chl));
         x2Perm.resize(x2.rows(), x2.cols());
 
         // Permuting the secret shares x2

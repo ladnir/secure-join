@@ -31,7 +31,7 @@ namespace secJoin
         oc::block kk;
         kk = prng0.get();
         dm.setKey(kk);
-        sender.setKey(kk);
+        //sender.setKey(kk);
 
         CorGenerator ole0, ole1;
         ole0.mock(CorGenerator::Role::Sender);
@@ -47,7 +47,7 @@ namespace secJoin
             sk[i][1] = oc::block(i, 1);
             rk[i] = oc::block(i, *oc::BitIterator((u8*)&sender.mPrf.mKey, i));
         }
-        sender.setKeyOts(rk);
+        sender.setKeyOts(kk, rk);
         recver.setKeyOts(sk);
 
         auto begin = timer.setTimePoint("begin");

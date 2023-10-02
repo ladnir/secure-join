@@ -24,9 +24,8 @@ void AdditivePerm_xor_test()
     std::array<std::vector<u32>, 2> sShares = xorShare(mPi.mPi, prng);
     std::array<oc::Matrix<u8>, 2> yShare;
 
-    AdditivePerm
-        vecPerm1(sShares[0], prng, 0),
-        vecPerm2(sShares[1], prng, 1);
+    AdditivePerm vecPerm1;vecPerm1.init2(0, n, rowSize * 2); vecPerm1.setShares(sShares[0]);
+    AdditivePerm vecPerm2;vecPerm2.init2(1, n, rowSize * 2); vecPerm2.setShares(sShares[1]);
 
     CorGenerator ole0, ole1;
     ole0.mock(CorGenerator::Role::Sender);
@@ -45,9 +44,10 @@ void AdditivePerm_xor_test()
     vecPerm1.setKeyOts(kk, rk, sk);
     vecPerm2.setKeyOts(kk, rk, sk);
 
-
-    auto proto0 = vecPerm1.setup(chls[0], ole0, prng);
-    auto proto1 = vecPerm2.setup(chls[1], ole1, prng);
+    vecPerm1.request(ole0);
+    vecPerm2.request(ole1);
+    auto proto0 = vecPerm1.setup(chls[0], prng);
+    auto proto1 = vecPerm2.setup(chls[1], prng);
 
     auto res = macoro::sync_wait(macoro::when_all_ready(std::move(proto0), std::move(proto1)));
 
@@ -57,7 +57,7 @@ void AdditivePerm_xor_test()
     if (vecPerm1.mRho != vecPerm2.mRho)
         throw RTE_LOC;
 
-    auto pi = vecPerm1.mPi.mPi.composeSwap(vecPerm2.mPi.mPi);
+    auto pi = vecPerm1.mRandPi.mSender.mPi->composeSwap(*vecPerm2.mRandPi.mSender.mPi);
     Perm rhoExp = pi.apply(mPi.mPi);
     if (rhoExp != vecPerm1.mRho)
         throw RTE_LOC;
@@ -66,8 +66,8 @@ void AdditivePerm_xor_test()
     yShare[0].resize(x.rows(), x.cols());
     yShare[1].resize(x.rows(), x.cols());
 
-    proto0 = vecPerm1.apply<u8>(PermOp::Regular, xShares[0], yShare[0], prng, chls[0], ole0);
-    proto1 = vecPerm2.apply<u8>(PermOp::Regular, xShares[1], yShare[1], prng, chls[1], ole1);
+    proto0 = vecPerm1.apply<u8>(PermOp::Regular, xShares[0], yShare[0], prng, chls[0]);
+    proto1 = vecPerm2.apply<u8>(PermOp::Regular, xShares[1], yShare[1], prng, chls[1]);
 
     auto res1 = macoro::sync_wait(macoro::when_all_ready(std::move(proto0), std::move(proto1)));
 
@@ -82,8 +82,8 @@ void AdditivePerm_xor_test()
 
 
     auto res2 = macoro::sync_wait(macoro::when_all_ready(
-        vecPerm1.apply<u8>(PermOp::Inverse, xShares[0], yShare[0], prng, chls[0], ole0),
-        vecPerm2.apply<u8>(PermOp::Inverse, xShares[1], yShare[1], prng, chls[1], ole1)
+        vecPerm1.apply<u8>(PermOp::Inverse, xShares[0], yShare[0], prng, chls[0]),
+        vecPerm2.apply<u8>(PermOp::Inverse, xShares[1], yShare[1], prng, chls[1])
     ));
     std::get<0>(res2).result();
     std::get<1>(res2).result();
@@ -115,27 +115,31 @@ void AdditivePerm_prepro_test()
     std::array<std::vector<u32>, 2> sShares = xorShare(mPi.mPi, prng);
     std::array<oc::Matrix<u8>, 2> yShare;
 
-    AdditivePerm
-        vecPerm1(sShares[0], prng, 0),
-        vecPerm2(sShares[1], prng, 1);
+    AdditivePerm vecPerm1;vecPerm1.init2(0, n, rowSize); vecPerm1.setShares(sShares[0]);
+    AdditivePerm vecPerm2;vecPerm2.init2(1, n, rowSize); vecPerm2.setShares(sShares[1]);
+
 
     CorGenerator ole0, ole1;
     ole0.mock(CorGenerator::Role::Sender);
     ole1.mock(CorGenerator::Role::Receiver);
 
+
+    vecPerm1.request(ole0);
+    vecPerm2.request(ole1);
+
     auto res0 = macoro::sync_wait(macoro::when_all_ready(
-        vecPerm1.preprocess(n, rowSize, chls[0], ole0, prng),
-        vecPerm2.preprocess(n, rowSize, chls[1], ole1, prng)
+        vecPerm1.preprocess(chls[0], prng),
+        vecPerm2.preprocess(chls[1], prng)
     ));
 
     std::get<0>(res0).result();
     std::get<1>(res0).result();
 
-    if(0)
+    if (0)
     {
         auto res1 = macoro::sync_wait(macoro::when_all_ready(
-            vecPerm1.setup(chls[0], ole0, prng),
-            vecPerm2.setup(chls[1], ole1, prng)
+            vecPerm1.setup(chls[0], prng),
+            vecPerm2.setup(chls[1], prng)
         ));
 
         std::get<0>(res1).result();
@@ -143,7 +147,7 @@ void AdditivePerm_prepro_test()
 
         if (vecPerm1.mRho != vecPerm2.mRho)
             throw RTE_LOC;
-        auto pi = vecPerm1.mPi.mPi.composeSwap(vecPerm2.mPi.mPi);
+        auto pi = vecPerm1.mRandPi.mSender.mPi->composeSwap(*vecPerm2.mRandPi.mSender.mPi);
         Perm rhoExp = pi.apply(mPi.mPi);
         if (rhoExp != vecPerm1.mRho)
             throw RTE_LOC;
@@ -155,8 +159,8 @@ void AdditivePerm_prepro_test()
     yShare[1].resize(x.rows(), x.cols());
 
     auto res1 = macoro::sync_wait(macoro::when_all_ready(
-        vecPerm1.apply<u8>(PermOp::Regular, xShares[0], yShare[0], prng, chls[0], ole0),
-        vecPerm2.apply<u8>(PermOp::Regular, xShares[1], yShare[1], prng, chls[1], ole1)
+        vecPerm1.apply<u8>(PermOp::Regular, xShares[0], yShare[0], prng, chls[0]),
+        vecPerm2.apply<u8>(PermOp::Regular, xShares[1], yShare[1], prng, chls[1])
     ));
 
     std::get<0>(res1).result();

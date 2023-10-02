@@ -61,54 +61,28 @@ namespace secJoin
         MC_END();
     }
 
-    macoro::task<> RadixSort::hadamardSumPreprocess(
-        u64 size,
-        CorGenerator& gen_,
-        coproto::Socket&sock_, 
-        OtRecvGenerator&recv, 
-        OtSendGenerator&send,
-        oc::PRNG&prng_)
-    {
-        //std::cout << (int)gen.mRole << " had pre" << std::endl;
-        MC_BEGIN(macoro::task<>, this, &recv, &send, size,
-            gen = gen_.fork(), 
-            sock = sock_.fork(), 
-            prng = prng_.fork(),
-            t0 = macoro::task<>{},
-            t1 = macoro::task<>{});
+    //void RadixSort::hadamardSumRequest(
+    //    u64 size,
+    //    CorGenerator& gen,
+    //    OtRecvGenerator&recv, 
+    //    OtSendGenerator&send)
+    //{
 
-        //std::cout << (int)gen.mRole << " had start" << std::endl;
-        if (gen.mRole == CorGenerator::Role::Sender)
-        {
-            t0 = gen.otRecvRequest(recv, size, sock, prng);
-            t1 = gen.otSendRequest(send, size, sock.fork(), prng);
-        }
-        else
-        {
-            t0 = gen.otSendRequest(send, size, sock, prng);
-            t1 = gen.otRecvRequest(recv, size, sock.fork(), prng);
-        }
-
-        MC_AWAIT(
-            macoro::when_all_ready(std::move(t0), std::move(t1))
-        );
-
-        MC_END();
-    }
+    //}
 
     // compute dst = sum_i f.col(i) * s.col(i) where * 
     // is the hadamard (component-wise) product. 
     macoro::task<> RadixSort::hadamardSum(
-        u64 round,
+        Round& round,
         BinMatrix& f,
         Matrix32& s,
         AdditivePerm& dst,
         coproto::Socket& comm)
     {
-        MC_BEGIN(macoro::task<>, this, &f, &s, &dst, &comm, round,
+        MC_BEGIN(macoro::task<>, this, &f, &s, &dst, &comm, &round,
 
-            otRecvReq = OtRecvGenerator{},
-            otSendReq = OtSendGenerator{},
+            otRecvReq = OtRecvRequest{},
+            otSendReq = OtSendRequest{},
             otRecv = OtRecv{},
             otSend = OtSend{},
             a = std::vector<oc::AlignedUnVector<u32>>{},
@@ -133,8 +107,8 @@ namespace secJoin
 
         shares.resize(s.rows());
 
-        otRecvReq = std::move(mHadamardSumRecvOts[round]);
-        otSendReq = std::move(mHadamardSumSendOts[round]);
+        otRecvReq = std::move(round.mHadamardSumRecvOts);
+        otSendReq = std::move(round.mHadamardSumSendOts);
         //if (gen.mRole == CorGenerator::Role::Sender)
         //{
         //    MC_AWAIT_SET(otRecvReq, gen.otRecvRequest(s.size()));
@@ -147,7 +121,7 @@ namespace secJoin
         //}
 
         //initArith2BinCircuit(shares.size());
-        //mArithToBinGmw[round].init(shares.size(), mArith2BinCir);
+        //round.mArithToBinGmw.init(shares.size(), mArith2BinCir);
 
         for (role = 0; role < 2; ++role)
         {
@@ -222,20 +196,18 @@ namespace secJoin
             MC_AWAIT(checkHadamardSum(f, s, shares, comm, true));
 
         bitCount = std::max<u64>(1, oc::log2ceil(shares.size()));
-        if(mArith2BinCir.mInputs.size() == 0 || mArith2BinCir.mInputs[0].size() != bitCount)
+        if (mArith2BinCir.mInputs.size() == 0 || mArith2BinCir.mInputs[0].size() != bitCount)
             throw RTE_LOC;
-        if (mArithToBinGmw.size() <= round)
-            throw RTE_LOC;
-        if (mArithToBinGmw[round].mN != shares.size())
+        if (round.mArithToBinGmw.mN != shares.size())
             throw RTE_LOC;
 
-        mArithToBinGmw[round].setZeroInput(mRole);
-        mArithToBinGmw[round].setInput(mRole ^ 1, oc::MatrixView<u32>(shares.data(), shares.size(), 1));
+        round.mArithToBinGmw.setZeroInput(mRole);
+        round.mArithToBinGmw.setInput(mRole ^ 1, oc::MatrixView<u32>(shares.data(), shares.size(), 1));
 
-        MC_AWAIT(mArithToBinGmw[round].run(comm));
+        MC_AWAIT(round.mArithToBinGmw.run(comm));
 
         dst.mShare.resize(shares.size());
-        mArithToBinGmw[round].getOutput(0, oc::MatrixView<u32>(dst.mShare.data(), dst.mShare.size(), 1));
+        round.mArithToBinGmw.getOutput(0, oc::MatrixView<u32>(dst.mShare.data(), dst.mShare.size(), 1));
 
         if (mDebug)
         {
@@ -415,14 +387,14 @@ namespace secJoin
     // Computes the same function as genValMask but is more efficient
     // due to the use a binary secret sharing.
     macoro::task<> RadixSort::genValMasks2(
-        u64 round,
+        Round& round,
         u64 bitCount,
         const BinMatrix& k,
         Matrix32& f,
         BinMatrix& fBin,
         coproto::Socket& comm)
     {
-        MC_BEGIN(macoro::task<>, this, &k, &f, &comm, bitCount, &fBin, round
+        MC_BEGIN(macoro::task<>, this, &k, &f, &comm, bitCount, &fBin, &round
             //cir = oc::BetaCircuit{}
         );
 
@@ -452,12 +424,10 @@ namespace secJoin
             //initIndexToOneHotCircuit(bitCount);
             //eval.init(k.rows(), mIndexToOneHotCircuit);
 
-            if (mIndexToOneHotGmw.size() <= round)
-                throw RTE_LOC;
 
-            mIndexToOneHotGmw[round].setInput(0, k);
-            MC_AWAIT(mIndexToOneHotGmw[round].run(comm));
-            mIndexToOneHotGmw[round].getOutput(0, fBin);
+            round.mIndexToOneHotGmw.setInput(0, k);
+            MC_AWAIT(round.mIndexToOneHotGmw.run(comm));
+            round.mIndexToOneHotGmw.getOutput(0, fBin);
         }
 
         if (bitCount == 1)
@@ -515,9 +485,8 @@ namespace secJoin
         memset(fBin.data() + fBin.size(), 0, sizeof(block));
 
         TODO("determine min bit count required. currently 32");
-        if (round >= mBitInjects.size())
-            throw RTE_LOC;
-        MC_AWAIT(mBitInjects[round].bitInjection((1ull << bitCount) * k.rows(), fBin.mData, 32, f, comm));
+        //MC_AWAIT(round.mBitInjects.bitInjection((1ull << bitCount) * k.rows(), fBin.mData, 32, f, comm));
+        MC_AWAIT(round.mBitInject.bitInjection(fBin.mData, 32, f, comm));
 
         f.reshape(k.rows(), 1ull << bitCount);
 
@@ -705,13 +674,13 @@ namespace secJoin
     // Generate a permutation dst which will be the inverse of the
     // permutation that permutes the keys k into sorted order. 
     macoro::task<> RadixSort::genBitPerm(
-        u64 round,
+        Round& round,
         u64 keyBitCount,
         const BinMatrix& k,
         AdditivePerm& dst,
         coproto::Socket& comm)
     {
-        MC_BEGIN(macoro::task<>, this, keyBitCount, &k, &dst, &comm, round,
+        MC_BEGIN(macoro::task<>, this, keyBitCount, &k, &comm, &round, &dst,
             m = u64{},
             L = u64{},
             L2 = u64{},
@@ -953,8 +922,6 @@ namespace secJoin
                     if (k0 > k1)
                         throw RTE_LOC;
                 }
-
-                //dst.validate(comm);
             }
             std::cout << std::endl;
             std::cout << std::endl;
@@ -964,208 +931,125 @@ namespace secJoin
         MC_END();
     }
 
-
-    //struct Session
-    //{
-
-    //    Session(coproto::Socket& s, oc::PRNG& prng, CorGenerator& gen, macoro::eager_task<>&& t)
-    //        : mSock(s.fork())
-    //        , mPrng(prng.get<oc::block>())
-    //        , mGen(gen.fork())
-    //        , mTask(std::forward<macoro::eager_task<>>(t))
-    //    {
-    //    }
-
-    //    coproto::Socket mSock;
-    //    oc::PRNG mPrng;
-    //    CorGenerator mGen;
-    //    macoro::eager_task<> mTask;
-    //};
-
-
-
-    void RadixSort::configure(
+    void RadixSort::init(
+        u64 role,
         u64 n,
         u64 bitCount,
-        CorGenerator& gen,
         u64 bytesPerElem)
     {
-        mConfigured = true;
-        mRole = (int)gen.mRole;
-        u64 ll = oc::divCeil(bitCount, mL);
-        mRounds.resize(ll);
-        //tasks.resize(ll * 5 - !bool(bytesPerElem > 0));
+        mRole = role;
+        mSize = n;
+        mBitCount = bitCount;
+        mBytesPerElem = bytesPerElem;
+    }
 
-        TODO("Minimize")
-        auto byteCount = oc::divCeil(std::min<u64>(mL, bitCount), 8) + 2 * sizeof(u32);
-        auto pow2L = 1ull << mL;
+    void RadixSort::request(CorGenerator& gen)
+    {
+        if (mSize == 0 || mBitCount == 0)
+            throw std::runtime_error("init must be called before request(). " LOCATION);
+        mHasRequest = true;
 
         initIndexToOneHotCircuit(mL);
-        initArith2BinCircuit(n);
+        initArith2BinCircuit(mSize);
 
-        assert(mIndexToOneHotCircuit.mOutputs[0].size() == pow2L);
+        // the number if radix sort rounds
+        u64 ll = oc::divCeil(mBitCount, mL);
+        mRounds.resize(ll);
+        
+        // 2^mL
+        u64 pow2L = 1ull << mL;
+
         for (u64 i = 0, j = 0; i < ll; ++i)
         {
+            // the amount of correlated randomness for the permutations we will require.
+            u64 permutationByteSize = oc::divCeil(std::min<u64>(mL, mBitCount - i * mL), 8) + 2 * sizeof(u32);
+
             // for the last one, we use the requested number of bytes
             if (i == ll - 1)
-                byteCount = bytesPerElem;
+                permutationByteSize = mBytesPerElem;
 
-            if (byteCount)
-                mRounds[i].mPerm.init(n, byteCount, gen);
+            mRounds[i].mPerm.init2(mRole, mSize, permutationByteSize, i == 0);
+            if (permutationByteSize)
+                mRounds[i].mPerm.request(gen);
 
-            mRounds[i].mBitInject.init(n, pow2L, gen);
+            mRounds[i].mBitInject.init(mSize, pow2L);
+            mRounds[i].mBitInject.request(gen);
 
+            mRounds[i].mIndexToOneHotGmw.init(mSize, mIndexToOneHotCircuit);
+            mRounds[i].mIndexToOneHotGmw.request(gen);
 
-            mRounds[i].mIndexToOneHotGmw.init(n, mIndexToOneHotCircuit, gen);
-            tasks[j++] = mIndexToOneHotGmw[i].preprocess(comm, prng)
-                | macoro::make_eager();
+            mRounds[i].mArithToBinGmw.init(mSize, mArith2BinCir);
+            mRounds[i].mArithToBinGmw.request(gen);
 
+            if (mRole)
+            {
+                mRounds[i].mHadamardSumRecvOts = gen.otRecvRequest(mSize * pow2L);
+                mRounds[i].mHadamardSumSendOts = gen.otSendRequest(mSize * pow2L);
+            }
+            else
+            {
+                mRounds[i].mHadamardSumSendOts = gen.otSendRequest(mSize * pow2L);
+                mRounds[i].mHadamardSumRecvOts = gen.otRecvRequest(mSize * pow2L);
+            }
 
-            mArithToBinGmw[i].init(n, mArith2BinCir);
-            tasks[j++] = mArithToBinGmw[i].preprocess(gen, comm, prng)
-                | macoro::make_eager();
-
-            tasks[j++] = hadamardSumPreprocess(n * pow2L, gen, comm,
-                mHadamardSumRecvOts[i], mHadamardSumSendOts[i], prng)
-                | macoro::make_eager();
         }
 
-        for (i = 0; i < tasks.size(); ++i)
-            MC_AWAIT(tasks[i]);
-
-        mHasPreprocessing = true;
+        mHasRequest = true;
     }
 
     macoro::task<> RadixSort::preprocess(
-        u64 n,
-        u64 bitCount,
-        CorGenerator& gen,
         coproto::Socket& comm,
-        oc::PRNG& prng,
-        u64 bytesPerElem)
+        oc::PRNG& prng)
     {
-        MC_BEGIN(macoro::task<>, this, n, bitCount, &gen, &comm, &prng, bytesPerElem,
-            ll = u64{},
-            pow2L = u64{},
-            i = u64{}, j = u64{},
-            byteCount = u64{},
+        mHasPrepro = true;
+        MC_BEGIN(macoro::task<>, this, &comm, 
+            g = prng.fork(),
+            i = u64{},
+            socks = std::vector<coproto::Socket>{},
+            prngs = std::vector<oc::PRNG>{},
             tasks = std::vector<macoro::eager_task<>>{});
 
-        mRole = (int)gen.mRole;
-        ll = oc::divCeil(bitCount, mL);
-        mPerms.resize(ll);
-        tasks.resize(ll * 5 - !bool(bytesPerElem > 0));
-
-        byteCount = oc::divCeil(std::min<u64>(mL, bitCount - i * mL), 8) + 2 * sizeof(u32);
-        pow2L = 1ull << mL;
-        mArithToBinGmw.resize(ll);
-        mIndexToOneHotGmw.resize(ll);
-        mBitInjects.resize(ll);
-        mHadamardSumRecvOts.resize(ll);
-        mHadamardSumSendOts.resize(ll);
-        initIndexToOneHotCircuit(mL);
-        initArith2BinCircuit(n);
-        assert(mIndexToOneHotCircuit.mOutputs[0].size() == pow2L);
-        for (i = 0, j = 0; i < ll; ++i)
+        if (hasRequest() == false)
+            throw std::runtime_error("request must be called first. " LOCATION);
         {
-            // for the last one, we use the requested number of bytes
-            if (i == ll - 1)
-                byteCount = bytesPerElem;
+            auto sock = [&]() -> coproto::Socket&
+            {
+                if (socks.capacity() == socks.size())
+                    throw std::runtime_error("not enough space reserved." LOCATION);
+                socks.emplace_back(comm.fork());
+                return socks.back();
+            };
 
-            if (byteCount)
-                tasks[j++] = mPerms[i].preprocess(n, byteCount, comm, gen, prng)
-                | macoro::make_eager();
+            auto prng = [&]() -> oc::PRNG&
+            {
+                if (prngs.capacity() == prngs.size())
+                    throw std::runtime_error("not enough space reserved." LOCATION);
+                prngs.emplace_back(g.fork());
+                return prngs.back();
+            };
 
-            tasks[j++] = mBitInjects[i].preprocess(n, pow2L, gen, prng, comm)
-                | macoro::make_eager();
+            auto task = [&](macoro::task<>&& t) -> void
+            {
+                tasks.emplace_back(std::move(t) | macoro::make_eager());
+            };
 
-
-            mIndexToOneHotGmw[i].init(n, mIndexToOneHotCircuit);
-            tasks[j++] = mIndexToOneHotGmw[i].preprocess(gen, comm, prng)
-                | macoro::make_eager();
-
-
-            mArithToBinGmw[i].init(n, mArith2BinCir);
-            tasks[j++] = mArithToBinGmw[i].preprocess(gen, comm, prng)
-                | macoro::make_eager();
-
-            tasks[j++] = hadamardSumPreprocess(n * pow2L, gen, comm,
-                mHadamardSumRecvOts[i], mHadamardSumSendOts[i], prng)
-                | macoro::make_eager();
+            for (i = 0; i < mRounds.size(); ++i)
+            {
+                if (mRounds[i].mPerm.hasRequest())
+                    task(mRounds[i].mPerm.preprocess(sock(), prng()));
+                task(mRounds[i].mBitInject.preprocess());
+                task(mRounds[i].mIndexToOneHotGmw.preprocess());
+                task(mRounds[i].mArithToBinGmw.preprocess());
+                task(mRounds[i].mHadamardSumRecvOts.start());
+                task(mRounds[i].mHadamardSumSendOts.start());
+            }
         }
 
-        for (i = 0; i < tasks.size(); ++i)
+        for (i = 0; i < tasks.size();++i)
             MC_AWAIT(tasks[i]);
 
-        mHasPreprocessing = true;
         MC_END();
     }
-
-    macoro::task<> RadixSort::preprocess(
-        u64 n,
-        u64 bitCount,
-        CorGenerator& gen,
-        coproto::Socket& comm,
-        oc::PRNG& prng,
-        u64 bytesPerElem)
-    {
-        MC_BEGIN(macoro::task<>, this, n, bitCount, &gen, &comm, &prng, bytesPerElem,
-            ll = u64{},
-            pow2L = u64{},
-            i = u64{}, j = u64{},
-            byteCount = u64{},
-            tasks = std::vector<macoro::eager_task<>>{});
-
-        mRole = (int)gen.mRole;
-        ll = oc::divCeil(bitCount, mL);
-        mPerms.resize(ll);
-        tasks.resize(ll * 5 - !bool(bytesPerElem > 0));
-
-        byteCount = oc::divCeil(std::min<u64>(mL, bitCount - i * mL), 8) + 2 * sizeof(u32);
-        pow2L = 1ull << mL;
-        mArithToBinGmw.resize(ll);
-        mIndexToOneHotGmw.resize(ll);
-        mBitInjects.resize(ll);
-        mHadamardSumRecvOts.resize(ll);
-        mHadamardSumSendOts.resize(ll);
-        initIndexToOneHotCircuit(mL);
-        initArith2BinCircuit(n);
-        assert(mIndexToOneHotCircuit.mOutputs[0].size() == pow2L);
-        for (i = 0, j = 0; i < ll; ++i)
-        {
-            // for the last one, we use the requested number of bytes
-            if (i == ll - 1)
-                byteCount = bytesPerElem;
-
-            if(byteCount)
-                tasks[j++] = mPerms[i].preprocess(n, byteCount, comm, gen, prng) 
-                    | macoro::make_eager();
-
-            tasks[j++] = mBitInjects[i].preprocess(n, pow2L, gen, prng, comm) 
-                | macoro::make_eager();
-
-
-            mIndexToOneHotGmw[i].init(n, mIndexToOneHotCircuit);
-            tasks[j++] = mIndexToOneHotGmw[i].preprocess(gen, comm,prng)
-                | macoro::make_eager();
-
-            
-            mArithToBinGmw[i].init(n, mArith2BinCir);
-            tasks[j++] = mArithToBinGmw[i].preprocess(gen, comm, prng)
-                | macoro::make_eager();
-
-            tasks[j++] = hadamardSumPreprocess(n * pow2L ,gen, comm, 
-                    mHadamardSumRecvOts[i], mHadamardSumSendOts[i], prng) 
-                | macoro::make_eager();
-        }
-
-        for (i = 0; i < tasks.size(); ++i)
-            MC_AWAIT(tasks[i]);
-
-        mHasPreprocessing = true;
-        MC_END();
-    }
-
     // generate the (inverse) permutation that sorts the keys k.
     macoro::task<> RadixSort::genPerm(
         const BinMatrix& k,
@@ -1183,13 +1067,13 @@ namespace secJoin
             rho = AdditivePerm{},
             i = u64{},
             debugPerms = std::vector<Perm>{},
-            debugPerm = Perm{}
+            debugPerm = Perm{},
+            pre = macoro::eager_task<>{}
         );
 
         if (hasPreprocessing() == false)
         {
-            MC_AWAIT(preprocess(
-                k.rows(), k.bitsPerEntry(), gen, comm, prng, 0));
+            pre = preprocess(comm, prng) | macoro::make_eager();
         }
 
         setTimePoint("genPerm begin");
@@ -1209,7 +1093,7 @@ namespace secJoin
 
         // generate the sorting permutation for the
         // first L bits of the key.
-        MC_AWAIT(genBitPerm(0, mL, sk, mPerms[0], comm));
+        MC_AWAIT(genBitPerm(mRounds[0], mL, sk, mRounds[0].mPerm, comm));
         setTimePoint("genBitPerm");
         //dst.validate(comm);
 
@@ -1242,34 +1126,36 @@ namespace secJoin
 
 
             if (mTimer)
-                mPerms[i - 1].setTimer(getTimer());
+                mRounds[i-1].mPerm.setTimer(getTimer());
 
             // apply the partial sort that we have so far 
             // to the next L bits of the key.
             // 4 + 1 bytes
-            assert(mPerms[i - 1].hasSetup(sk.bytesPerEntry()));
-            MC_AWAIT(mPerms[i - 1].apply<u8>(
-                PermOp::Inverse, sk.mData, ssk.mData, prng, comm, gen));
+            assert(mRounds[i-1].mPerm.hasSetup(sk.bytesPerEntry()));
+            MC_AWAIT(mRounds[i-1].mPerm.apply<u8>(
+                PermOp::Inverse, sk.mData, ssk.mData, prng, comm));
             setTimePoint("apply(sk)");
 
             // generate the sorting permutation for the
             // next L bits of the key.
-            MC_AWAIT(genBitPerm(i, mL, ssk, rho, comm));
+            MC_AWAIT(genBitPerm(mRounds[i], mL, ssk, rho, comm));
             setTimePoint("genBitPerm");
 
             // compose the current partial sort with
             // the permutation that sorts the next L bits
             // 4 bytes
-            assert(mPerms[i - 1].hasSetup(4));
-            MC_AWAIT(mPerms[i - 1].compose(rho, mPerms[i], prng, comm, gen));
+            assert(mRounds[i-1].mPerm.hasSetup(4));
+            MC_AWAIT(mRounds[i-1].mPerm.compose(rho, mRounds[i].mPerm, prng, comm));
             setTimePoint("compose");
-            mPerms[i - 1].clear();
+
+            assert(mRounds[i - 1].mPerm.hasSetup(1) == false);
+            mRounds[i-1].mPerm.clear();
             //std::swap(dst, sigma2);
             //dst.validate(comm);
         }
         setTimePoint("genPerm end");
 
-        dst = std::move(mPerms.back());
+        dst = std::move(mRounds[i].mPerm);
         MC_END();
     }
 
@@ -1403,11 +1289,11 @@ namespace secJoin
         CorGenerator& ole,
         coproto::Socket& comm)
     {
-        MC_BEGIN(macoro::task<>, &k, &dst, &ole, &comm,
+        MC_BEGIN(macoro::task<>, &k, &dst, &ole, &comm, this,
             data = BinMatrix{},
             perm = Perm{});
 
-        if (ole.mRole == CorGenerator::Role::Receiver)
+        if (mRole)
         {
             data.resize(k.rows(), k.bitsPerEntry());
             MC_AWAIT(comm.recv(data));
@@ -1419,12 +1305,12 @@ namespace secJoin
 
             perm = sort(data).inverse();
 
-            dst.init(perm.size());
+            dst.init2(mRole,perm.size());
             dst.mShare = perm.mPi;
         }
         else {
             MC_AWAIT(comm.send(coproto::copy(k)));
-            dst.init(k.numEntries());
+            dst.init2(mRole, k.numEntries());
         }
 
         MC_END();

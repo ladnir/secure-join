@@ -5,8 +5,7 @@ namespace secJoin
 
     void DLpnPermReceiver::setKeyOts(oc::block& key, std::vector<oc::block>& rk)
     {
-        mSender.setKey(key);
-        mSender.setKeyOts(rk);
+        mSender.setKeyOts(key, rk);
     }
 
     void DLpnPermSender::setKeyOts(std::vector<std::array<oc::block, 2>>& sk)
@@ -14,28 +13,12 @@ namespace secJoin
         mRecver.setKeyOts(sk);
     }
 
-    macoro::task<> DLpnPermReceiver::genKeyOts(CorGenerator& ole, coproto::Socket& chl, oc::PRNG& prng)
-    {
-        return mSender.genKeyOts(ole, chl, prng);
-    }
-
-    macoro::task<> DLpnPermSender::genKeyOts(CorGenerator& ole, coproto::Socket& chl, oc::PRNG& prng)
-    {
-        return mRecver.genKeyOts(ole, chl, prng);
-    }
-
-
     void xorShare(
         oc::MatrixView<const oc::block> v1_,
         u64 byteOffset,
         oc::MatrixView<const oc::u8> v2,
         oc::MatrixView<oc::u8>& s)
     {
-        // Checking the dimensions
-        //if (v1.rows() != v2.rows())
-        //    throw RTE_LOC;
-        //if (v1.cols() != v2.cols())
-        //    throw RTE_LOC;
         auto v1 = matrixCast<const u8>(v1_);
         for (oc::u64 i = 0; i < s.rows(); ++i)
             for (oc::u64 j = 0; j < s.cols(); ++j)
@@ -56,82 +39,167 @@ namespace secJoin
     }
 
     // generate the preprocessing when all inputs are unknown.
-    macoro::task<> DLpnPermSender::preprocess(
-        u64 totElements,
-        u64 bytesPerRow,
-        oc::PRNG& prng,
-        coproto::Socket& chl,
-        CorGenerator& ole)
+    void DLpnPermSender::request(CorGenerator& ole)
     {
-        mHasPreprocess = true;
-        mPrePerm.randomize(totElements, prng);
-        return setup(mPrePerm, bytesPerRow, prng, chl, ole);
+        if (mNumElems == 0)
+            throw std::runtime_error("DLpnPermSender::init must be called before request. " LOCATION);
+        if(hasRequest())
+            throw std::runtime_error("the correlated randomness has already been requested. " LOCATION);
+
+        mRecver.request(ole);
     }
 
-    // generate the preprocessing when all inputs are unknown.
-    macoro::task<> DLpnPermReceiver::preprocess(
-        u64 totElements,
-        u64 bytesPerRow,
-        oc::PRNG& prng,
-        coproto::Socket& chl,
-        CorGenerator& ole)
+    void DLpnPermReceiver::request(CorGenerator& ole)
     {
-        mHasPreprocess = true;
-        return setup(totElements, bytesPerRow, prng, chl, ole);
+        if (mNumElems == 0)
+            throw std::runtime_error("DLpnPermReceiver::init must be called before request. " LOCATION);
+        if (hasRequest())
+            throw std::runtime_error("the correlated randomness has already been requested. " LOCATION);
+
+        mSender.request(ole);
     }
 
+    //macoro::task<> DLpnPermReceiver::preprocess(oc::PRNG& prng, coproto::Socket& chl)
+    //{
+    //    if (hasRequest() == false)
+    //        throw std::runtime_error("DLpnPermReceiver::request() must be called before DLpnPermReceiver::preprocess() " LOCATION);
+
+    //    return setup(prng, chl);
+    //}
+
+    //macoro::task<> DLpnPermSender::preprocess(oc::PRNG& prng, coproto::Socket& chl)
+    //{
+    //    if (hasRequest() == false)
+    //        throw std::runtime_error("DLpnPermReceiver::request() must be called before DLpnPermSender::preprocess() " LOCATION);
+
+    //    return setup(prng, chl);
+    //}
+
+
+
+    // initialize this sender to have a permutation of size n, where 
+    // bytesPerRow bytes can be permuted per position. keyGen can be 
+    // set if the caller wants to explicitly ask to perform dlpn keygen or not.
+    void DLpnPermSender::init(u64 n, u64 bytesPerRow, macoro::optional<bool> keyGen)
+    {
+        clear();
+        mNumElems = n;
+        mBytesPerRow = bytesPerRow;
+        mByteOffset = bytesPerRow;
+        mRecver.init(oc::divCeil(bytesPerRow, sizeof(oc::block)) * n, keyGen);
+    }
+
+    // returns true of we have requested correlated randomness.
+    bool DLpnPermSender::hasRequest()
+    {
+        return mRecver.hasRequest();
+    }
+
+    // clears the internal state
+    void DLpnPermSender::clear()
+    {
+        mRecver.clear();
+        mHasPreprocess = false;
+        mPrePerm.clear();
+        mPi = nullptr;
+        mPermStorage.clear();
+        mDelta.resize(0, 0);
+        mNumElems = 0;
+        mBytesPerRow = 0;
+        mByteOffset = 0;
+        mHasPreprocess = 0;
+    }
+
+    // sets the permutation of the sender
+    void DLpnPermSender::setPermutation(Perm&& p)
+    {
+        mPermStorage = std::move(p);
+        setPermutation(mPermStorage);
+    }
+
+    // sets the permutation of the sender
+    void DLpnPermSender::setPermutation(const Perm& p)
+    {
+        if (p.size() != mNumElems)
+            throw std::runtime_error("setPermutation called with the wrong size permutation. " LOCATION);
+
+        if (mHasPreprocess)
+        {
+            if (p.size() != mDelta.rows())
+                throw RTE_LOC;
+        }
+        else
+        {
+            clear();
+        }
+        mPi = &p;
+    }
+
+    struct SetupMeta
+    {
+        oc::block mKey;
+        u8 mPrepro;
+    };
     // DLpn Receiver calls this setup
     // generate random mDelta such that
     // mDelta ^ mB = pi(mA)
     macoro::task<> DLpnPermSender::setup(
-        const Perm& pi,
-        u64 bytesPerRow,
         oc::PRNG& prng,
-        coproto::Socket& chl,
-        CorGenerator& ole)
+        coproto::Socket& chl)
     {
-        MC_BEGIN(macoro::task<>, &pi, &chl, &prng, &ole, bytesPerRow, this,
+        MC_BEGIN(macoro::task<>, &chl, &prng, this,
             aesCipher = oc::Matrix<oc::block>(),
-            blocksPerRow = u64(),
-            totElements = u64(),
+            blocksPerRow = u64{},
             aes = oc::AES(),
-            key = oc::block());
+            meta = SetupMeta(),
+            pi = (const Perm*)nullptr);
 
-        mSetupSize = bytesPerRow;
-        totElements = pi.mPi.size();
-        blocksPerRow = oc::divCeil(bytesPerRow, sizeof(oc::block));
+        if (mNumElems == 0)
+            throw std::runtime_error("DLpnPermSender::init() must be called before setup. " LOCATION);
+
+        if(hasRequest() == false)
+            throw std::runtime_error("DLpnPermSender::request() must be called before setup. " LOCATION);
+
+        if (mPi)
+        {
+            mHasPreprocess = false;
+            pi = mPi;
+        }
+        else
+        {
+            mHasPreprocess = true;
+            mPrePerm.randomize(mNumElems, prng);
+            pi = &mPrePerm;
+        }
+
+        if (pi->size() != mNumElems)
+            throw std::runtime_error("the setup perm has not been initialized or is the wrong size. " LOCATION);
+
+
+        blocksPerRow = oc::divCeil(mBytesPerRow, sizeof(oc::block));
         mByteOffset = 0;
 
-        key = prng.get();
-        aes.setKey(key);
+        meta.mPrepro = mHasPreprocess;
+        meta.mKey = prng.get();
+        aes.setKey(meta.mKey);
 
         if (mRecver.hasKeyOts())
-            mRecver.tweakKeyOts(key);
-        MC_AWAIT(chl.send(std::move(key)));
+            mRecver.tweakKeyOts(meta.mKey);
 
-        mDelta.resize(totElements, blocksPerRow);
-        for (u64 i = 0; i < totElements; i++)
+        MC_AWAIT(chl.send(std::move(meta)));
+
+        mDelta.resize(mNumElems, blocksPerRow);
+        for (u64 i = 0; i < mNumElems; i++)
         {
             for (u64 j = 0; j < blocksPerRow; j++)
             {
-                //if (!invPerm)
-                {
-                    auto srcIdx = pi[i] * blocksPerRow + j;
-                    mDelta(i, j) = oc::block(0, srcIdx);
-                }
-                //else
-                //{
-                //    auto srcIdx = i * blocksPerRow + j;
-                //    mDelta(pi[i], j) = oc::block(0, srcIdx);
-                //}
+                auto srcIdx = pi->mPi[i] * blocksPerRow + j;
+                mDelta(i, j) = oc::block(0, srcIdx);
             }
         }
         aes.ecbEncBlocks(mDelta, mDelta);
 
-        MC_AWAIT(mRecver.evaluate(mDelta, mDelta, chl, prng, ole));
-
-        //for (u64 i = 0; i < totElements; i++)
-        //    memcpyMin(mDelta[i], dlpnCipher[i]);
+        MC_AWAIT(mRecver.evaluate(mDelta, mDelta, chl, prng));
 
         MC_END();
     }
@@ -140,39 +208,41 @@ namespace secJoin
     // generate random mA, mB such that
     // mDelta ^ mB = pi(mA)
     macoro::task<> DLpnPermReceiver::setup(
-        u64 totElements,
-        u64 bytesPerRow,
         oc::PRNG& prng,
-        coproto::Socket& chl,
-        CorGenerator& ole)
+        coproto::Socket& chl)
     {
-
-        MC_BEGIN(macoro::task<>, &chl, &prng, &ole, totElements, bytesPerRow, this,
+        MC_BEGIN(macoro::task<>, &chl, &prng, this,
             aesPlaintext = oc::Matrix<oc::block>(),
             aesCipher = oc::Matrix<oc::block>(),
             preProsdlpnCipher = oc::Matrix<oc::block>(),
             dlpnCipher = oc::Matrix<oc::block>(),
             blocksPerRow = u64(),
             aes = oc::AES(),
-            key = oc::block());
+            meta = SetupMeta());
 
-        mSetupSize = bytesPerRow;
-        blocksPerRow = oc::divCeil(bytesPerRow, sizeof(oc::block));
+        if (mNumElems == 0)
+            throw std::runtime_error("DLpnPermReceiver::init() must be called before setup. " LOCATION);
+
+        if (hasRequest() == false)
+            throw std::runtime_error("DLpnPermReceiver::request() must be called before setup. " LOCATION);
+
+        blocksPerRow = oc::divCeil(mBytesPerRow, sizeof(oc::block));
         mByteOffset = 0;
 
-        MC_AWAIT(chl.recv(key));
+        MC_AWAIT(chl.recv(meta));
 
+        mHasPreprocess = meta.mPrepro;
         if (mSender.hasKeyOts())
-            mSender.tweakKeyOts(key);
+            mSender.tweakKeyOts(meta.mKey);
 
         // B = (DLPN(k,AES(k', pi(0))), ..., (DLPN(k,AES(k', pi(n-1)))))
-        mB.resize(totElements, blocksPerRow);
-        MC_AWAIT(mSender.evaluate(mB, chl, prng, ole));
+        mB.resize(mNumElems, blocksPerRow);
+        MC_AWAIT(mSender.evaluate(mB, chl, prng));
 
         // A = (DLPN(k,AES(k', 0)), ..., (DLPN(k,AES(k', n-1))))
-        aes.setKey(key);
+        aes.setKey(meta.mKey);
 
-        mA.resize(totElements, blocksPerRow);
+        mA.resize(mNumElems, blocksPerRow);
         for (u64 i = 0; i < mA.size(); i++)
             mA(i) = oc::block(0, i);
         aes.ecbEncBlocks(mA, mA);
@@ -218,45 +288,37 @@ namespace secJoin
 
     template <>
     macoro::task<> DLpnPermSender::apply<u8>(
-        const Perm& pi,
         PermOp op,
         oc::MatrixView<u8> sout,
         oc::PRNG& prng,
-        coproto::Socket& chl,
-        CorGenerator& ole)
+        coproto::Socket& chl)
     {
-        setPermutation(pi);
-        return apply(op, sout, prng, chl, ole);
-    }
-
-    template <>
-    macoro::task<> DLpnPermSender::apply<u8>(
-        PermOp op,
-        oc::MatrixView<u8> sout,
-        oc::PRNG& prng,
-        coproto::Socket& chl,
-        CorGenerator& ole)
-    {
-        MC_BEGIN(macoro::task<>, &chl, &prng, &ole, this, sout, op,
+        MC_BEGIN(macoro::task<>, &chl, &prng, this, sout, op,
             xEncrypted = oc::Matrix<u8>(),
             xPermuted = oc::Matrix<u8>(),
-            totElements = u64(),
-            bytesPerRow = u64(),
             delta = Perm{}
         );
+
+        if (mNumElems == 0)
+            throw std::runtime_error("init() has not been called." LOCATION);
+
+        if (mNumElems != sout.rows())
+            throw std::runtime_error("output rows does not match init(). " LOCATION);
+
         if (mPi == nullptr)
+            throw std::runtime_error("permutation has not been set." LOCATION);
+
+        if (hasRequest() == false)
+            throw std::runtime_error("the correlated randomness must be requested before calling apply. " LOCATION);
+
+        if (mNumElems != mPi->mPi.size())
             throw RTE_LOC;
 
-        totElements = mPi->mPi.size();
-        bytesPerRow = sout.cols();
+        if (hasSetup(mBytesPerRow) == false)
+            MC_AWAIT(setup(prng, chl));
 
-        if (hasSetup(bytesPerRow) == false)
-            MC_AWAIT(setup(*mPi, sout.cols(), prng, chl, ole));
-
-        if (mDelta.rows() != totElements)
+        if (mDelta.rows() != mNumElems)
             throw RTE_LOC;
-        //if (mDelta.cols() * sizeof(oc::block) < bytesPerRow)
-        //    throw RTE_LOC;
 
         if (mHasPreprocess)
         {
@@ -273,8 +335,8 @@ namespace secJoin
             mHasPreprocess = false;
         }
 
-        xPermuted.resize(totElements, sout.cols());
-        xEncrypted.resize(totElements, sout.cols());
+        xPermuted.resize(mNumElems, sout.cols());
+        xEncrypted.resize(mNumElems, sout.cols());
 
         MC_AWAIT(chl.recv(xEncrypted));
 
@@ -293,25 +355,13 @@ namespace secJoin
         }
         //mDelta.resize(0, 0);
 
+        if (remainingSetup() == false)
+            clear();
+
         MC_END();
     }
 
-    // If DLPN receiver only wants to call apply
-    // when it also has inputs
-    // this will internally call setup for it
-    template <>
-    macoro::task<> DLpnPermSender::apply<u8>(
-        const Perm& pi,
-        PermOp op,
-        oc::MatrixView<const u8> in,
-        oc::MatrixView<u8> sout,
-        oc::PRNG& prng,
-        coproto::Socket& chl,
-        CorGenerator& ole)
-    {
-        setPermutation(pi);
-        return apply(op, in, sout, prng, chl, ole);
-    }
+
 
     // If DLPN receiver only wants to call apply
     // when it also has inputs
@@ -322,15 +372,14 @@ namespace secJoin
         oc::MatrixView<const u8> in,
         oc::MatrixView<u8> sout,
         oc::PRNG& prng,
-        coproto::Socket& chl,
-        CorGenerator& ole)
+        coproto::Socket& chl)
     {
-        MC_BEGIN(macoro::task<>, &chl, &prng, &ole, this, sout, in, op,
+        MC_BEGIN(macoro::task<>, &chl, &prng, this, sout, in, op,
             xPermuted = oc::Matrix<u8>());
 
         xPermuted.resize(in.rows(), in.cols());
 
-        MC_AWAIT(apply(op, sout, prng, chl, ole));
+        MC_AWAIT(apply(op, sout, prng, chl));
 
         mPi->apply<u8>(in, xPermuted, op);
         xorShare(xPermuted, sout, sout);
@@ -346,23 +395,30 @@ namespace secJoin
         oc::MatrixView<const u8> input,
         oc::MatrixView<u8> sout,
         oc::PRNG& prng,
-        coproto::Socket& chl,
-        CorGenerator& ole)
+        coproto::Socket& chl)
     {
-        MC_BEGIN(macoro::task<>, &chl, &prng, &ole, this, input, sout, op,
-            totElements = u64(),
-            bytesPerRow = u64(),
+        MC_BEGIN(macoro::task<>, &chl, &prng, this, input, sout, op,
             xEncrypted = oc::Matrix<u8>(),
             delta = Perm{});
 
-        totElements = input.rows();
-        bytesPerRow = input.cols();
-        if (hasSetup(bytesPerRow) == false)
-            MC_AWAIT(setup(totElements, bytesPerRow, prng, chl, ole));
+        if (input.rows() != sout.rows() || input.cols() != sout.cols())
+            throw std::runtime_error("input output size mismatch. " LOCATION);
 
-        if (mA.rows() != totElements)
+        if (mNumElems == 0)
+            throw std::runtime_error("init has not been called. " LOCATION);
+
+        if (mNumElems == input.rows())
+            throw std::runtime_error("input rows do not match init(n). " LOCATION);
+
+        if (hasRequest() == false)
+            throw std::runtime_error("the correlated randomness must be requested before calling apply. " LOCATION);
+
+        if (hasSetup(input.cols()) == false)
+            MC_AWAIT(setup(prng, chl));
+
+        if (mA.rows() != mNumElems)
             throw RTE_LOC;
-        if (mA.cols() * sizeof(oc::block) < bytesPerRow)
+        if (mA.cols() * sizeof(oc::block) < input.cols())
             throw RTE_LOC;
 
         if (mHasPreprocess)
@@ -383,7 +439,7 @@ namespace secJoin
             // where mA' = (pi^-1 o pre)(mA)
             //           = delta(mA)
             // 
-            delta.mPi.resize(totElements);
+            delta.mPi.resize(mNumElems);
             MC_AWAIT(chl.recv(delta.mPi));
 
             {
@@ -402,20 +458,22 @@ namespace secJoin
         {
             xorShare(mA, mByteOffset, input, xEncrypted);
             MC_AWAIT(chl.send(std::move(xEncrypted)));
-            for (u64 i = 0; i < totElements; ++i)
+            for (u64 i = 0; i < mNumElems; ++i)
                 memcpy(sout.data(i), (u8*)mB.data(i) + mByteOffset, sout.cols());
         }
         else
         {
             xorShare(mB, mByteOffset, input, xEncrypted);
             MC_AWAIT(chl.send(std::move(xEncrypted)));
-            for (u64 i = 0; i < totElements; ++i)
+            for (u64 i = 0; i < mNumElems; ++i)
                 memcpy(sout.data(i), (u8*)mA.data(i) + mByteOffset, sout.cols());
         }
 
         mByteOffset += sout.cols();
-        //mA.resize(0, 0);
-        //mB.resize(0, 0);
+
+        if (remainingSetup() == false)
+            clear();
+
         MC_END();
     }
 }

@@ -112,7 +112,7 @@ namespace secJoin
         else
         {
             mReceiver.setBaseOts(state->mSendBase.get());
-            mT = sendTask();
+            mT = recvTask();
         }
         //mSize = size;
         //mSock = sock.fork();
@@ -368,12 +368,12 @@ namespace secJoin
         mState->mPrng = prng.get<oc::block>();
         mState->mRole = std::is_same_v<Base, SendBase>;
         mState->set(base);
-        //mState->mCorrelations.reserve(oc::divCeil(n, batchSize));
+        //mState->mBatches.reserve(oc::divCeil(n, batchSize));
         //for (u64 i = 0; i < n; i += batchSize)
         //{
         //    u64 size = std::min(n - i * batchSize, batchSize);
-        //    mState->mCorrelations.emplace_back();
-        //    mState->mCorrelations.back().init(size, sock, prng, base);
+        //    mState->mBatches.emplace_back();
+        //    mState->mBatches.back().init(size, sock, prng, base);
         //}
     }
 
@@ -390,41 +390,46 @@ namespace secJoin
             MC_RETURN_VOID();
 
 
-        for (i = 0; i < mOffsets.size(); ++i)
-            mOffsets[i].mBatch->start();
+        for (i = 0; i < mBatches.size(); ++i)
+            mBatches[i].mBatch->start();
 
-        for (i = 0; i < mOffsets.size(); ++i)
+        for (i = 0; i < mBatches.size(); ++i)
         {
-            MC_AWAIT(mOffsets[i].mBatch->mDone);
+            MC_AWAIT(mBatches[i].mBatch->mDone);
         }
 
         MC_END();
+    }
+
+
+    void BinOleGenerator::Request::clear() {
+        TODO("request . clear");
     }
 
     macoro::task<> BinOleGenerator::Request::get(BinOle& d)
     {
         MC_BEGIN(macoro::task<>, this, &d);
 
-        if (mIdx >= mOffsets.size())
+        if (mIdx >= mBatches.size())
             throw RTE_LOC;
 
 
         if (mState->mMock)
         {
-            auto s = mOffsets[mIdx].mSize;
+            auto s = mBatches[mIdx].mSize;
             auto r = mState->mRole;
             d.mBatch = std::make_shared<Batch>();
 
             oc::block sid;
-            memcpy(&sid, &mOffsets[mIdx].mBatch->mSock.mId, sizeof(oc::block));
+            memcpy(&sid, &mBatches[mIdx].mBatch->mSock.mId, sizeof(oc::block));
             fakeFill(s, *d.mBatch, r, sid);
             d.mBatch->mDone.set();
         }
 
 
-        MC_AWAIT(mOffsets[mIdx].mBatch->mDone);
-        d.mMult = std::move(mOffsets[mIdx].mBatch->mMult.subspan(mOffsets[mIdx].mOffset, mOffsets[mIdx].mSize));
-        d.mAdd = std::move(mOffsets[mIdx].mBatch->mAdd.subspan(mOffsets[mIdx].mOffset, mOffsets[mIdx].mSize));
+        MC_AWAIT(mBatches[mIdx].mBatch->mDone);
+        d.mMult = std::move(mBatches[mIdx].mBatch->mMult.subspan(mBatches[mIdx].mOffset, mBatches[mIdx].mSize));
+        d.mAdd = std::move(mBatches[mIdx].mBatch->mAdd.subspan(mBatches[mIdx].mOffset, mBatches[mIdx].mSize));
         ++mIdx;
 
         MC_END();
@@ -438,26 +443,30 @@ namespace secJoin
         if (mState->mStarted)
             throw RTE_LOC;
 
-        // we internally measure in multiple of 128;
-        n = oc::divCeil(n, 128);
+        // we give out OLEs in chunks of 128
+        n = oc::roundUpTo(n, 128);
+
         while (n)
         {
 
-            if (mState->mCorrelations.size() == 0 || mState->mCorrelations.back()->mSize == mState->mBatchSize)
+            if (mState->mBatches.size() == 0 || mState->mBatches.back()->mSize == mState->mBatchSize)
             {
-                mState->mCorrelations.emplace_back(std::make_shared<Batch>());
-                mState->mCorrelations.back()->init(mState);
+                mState->mBatches.emplace_back(std::make_shared<Batch>());
+                mState->mBatches.back()->init(mState);
             }
              
-            r.mOffsets.emplace_back();
-            auto rem = mState->mBatchSize - mState->mCorrelations.back()->mSize;
+            r.mBatches.emplace_back();
+            auto size = std::min<u64>(n, mState->mBatchSize - mState->mBatches.back()->mSize);
 
-            r.mOffsets.back().mOffset = mState->mCorrelations.back()->mSize;
-            r.mOffsets.back().mSize = rem;
-            r.mOffsets.back().mBatch = mState->mCorrelations.back();
+            r.mBatches.back().mOffset = mState->mBatches.back()->mSize;
+            r.mBatches.back().mSize = size;
+            r.mBatches.back().mBatch = mState->mBatches.back();
 
-            mState->mCorrelations.back()->mSize += mState->mBatchSize;
+            mState->mBatches.back()->mSize += size;
+
+            n -= size;
         }
+        return r;
     }
 
 }

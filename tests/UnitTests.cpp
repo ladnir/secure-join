@@ -4,7 +4,6 @@
 #include "PaillierPerm_Test.h"
 #include "ComposedPerm_Test.h"
 #include "DarkMatterPrf_Test.h"
-#include "OleGenerator_Test.h"
 #include "GMW_Test.h"
 #include "RadixSort_Test.h"
 
@@ -30,9 +29,9 @@ namespace secJoin_Tests
 
             t.add("CorGenerator_Ot_Test                          ", CorGenerator_Ot_Test);
             t.add("CorGenerator_BinOle_Test                      ", CorGenerator_BinOle_Test);
-            t.add("Generator_BinOle_Test                         ", Generator_BinOle_Test);
-            t.add("Generator_Ot_Test                             ", Generator_Ot_Test);
-            t.add("Generator_ArithTriple_Test                    ", Generator_ArithTriple_Test);
+            //t.add("Generator_BinOle_Test                         ", Generator_BinOle_Test);
+            //t.add("Generator_Ot_Test                             ", Generator_Ot_Test);
+            //t.add("Generator_ArithTriple_Test                    ", Generator_ArithTriple_Test);
 
             t.add("Gmw_half_test                                 ", Gmw_half_test);
             t.add("Gmw_basic_test                                ", Gmw_basic_test);

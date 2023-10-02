@@ -51,8 +51,6 @@ namespace secJoin
             std::atomic_bool mStarted;
 
             void init(std::shared_ptr<State>& state);
-            //void init(u64 size, coproto::Socket& sock, oc::PRNG& prng, SendBase& base);
-            //void init(u64 size, coproto::Socket& sock, oc::PRNG& prng, RecvBase& base);
             macoro::task<> recvTask();
             macoro::task<> sendTask();
             macoro::task<> task();
@@ -86,6 +84,13 @@ namespace secJoin
             {
                 return mMult.size() * 128;
             }
+
+            void clear()
+            {
+                mBatch = {};
+                mMult = {};
+                mAdd = {};
+            }
         };
 
         struct Request
@@ -103,12 +108,25 @@ namespace secJoin
 
             std::shared_ptr<State> mState;
             u64 mIdx = 0;
-            std::vector<Offset> mOffsets;
+            std::vector<Offset> mBatches;
 
             macoro::task<> start();
             macoro::task<> get(BinOle& d);
 
-            macoro::task<> close() { throw RTE_LOC; }
+            u64 batchCount()
+            {
+                return mState->mBatches.size();
+            }
+
+            u64 size() const 
+            {
+                u64 s = 0;
+                for (auto b : mBatches)
+                    s += b.mSize;
+                return s;
+            }
+
+            void clear();
         };
 
         struct State
@@ -117,7 +135,7 @@ namespace secJoin
             State(const State&) = delete;
             State(State&&) = delete;
 
-            std::vector<std::shared_ptr<Batch>> mCorrelations;
+            std::vector<std::shared_ptr<Batch>> mBatches;
             std::vector<Request> mRequests;
 
             oc::PRNG mPrng;
@@ -146,6 +164,16 @@ namespace secJoin
             bool mock);
 
         Request request(u64 n);
+
+        bool started()
+        {
+            return mState && mState->mStarted;
+        }
+
+        bool initialized()
+        {
+            return mState.get();
+        }
 
     };
 
