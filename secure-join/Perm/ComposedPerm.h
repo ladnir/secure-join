@@ -6,6 +6,7 @@
 
 namespace secJoin
 {
+    extern int count;
     // A shared permutation where P0 holds pi_0 and P1 holds pi_1
     // such that the combined permutation is pi = pi_1 o pi_0.
     class ComposedPerm
@@ -15,7 +16,7 @@ namespace secJoin
         Perm mPerm;
         DLpnPermSender mSender;
         DLpnPermReceiver mReceiver;
-        bool mIsSecure = true;
+        bool mIsSecure = false;
 
         ComposedPerm() = default;
         ComposedPerm(const ComposedPerm&) = default;
@@ -86,6 +87,7 @@ namespace secJoin
             MC_BEGIN(macoro::task<>, this, &ole, &chl, &prng, n, bytesPer,
                 chl2 = coproto::Socket{}
             );
+            
             chl2 = chl.fork();
             if ((int)ole.mRole)
             {
@@ -130,6 +132,8 @@ namespace secJoin
                 soutperm = oc::Matrix<T>{}
             );
 
+            //if (mPartyIdx)
+            //    std::cout << "cperm " << ++count << " " << mPerm[0] << ":" << in.rows() << " " << in.cols() << std::endl;
             soutperm.resize(in.rows(), in.cols());
             if ((inv ^ bool(mPartyIdx)) == true)
             {

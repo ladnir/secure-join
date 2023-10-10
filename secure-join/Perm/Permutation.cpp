@@ -15,7 +15,7 @@ namespace secJoin
     }
 
 
-    // A.composeSwap(B) computes the permutation AoB
+    // A.compose(B) computes the permutation AoB
     Perm Perm::compose(const Perm& rhs) const
     {
         return apply(rhs.mPerm);

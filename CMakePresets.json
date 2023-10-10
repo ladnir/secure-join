@@ -43,6 +43,8 @@
         "SECUREJOIN_ENABLE_FAKE_GEN": true,
         "SECUREJOIN_ENABLE_BOOST": false,
         "SECUREJOIN_STATIC_WRAPPER": true,
+        "SECUREJOIN_ENABLE_PAILLIER": true,
+        "CMAKE_PREFIX_PATH": "C:\\Users\\peter\\repo\\vcpkg\\installed\\x64-windows\\debug;C:\\Users\\peter\\repo\\vcpkg\\installed\\x64-windows\\include;",
         "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}"
       },
       "vendor": {
@@ -70,6 +72,8 @@
         "SECUREJOIN_ENABLE_FAKE_GEN": true,
         "SECUREJOIN_ENABLE_BOOST": false,
         "SECUREJOIN_STATIC_WRAPPER": true,
+        "SECUREJOIN_ENABLE_PAILLIER": true,
+        "CMAKE_PREFIX_PATH": "C:\\Users\\peter\\repo\\vcpkg\\installed\\x64-windows",
         "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}"
       },
       "vendor": {

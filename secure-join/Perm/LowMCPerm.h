@@ -21,6 +21,7 @@
 #include <bitset>
 #include "cryptoTools/Common/Matrix.h"
 #include "coproto/coproto.h"
+#include <numeric>
 
 // using coproto::LocalAsyncSocket;
 

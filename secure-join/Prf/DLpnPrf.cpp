@@ -174,19 +174,25 @@ namespace secJoin
                 assert(x1.size() == x0.size());
                 assert(y1.size() == y0.size());
 
+                oc::block* x1d = x1.data();
+                oc::block* x0d = x0.data();
+                oc::block* y1d = y1.data();
+                oc::block* y0d = y0.data();
+                oc::block* z1d = z1.data();
+                oc::block* z0d = z0.data();
                 //auto x1x0 = x1 ^ x0;
                 //auto z1 = (1 ^ y0 ^ x0) * (x1x0 ^ y1);
                 //auto z0 = (1 ^ x1 ^ y1) * (x1x0 ^ y0);
                 //auto e = (x + y) % 3;
                 for (u64 i = 0; i < z0.size(); ++i)
                 {
-                    auto x1i = x1.data()[i];
-                    auto x0i = x0.data()[i];
-                    auto y1i = y1.data()[i];
-                    auto y0i = y0.data()[i];
+                    auto x1i = x1d[i];
+                    auto x0i = x0d[i];
+                    auto y1i = y1d[i];
+                    auto y0i = y0d[i];
                     auto x1x0 = x1i ^ x0i;
-                    z1[i] = (y0i ^ x0i).andnot_si128(x1x0 ^ y1i);
-                    z0[i] = (x1i ^ y1i).andnot_si128(x1x0 ^ y0i);
+                    z1d[i] = (y0i ^ x0i).andnot_si128(x1x0 ^ y1i);
+                    z0d[i] = (x1i ^ y1i).andnot_si128(x1x0 ^ y0i);
                 }
             }
 
@@ -677,25 +683,27 @@ namespace secJoin
                 memcpy(u1[0], mH[1]);
                 memcpy(u0[0 + 128], mH[0]);
                 memcpy(u1[0 + 128], mH[1]);
-
-                for (u64 i = 1; i < keySize; ++i)
+                for (u64 j = 0; j < 128; ++j)
                 {
-                    auto h0lsb = mH[(i - 1) * 2 + 0];
-                    auto h0msb = mH[(i - 1) * 2 + 1];
-                    auto h1lsb = mH[i * 2 + 0];
-                    auto h1msb = mH[i * 2 + 1];
 
-                    // h[i] += h[i-1];
-                    mod3Add(h1msb, h1lsb, h0msb, h0lsb, h1msb, h1lsb);
+                    for (u64 i = 1; i < keySize; ++i)
+                    {
+                        auto h0lsb = mH[(i - 1) * 2 + 0];
+                        auto h0msb = mH[(i - 1) * 2 + 1];
+                        auto h1lsb = mH[i * 2 + 0];
+                        auto h1msb = mH[i * 2 + 1];
 
-                    // u[i      ] = h[i]
-                    // u[i + 128] = h[i]
-                    memcpy(u0[i], h1lsb);
-                    memcpy(u1[i], h1msb);
-                    memcpy(u0[i + 128], h1lsb);
-                    memcpy(u1[i + 128], h1msb);
+                        // h[i] += h[i-1];
+                        mod3Add(h1msb, h1lsb, h0msb, h0lsb, h1msb, h1lsb);
+
+                        // u[i      ] = h[i]
+                        // u[i + 128] = h[i]
+                        memcpy(u0[i], h1lsb);
+                        memcpy(u1[i], h1msb);
+                        memcpy(u0[i + 128], h1lsb);
+                        memcpy(u1[i + 128], h1msb);
+                    }
                 }
-
                 mH = {};
             }
 

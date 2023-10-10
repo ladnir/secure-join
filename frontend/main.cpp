@@ -12,16 +12,8 @@ int main(int argc, char** argv)
 
     if (clp.isSet("bench"))
     {
-        if (clp.isSet("Dlpn"))
-        {
-            Dlpn_benchmark(clp);
-            return 0;
-        }
-        if (clp.isSet("CompressB"))
-        {
-            Dlpn_compressB_benchmark(clp);
-            return 0;
-        }
+        benchmark(clp);
+        return 0;
     }
     //clp.set("u");
     secJoin_Tests::Tests.runIf(clp);

@@ -82,81 +82,83 @@ namespace secJoin
                 MC_RETURN_VOID();
             }
 
-            if (mParent->mRole == Role::Sender)
-            {
-                if (rec.mOp.index() == 0)
-                {
-                    if (inplace)
-                    {
-                        delta = mPrng.get();
-                        MC_AWAIT(mSender->silentSendInplace(delta, mParent->mChunkSize, mPrng, mChl));
-                    }
-                    else
-                    {
-                        sendMsg.resize(mParent->mChunkSize);
-                        MC_AWAIT(mSender->silentSend(sendMsg, mPrng, mChl));
-                    }
-                    LOG("silentSend " + std::to_string(rec.mSequence));
-                    //A// std::cout << "send ot " << sendMsg[0][0] << " " << sendMsg[0][1] << std::endl;
+            throw RTE_LOC;
+            //if (mParent->mRole == Role::Sender)
+            //{
+            //    if (rec.mOp.index() == 0)
+            //    {
+            //        if (inplace)
+            //        {
+            //            delta = mPrng.get();
+            //            MC_AWAIT(mSender->silentSendInplace(delta, mParent->mChunkSize, mPrng, mChl));
+            //        }
+            //        else
+            //        {
+            //            sendMsg.resize(mParent->mChunkSize);
+            //            MC_AWAIT(mSender->silentSend(sendMsg, mPrng, mChl));
+            //        }
+            //        LOG("silentSend " + std::to_string(rec.mSequence));
+            //        //A// std::cout << "send ot " << sendMsg[0][0] << " " << sendMsg[0][1] << std::endl;
 
-                    rec.mOp.get<0>().mAdd.resize(mParent->mChunkSize / 128);
-                    rec.mOp.get<0>().mMult.resize(mParent->mChunkSize / 128);
-                    if (inplace)
-                        compressSender(mSender->mB, delta, rec.mOp.get<0>().mAdd, rec.mOp.get<0>().mMult);
-                    else
-                        compressSender(sendMsg, rec.mOp.get<0>().mAdd, rec.mOp.get<0>().mMult);
 
-                }
-                else if (rec.mOp.index() == 2)
-                {
-                    rec.mOp.get<2>().mMsg.resize(mParent->mChunkSize);
-                    MC_AWAIT(mSender->silentSend(rec.mOp.get<2>().mMsg, mPrng, mChl));
-                }
-                else
-                    std::terminate();
-            }
-            else
-            {
+            //        rec.mOp.get<0>().mAdd.resize(mParent->mChunkSize / 128);
+            //        rec.mOp.get<0>().mMult.resize(mParent->mChunkSize / 128);
+            //        if (inplace)
+            //            compressSender(mSender->mB, delta, rec.mOp.get<0>().mAdd, rec.mOp.get<0>().mMult);
+            //        else
+            //            compressSender(sendMsg, rec.mOp.get<0>().mAdd, rec.mOp.get<0>().mMult);
 
-                if (rec.mOp.index() == 0)
-                {
-                    if (inplace)
-                    {
-                        MC_AWAIT_TRY(ec, mRecver->silentReceiveInplace(mParent->mChunkSize, mPrng, mChl, oc::ChoiceBitPacking::True));
-                        CHECK;
+            //    }
+            //    else if (rec.mOp.index() == 2)
+            //    {
+            //        rec.mOp.get<2>().mMsg.resize(mParent->mChunkSize);
+            //        MC_AWAIT(mSender->silentSend(rec.mOp.get<2>().mMsg, mPrng, mChl));
+            //    }
+            //    else
+            //        std::terminate();
+            //}
+            //else
+            //{
 
-                        LOG("silentReceive " + std::to_string(rec.mSequence));
-                        rec.mOp.get<0>().mAdd.resize(mParent->mChunkSize / 128);
-                        rec.mOp.get<0>().mMult.resize(mParent->mChunkSize / 128);
-                        compressRecver(recvMsg, rec.mOp.get<0>().mAdd, rec.mOp.get<0>().mMult);
-                    }
-                    else
-                    {
+            //    if (rec.mOp.index() == 0)
+            //    {
+            //        if (inplace)
+            //        {
+            //            MC_AWAIT_TRY(ec, mRecver->silentReceiveInplace(mParent->mChunkSize, mPrng, mChl, oc::ChoiceBitPacking::True));
+            //            CHECK;
 
-                        recvMsg.resize(mParent->mChunkSize);
-                        bv.resize(mParent->mChunkSize);
-                        LOG("silentReceive begin " + std::to_string(rec.mSequence));
-                        MC_AWAIT_TRY(ec, mRecver->silentReceive(bv, recvMsg, mPrng, mChl));
-                        CHECK;
+            //            LOG("silentReceive " + std::to_string(rec.mSequence));
+            //            rec.mOp.get<0>().mAdd.resize(mParent->mChunkSize / 128);
+            //            rec.mOp.get<0>().mMult.resize(mParent->mChunkSize / 128);
+            //            compressRecver(recvMsg, rec.mOp.get<0>().mAdd, rec.mOp.get<0>().mMult);
+            //        }
+            //        else
+            //        {
 
-                        LOG("silentReceive done  " + std::to_string(rec.mSequence));
+            //            recvMsg.resize(mParent->mChunkSize);
+            //            bv.resize(mParent->mChunkSize);
+            //            LOG("silentReceive begin " + std::to_string(rec.mSequence));
+            //            MC_AWAIT_TRY(ec, mRecver->silentReceive(bv, recvMsg, mPrng, mChl));
+            //            CHECK;
 
-                        rec.mOp.get<0>().mAdd.resize(mParent->mChunkSize / 128);
-                        rec.mOp.get<0>().mMult.resize(mParent->mChunkSize / 128);
-                        compressRecver(bv, recvMsg, rec.mOp.get<0>().mAdd, rec.mOp.get<0>().mMult);
-                    }
-                }
-                else if (rec.mOp.index() == 1)
-                {
-                    rec.mOp.get<1>().mChoice.resize(mParent->mChunkSize);
-                    rec.mOp.get<1>().mMsg.resize(mParent->mChunkSize);
-                    MC_AWAIT_TRY(ec, mRecver->silentReceive(bv, recvMsg, mPrng, mChl));
-                    CHECK;
+            //            LOG("silentReceive done  " + std::to_string(rec.mSequence));
 
-                }
-                else
-                    std::terminate();
-            }
+            //            rec.mOp.get<0>().mAdd.resize(mParent->mChunkSize / 128);
+            //            rec.mOp.get<0>().mMult.resize(mParent->mChunkSize / 128);
+            //            compressRecver(bv, recvMsg, rec.mOp.get<0>().mAdd, rec.mOp.get<0>().mMult);
+            //        }
+            //    }
+            //    else if (rec.mOp.index() == 1)
+            //    {
+            //        rec.mOp.get<1>().mChoice.resize(mParent->mChunkSize);
+            //        rec.mOp.get<1>().mMsg.resize(mParent->mChunkSize);
+            //        MC_AWAIT_TRY(ec, mRecver->silentReceive(bv, recvMsg, mPrng, mChl));
+            //        CHECK;
+
+            //    }
+            //    else
+            //        std::terminate();
+            //}
 
             LOG("publish " + std::to_string(rec.mSequence));
             MC_AWAIT(mParent->mControlQueue->push({ Command::ChunkComplete{mIdx, std::move(rec)} }));
@@ -265,193 +267,194 @@ namespace secJoin
         pushIdxs.resize(mNumConcurrent);
 
         //popIdx = 0;
-        while (true)
-        {
-            MC_AWAIT_SET(cmd, mControlQueue->pop());
+        throw RTE_LOC;
+        //while (true)
+        //{
+        //    MC_AWAIT_SET(cmd, mControlQueue->pop());
 
-            if (cmd.mOp.index() == cmd.mOp.index_of<Command::ChunkComplete>())
-            {
+        //    if (cmd.mOp.index() == cmd.mOp.index_of<Command::ChunkComplete>())
+        //    {
 
-                wid = cmd.mOp.get<Command::ChunkComplete>().mWorkerId;
-                sid = cmd.mOp.get<Command::ChunkComplete>().mChunk.mSessionID;
-                chunk = std::move(cmd.mOp.get<Command::ChunkComplete>().mChunk);
-                LOG("control: ChunkComplete " + str(sid));
+        //        wid = cmd.mOp.get<Command::ChunkComplete>().mWorkerId;
+        //        sid = cmd.mOp.get<Command::ChunkComplete>().mChunk.mSessionID;
+        //        chunk = std::move(cmd.mOp.get<Command::ChunkComplete>().mChunk);
+        //        LOG("control: ChunkComplete " + str(sid));
 
-                if (sessions.find(sid) != sessions.end())
-                {
-                    curReq = &sessions[sid];
-                    assert(chunk.mSequence != ~0ull);
-                    //sessions[sid].publish(std::move(cmd.mOp.get<Command::ChunkComplete>().mChunk));
-                    if (curReq->mOp.index() == 0)
-                    {
-                        MC_AWAIT(curReq->mOp.get<0>().mQueue->push({ 
-                            chunk.mSequence,
-                            std::move(chunk.mOp.get<0>()) }));
-                    }
-                    else if (curReq->mOp.index() == 1)
-                    {
-                        MC_AWAIT(curReq->mOp.get<1>().mQueue->push({
-                            chunk.mSequence,
-                            std::move(chunk.mOp.get<1>()) }));
-                    }
-                    else if (curReq->mOp.index() == 2)
-                    {
-                        MC_AWAIT(curReq->mOp.get<2>().mQueue->push({
-                            chunk.mSequence,
-                            std::move(chunk.mOp.get<2>()) }));
-                    }
-                    else if (curReq->mOp.index() == 3)
-                    {
-                        MC_AWAIT(curReq->mOp.get<3>().mQueue->push({
-                            chunk.mSequence,
-                            std::move(chunk.mOp.get<3>()) }));
-                    }
-                    else
-                        std::terminate();
+        //        if (sessions.find(sid) != sessions.end())
+        //        {
+        //            curReq = &sessions[sid];
+        //            assert(chunk.mSequence != ~0ull);
+        //            //sessions[sid].publish(std::move(cmd.mOp.get<Command::ChunkComplete>().mChunk));
+        //            if (curReq->mOp.index() == 0)
+        //            {
+        //                MC_AWAIT(curReq->mOp.get<0>().mQueue->push({ 
+        //                    chunk.mSequence,
+        //                    std::move(chunk.mOp.get<0>()) }));
+        //            }
+        //            else if (curReq->mOp.index() == 1)
+        //            {
+        //                MC_AWAIT(curReq->mOp.get<1>().mQueue->push({
+        //                    chunk.mSequence,
+        //                    std::move(chunk.mOp.get<1>()) }));
+        //            }
+        //            else if (curReq->mOp.index() == 2)
+        //            {
+        //                MC_AWAIT(curReq->mOp.get<2>().mQueue->push({
+        //                    chunk.mSequence,
+        //                    std::move(chunk.mOp.get<2>()) }));
+        //            }
+        //            else if (curReq->mOp.index() == 3)
+        //            {
+        //                MC_AWAIT(curReq->mOp.get<3>().mQueue->push({
+        //                    chunk.mSequence,
+        //                    std::move(chunk.mOp.get<3>()) }));
+        //            }
+        //            else
+        //                std::terminate();
 
-                    sessions.erase(sid);
-                }
-                else
-                {
-                    if (completed.find(sid) != completed.end())
-                    {
-                        std::cout << "session id already completed. "<< sid << " " << LOCATION << std::endl;
-                        std::terminate();
-                    }
-                    completed[sid] = std::move(cmd.mOp.get<Command::ChunkComplete>().mChunk);
-                }
+        //            sessions.erase(sid);
+        //        }
+        //        else
+        //        {
+        //            if (completed.find(sid) != completed.end())
+        //            {
+        //                std::cout << "session id already completed. "<< sid << " " << LOCATION << std::endl;
+        //                std::terminate();
+        //            }
+        //            completed[sid] = std::move(cmd.mOp.get<Command::ChunkComplete>().mChunk);
+        //        }
 
-                //cmd.mOp.get<Command::ChunkComplete>().mChunk
+        //        //cmd.mOp.get<Command::ChunkComplete>().mChunk
 
-                if (mRole == Role::Sender)
-                {
-                    if (queue.size())
-                    {
-                        //sid = queue.front();
-                        //queue.splice(queue.end(), queue, queue.begin());
-                        //getBaseOts(chunk, queue.front());
+        //        if (mRole == Role::Sender)
+        //        {
+        //            if (queue.size())
+        //            {
+        //                //sid = queue.front();
+        //                //queue.splice(queue.end(), queue, queue.begin());
+        //                //getBaseOts(chunk, queue.front());
 
-                        //A//  std::cout << "\n\npush chunk " << i << std::endl;
-                        LOG("control: push chunk " + std::to_string(chunk.mSequence) + " " + str(chunk.mSessionID));
-                        MC_AWAIT(mGens[wid].mInQueue->push(std::move(chunk)));
-                    }
-                    else
-                    {
-                        idle.push_back(wid);
-                    }
-                }
-            }
-            else if (cmd.mOp.index() == cmd.mOp.index_of<Command::Stop>())
-            {
-                LOG("control: stop request");
-                mStopRequested = true;
-                for (i = 0; i < mNumConcurrent; ++i)
-                {
-                    chunk.mSequence = -1;
-                    MC_AWAIT(mGens[i].mInQueue->push(std::move(chunk)));
-                    LOG("control: gen stop sent " + std::to_string(i));
+        //                //A//  std::cout << "\n\npush chunk " << i << std::endl;
+        //                LOG("control: push chunk " + std::to_string(chunk.mSequence) + " " + str(chunk.mSessionID));
+        //                MC_AWAIT(mGens[wid].mInQueue->push(std::move(chunk)));
+        //            }
+        //            else
+        //            {
+        //                idle.push_back(wid);
+        //            }
+        //        }
+        //    }
+        //    else if (cmd.mOp.index() == cmd.mOp.index_of<Command::Stop>())
+        //    {
+        //        LOG("control: stop request");
+        //        mStopRequested = true;
+        //        for (i = 0; i < mNumConcurrent; ++i)
+        //        {
+        //            chunk.mSequence = -1;
+        //            MC_AWAIT(mGens[i].mInQueue->push(std::move(chunk)));
+        //            LOG("control: gen stop sent " + std::to_string(i));
 
-                }
+        //        }
 
-                for (i = 0; i < mNumConcurrent; ++i)
-                {
-                    MC_AWAIT(mGens[i].mTask);
-                    LOG("control: gen stopded " + std::to_string(i));
-                }
-            }
-            else if (cmd.mOp.index() == cmd.mOp.index_of<Command::GenStopped>())
-            {
-                //A// std::cout << "gen " << cmd.mOp.get<Command::GenStopped>().mIdx << " stopped" << std::endl;
-                LOG("control: gen stopped " + std::to_string(cmd.mOp.get<Command::GenStopped>().mIdx));
+        //        for (i = 0; i < mNumConcurrent; ++i)
+        //        {
+        //            MC_AWAIT(mGens[i].mTask);
+        //            LOG("control: gen stopded " + std::to_string(i));
+        //        }
+        //    }
+        //    else if (cmd.mOp.index() == cmd.mOp.index_of<Command::GenStopped>())
+        //    {
+        //        //A// std::cout << "gen " << cmd.mOp.get<Command::GenStopped>().mIdx << " stopped" << std::endl;
+        //        LOG("control: gen stopped " + std::to_string(cmd.mOp.get<Command::GenStopped>().mIdx));
 
-                MC_AWAIT(mGens[cmd.mOp.get<Command::GenStopped>().mIdx].mTask);
+        //        MC_AWAIT(mGens[cmd.mOp.get<Command::GenStopped>().mIdx].mTask);
 
-                if (--numTasks == 0)
-                {
-                    //A// std::cout << "control stopped" << std::endl;
-                    LOG("control: stopped ");
-                    MC_RETURN_VOID();
-                }
-            }
-            else if (cmd.mOp.index() == cmd.mOp.index_of<CorRequest>())
-            {
-                curReq = &cmd.mOp.get<3>();
-                sid = curReq->mSessionID;
-                assert(curReq->mSequence != ~0ull);
-                if (mRole == Role::Sender)
-                {
-                    sessions.emplace(sid, std::move(*curReq));
+        //        if (--numTasks == 0)
+        //        {
+        //            //A// std::cout << "control stopped" << std::endl;
+        //            LOG("control: stopped ");
+        //            MC_RETURN_VOID();
+        //        }
+        //    }
+        //    else if (cmd.mOp.index() == cmd.mOp.index_of<CorRequest>())
+        //    {
+        //        curReq = &cmd.mOp.get<3>();
+        //        sid = curReq->mSessionID;
+        //        assert(curReq->mSequence != ~0ull);
+        //        if (mRole == Role::Sender)
+        //        {
+        //            sessions.emplace(sid, std::move(*curReq));
 
-                    if (idle.size())
-                    {
-                        wid = idle.back();
-                        idle.pop_back();
+        //            if (idle.size())
+        //            {
+        //                wid = idle.back();
+        //                idle.pop_back();
 
-                        LOG("control: push chunk " + std::to_string(curReq->mSequence) + " " + str(curReq->mSessionID));
-                        MC_AWAIT(mGens[wid].mInQueue->push(std::move(*curReq)));
-                    }
-                    else
-                    {
-                        queue.push_back(std::move(*curReq));
-                    }
-                }
-                else
-                {
-                    if (completed.find(sid) != completed.end())
-                    {
-                        chunk = std::move(completed.find(sid)->second);
-                        if (curReq->mOp.index() != chunk.mOp.index())
-                        {
-                            std::cout << "mixed correlation type for session id. " << LOCATION << std::endl;
-                            std::terminate();
-                        }
-                        if (curReq->mN != chunk.mN)
-                        {
-                            std::cout << "mixed correlation size for session id. " << LOCATION << std::endl;
-                            std::terminate();
-                        }
-                        assert(chunk.mSequence != ~0ull);
+        //                LOG("control: push chunk " + std::to_string(curReq->mSequence) + " " + str(curReq->mSessionID));
+        //                MC_AWAIT(mGens[wid].mInQueue->push(std::move(*curReq)));
+        //            }
+        //            else
+        //            {
+        //                queue.push_back(std::move(*curReq));
+        //            }
+        //        }
+        //        else
+        //        {
+        //            if (completed.find(sid) != completed.end())
+        //            {
+        //                chunk = std::move(completed.find(sid)->second);
+        //                if (curReq->mOp.index() != chunk.mOp.index())
+        //                {
+        //                    std::cout << "mixed correlation type for session id. " << LOCATION << std::endl;
+        //                    std::terminate();
+        //                }
+        //                if (curReq->mN != chunk.mN)
+        //                {
+        //                    std::cout << "mixed correlation size for session id. " << LOCATION << std::endl;
+        //                    std::terminate();
+        //                }
+        //                assert(chunk.mSequence != ~0ull);
 
-                        if (curReq->mOp.index() == 0)
-                        {
-                            MC_AWAIT(curReq->mOp.get<0>().mQueue->push({
-                                chunk.mSequence,
-                                std::move(chunk.mOp.get<0>()) }));
-                        }
-                        else if (curReq->mOp.index() == 1)
-                        {
-                            MC_AWAIT(curReq->mOp.get<1>().mQueue->push({
-                                chunk.mSequence,
-                                std::move(chunk.mOp.get<1>()) }));
-                        }
-                        else if (curReq->mOp.index() == 2)
-                        {
-                            MC_AWAIT(curReq->mOp.get<2>().mQueue->push({
-                                chunk.mSequence,
-                                std::move(chunk.mOp.get<2>()) }));
-                        }
-                        else if (curReq->mOp.index() == 3)
-                        {
-                            MC_AWAIT(curReq->mOp.get<3>().mQueue->push({
-                                chunk.mSequence,
-                                std::move(chunk.mOp.get<3>()) }));
-                        }
-                        else
-                            std::terminate();
+        //                if (curReq->mOp.index() == 0)
+        //                {
+        //                    MC_AWAIT(curReq->mOp.get<0>().mQueue->push({
+        //                        chunk.mSequence,
+        //                        std::move(chunk.mOp.get<0>()) }));
+        //                }
+        //                else if (curReq->mOp.index() == 1)
+        //                {
+        //                    MC_AWAIT(curReq->mOp.get<1>().mQueue->push({
+        //                        chunk.mSequence,
+        //                        std::move(chunk.mOp.get<1>()) }));
+        //                }
+        //                else if (curReq->mOp.index() == 2)
+        //                {
+        //                    MC_AWAIT(curReq->mOp.get<2>().mQueue->push({
+        //                        chunk.mSequence,
+        //                        std::move(chunk.mOp.get<2>()) }));
+        //                }
+        //                else if (curReq->mOp.index() == 3)
+        //                {
+        //                    MC_AWAIT(curReq->mOp.get<3>().mQueue->push({
+        //                        chunk.mSequence,
+        //                        std::move(chunk.mOp.get<3>()) }));
+        //                }
+        //                else
+        //                    std::terminate();
 
-                        completed.erase(sid);
-                    }
-                    else
-                    {
-                        sessions.emplace(sid, std::move(*curReq));
-                    }
-                }
-            }
-            else
-            {
-                throw RTE_LOC;
-            }
-        }
+        //                completed.erase(sid);
+        //            }
+        //            else
+        //            {
+        //                sessions.emplace(sid, std::move(*curReq));
+        //            }
+        //        }
+        //    }
+        //    else
+        //    {
+        //        throw RTE_LOC;
+        //    }
+        //}
 
         MC_END();
     }
