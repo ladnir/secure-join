@@ -39,7 +39,7 @@ namespace secJoin
     //    Request2(const Request2&) = delete;
     //    Request2(Request2&& o) noexcept
     //        , mSize(std::exchange(o.mSize, 0))
-    //        , mIdx(std::exchange(o.mIdx, 0))
+    //        , mNextBatchIdx(std::exchange(o.mNextBatchIdx, 0))
     //        , mCorrelations(std::move(o.mCorrelations))
     //    {}
 
@@ -47,7 +47,7 @@ namespace secJoin
     //    Request2& operator=(Request2&& o)
     //    {
     //        mSize = std::exchange(o.mSize, 0);
-    //        mIdx = std::exchange(o.mIdx, 0);
+    //        mNextBatchIdx = std::exchange(o.mNextBatchIdx, 0);
     //        mCorrelations = std::move(o.mCorrelations);
     //        return *this;
     //    }
@@ -55,26 +55,26 @@ namespace secJoin
     //    using value_type = T;
     //    using TGen = typename value_type::gen;
 
-    //    u64 mSize = 0, mIdx = 0;
+    //    u64 mSize = 0, mNextBatchIdx = 0;
     //    std::vector<std::unique_ptr<TGen>> mCorrelations;
     //    //std::unique_ptr<macoro::mpsc::channel<std::pair<u64, T>>> mChl;
 
     //    auto get(T& d)
     //    {
 
-    //        if (mIdx >= mCorrelations.size())
+    //        if (mNextBatchIdx >= mCorrelations.size())
     //            throw std::runtime_error("Out of correlations. " LOCATION);
 
-    //        return mCorrelations[mIdx].get(d);
+    //        return mCorrelations[mNextBatchIdx].get(d);
     //        //MC_BEGIN(macoro::task<T>, this,
     //        //    t = std::pair<u64, T>{}
     //        //);
 
-    //        //if (mIdx >= mCorrelations.size())
+    //        //if (mNextBatchIdx >= mCorrelations.size())
     //        //    throw std::runtime_error("Out of correlations. " LOCATION);
 
 
-    //        ////while (!mCorrelations[mIdx])
+    //        ////while (!mCorrelations[mNextBatchIdx])
     //        ////{
     //        ////    MC_AWAIT_SET(t, mChl->pop());
     //        ////    mCorrelations[t.first] = std::make_unique<T>(std::move(t.second));
@@ -84,7 +84,7 @@ namespace secJoin
     //        ////    //    mRemReq.pop_back();
     //        ////    //}
     //        ////}
-    //        ////MC_RETURN(std::move(*mCorrelations[mIdx++]));
+    //        ////MC_RETURN(std::move(*mCorrelations[mNextBatchIdx++]));
     //        //MC_END();
     //    }
     //};

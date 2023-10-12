@@ -20,69 +20,136 @@ namespace secJoin
     namespace Corrlation
     {
 
-        struct State;
+        struct GenState;
         struct RequestState;
 
         struct Batch
         {
             Batch() = default;
             Batch(Batch&&) { throw RTE_LOC; };
-            oc::SilentOtExtReceiver mReceiver;
-            oc::SilentOtExtSender mSender;
 
+            struct SendBatch
+            {
+                oc::SilentOtExtSender mSender;
+                oc::AlignedUnVector<std::array<oc::block, 2>> mMsg2;
+
+                macoro::task<> sendTask(oc::PRNG& prng, oc::Socket& sock);
+                void mock(u64 batchIdx);
+            };
+
+            struct RecvBatch
+            {
+                oc::SilentOtExtReceiver mReceiver;
+                oc::AlignedUnVector<oc::block> mMsg;
+                oc::BitVector mChoice;
+
+                macoro::task<> recvTask(oc::PRNG& prng, oc::Socket& sock);
+                void mock(u64 batchIdx);
+            };
+
+            macoro::variant<SendBatch, RecvBatch> mSendRecv;
+
+            // The size of the batch
             u64 mSize = 0;
-            oc::AlignedUnVector<oc::block> mMsg;
-            oc::AlignedUnVector<std::array<oc::block, 2>> mMsg2;
-            oc::BitVector mChoice;
 
-            macoro::eager_task<> mTask;
-            macoro::task<> mT;
-            macoro::async_manual_reset_event mHaveBase, mDone;
+            // the index of the batch
+            u64 mIndex = 0;
 
+            // true if the correlation is ready to be consumed.
+            macoro::async_manual_reset_event mCorReady;
+
+            // true once the base OTs have been set and 
+            // ready for the main phase to begin.
+            macoro::async_manual_reset_event mHaveBase;
+
+            // The socket that this batch runs on
             coproto::Socket mSock;
-            oc::PRNG mPrng;
-            std::shared_ptr<State> mState;
 
+            // randomness source.
+            oc::PRNG mPrng;
+
+            // The common state
+            std::shared_ptr<GenState> mState;
+
+            // true if the task for this batch has been started.
+            // When a task is split between one or more requests,
+            // multiple requests might try to start it. This flag 
+            // decides who is first.
             std::atomic_bool mStarted;
 
+            // Fork the socket held in the state.
+            void init(bool sender, std::shared_ptr<GenState>& state);
 
-            void init(std::shared_ptr<State>& state);
+            // mark this batch as final. At this point no more correlations 
+            // can be added to the batch. The task mT is created at this point.
+            //void finalize();
 
-            void finalize();
-            macoro::task<> recvTask();
-            macoro::task<> sendTask();
-            macoro::task<> task();
+            // Get the task associated with this batch.
+            macoro::task<> getTask();
 
-            void start();
+            // start the task associated with this batch.
+            //void start();
+
+            bool sender() { return mSendRecv.index() == 0; }
+
+            void mock(u64 batchIdx);
+
         };
 
 
-        struct BatchOffset { std::shared_ptr<Batch> mBatch; u64 mBegin = 0, mSize = 0; };
+        struct BatchOffset {
+
+            // The batch being referenced.
+            std::shared_ptr<Batch> mBatch;
+
+            // the begin index of this correlation within the referenced batch.
+            u64 mBegin = 0;
+
+            // the size of the correlation with respect to the referenced batch.
+            u64 mSize = 0;
+        };
 
         struct RequestState : std::enable_shared_from_this<RequestState>
         {
+            // is the OT sender
+            bool mSender = false;
+
             // the total size of the request
             u64 mSize = 0;
 
+            // the index of this request.
+            u64 mReqIndex = 0;
+
             // the index of the next batch in the get() call.
-            u64 mIdx = 0;
+            u64 mNextBatchIdx = 0;
+
+            // a flag encoding if the request has been started.
+            std::atomic_bool mStarted = false;
 
             // Where in the i'th batch should we take the correlations.
             std::vector<BatchOffset> mBatches;
 
             // The core state.
-            std::shared_ptr<State> mState;
+            std::shared_ptr<GenState> mGenState;
 
             // set by the batch when it completes.
             macoro::async_manual_reset_event mDone;
 
+            // Return a task that starts the preprocessing.
+            macoro::task<> startReq();
 
-            macoro::task<> start();
+            // returns the number of batches this request has.
             u64 batchCount();
+
+            // returns the total number of correlations requested.
             u64 size();
+
+            // clears the state associated with the request.
             void clear();
         };
 
+
+        // A receiver OT correlation.
         struct OtRecv
         {
 
@@ -92,19 +159,28 @@ namespace secJoin
             OtRecv(OtRecv&&) = default;
             OtRecv& operator=(OtRecv&&) = default;
 
+            // The request associated with this correlation.
             std::shared_ptr<RequestState> mRequest;
+
+            // The choice bits 
             oc::BitVector mChoice;
+
+            // the OT messages
             oc::span<oc::block> mMsg;
 
+            // the number of correlations this chunk has.
             u64 size() const { return mMsg.size(); }
 
+            // The choice bits 
             oc::BitVector& choice() { return mChoice; }
 
+            // the OT messages
             oc::span<oc::block> msg() { return mMsg; }
         };
 
 
 
+        // A sender OT correlation.
         struct OtSend
         {
 
@@ -114,7 +190,10 @@ namespace secJoin
             OtSend(OtSend&&) = default;
             OtSend& operator=(OtSend&&) = default;
 
+            // The request associated with this correlation.
             std::shared_ptr<RequestState> mRequest;
+
+            // the OT messages
             oc::span<std::array<oc::block, 2>> mMsg;
 
             u64 size() const
@@ -126,43 +205,14 @@ namespace secJoin
         };
 
 
-        struct SendBaseRequest
+        struct GenState : std::enable_shared_from_this<GenState>
         {
-            SendBaseRequest(span<std::array<oc::block, 2>> m, macoro::async_manual_reset_event& d)
-                : mMsg(m)
-                , mDone(d)
-            {}
-            span<std::array<oc::block, 2>> mMsg;
-            macoro::async_manual_reset_event& mDone;
-        };
-
-        struct RecvBaseRequest
-        {
-            RecvBaseRequest(
-                span<oc::block> m,
-                oc::BitVector&& c,
-                macoro::async_manual_reset_event& d
-            )
-                : mMsg(m)
-                , mChoice(std::move(c))
-                , mDone(d)
-            {}
-            span<oc::block> mMsg;
-            oc::BitVector mChoice;
-            macoro::async_manual_reset_event& mDone;
-        };
-
-
-        struct State : std::enable_shared_from_this<State>
-        {
-            State() = default;
-            State(const State&) = delete;
-            State(State&&) = delete;
+            GenState() = default;
+            GenState(const GenState&) = delete;
+            GenState(GenState&&) = delete;
 
             oc::SoftSpokenShOtSender<> mSendBase;
             oc::SoftSpokenShOtReceiver<> mRecvBase;
-            std::vector<SendBaseRequest> mSendRequest;
-            std::vector<RecvBaseRequest> mRecvRequest;
 
             std::vector<std::shared_ptr<Batch>> mBatches;
             std::vector<std::shared_ptr<RequestState>> mRequests;
@@ -170,17 +220,15 @@ namespace secJoin
             oc::PRNG mPrng;
             coproto::Socket mSock;
             u64 mBatchSize = 0;
-            std::atomic<bool> mStarted = false;
+            std::atomic<bool> mBaseOtsStarted = false;
             bool mMock = false;
 
-            macoro::mpsc::channel<std::shared_ptr<RequestState>> mChannel;
+            u64 mPartyIdx = 0;
 
             void requestBase(span<std::array<oc::block, 2>> msg, macoro::async_manual_reset_event& done);
             void requestBase(span<oc::block> msg, oc::BitVector&& choice, macoro::async_manual_reset_event& done);
 
-            macoro::task<> startRequest(std::shared_ptr<RequestState>& r);
-
-            macoro::task<> start();
+            macoro::task<> startBaseOts();
             void set(SendBase& b);
             void set(RecvBase& b);
 
@@ -189,7 +237,7 @@ namespace secJoin
 
         struct OtGenerator
         {
-            std::shared_ptr<State> mState;
+            std::shared_ptr<GenState> mGenState;
 
 
             template<typename Base>
@@ -198,27 +246,28 @@ namespace secJoin
                 coproto::Socket& sock,
                 oc::PRNG& prng,
                 Base& base,
+                u64 partyIdx,
                 bool mock)
             {
-                mState = std::make_shared<State>();
-                mState->mRole = role;
-                mState->mBatchSize = batchSize;
-                mState->mSock = sock;
-                mState->mPrng = prng.fork();
-                mState->set(base);
-                mState->mMock = mock;
+                mGenState = std::make_shared<GenState>();
+                mGenState->mBatchSize = batchSize;
+                mGenState->mSock = sock;
+                mGenState->mPrng = prng.fork();
+                mGenState->set(base);
+                mGenState->mPartyIdx = partyIdx;
+                mGenState->mMock = mock;
             }
 
-            std::shared_ptr<RequestState> request(u64 n);
+            std::shared_ptr<RequestState> request(bool sender, u64 n);
 
             bool started()
             {
-                return mState && mState->mStarted;
+                return mGenState && mGenState->mBaseOtsStarted;
             }
 
             bool initialized()
             {
-                return mState.get();
+                return mGenState.get();
             }
 
 
@@ -227,7 +276,7 @@ namespace secJoin
         struct OtRecvGenerator : public OtGenerator
         {
 
-            struct Request 
+            struct Request
             {
                 Request() = default;
                 Request(const Request&) = delete;
@@ -235,17 +284,25 @@ namespace secJoin
 
                 Request& operator=(Request&&) = default;
 
-                std::shared_ptr<RequestState> mState;
+                std::shared_ptr<RequestState> mReqState;
 
                 macoro::task<> get(OtRecv& d);
 
-                macoro::task<> start() { mState->start(); }
+                macoro::task<> start() { 
+                    if(mReqState->mStarted.exchange(true) == false)
+                        return mReqState->startReq();
+                    else
+                    {
+                        MC_BEGIN(macoro::task<>);
+                        MC_END();
+                    }
+                }
 
-                u64 batchCount() { mState->batchCount(); }
+                u64 batchCount() { return mReqState->batchCount(); }
 
-                u64 size() { mState->mSize; }
+                u64 size() { return mReqState->mSize; }
 
-                void clear() { mState->clear(); }
+                void clear() { mReqState->clear(); }
             };
 
             void init(
@@ -253,12 +310,13 @@ namespace secJoin
                 coproto::Socket& sock,
                 oc::PRNG& prng,
                 SendBase& base,
+                u64 partyIdx,
                 bool mock)
             {
-                OtGenerator::init(batchSize, sock, prng, base, mock);
+                OtGenerator::init(batchSize, sock, prng, base,partyIdx, mock);
             }
 
-            Request request(u64 n) { return Request{ OtGenerator::request(n) }; }
+            Request request(u64 n) { return Request{ OtGenerator::request(false, n) }; }
 
         };
 
@@ -272,17 +330,25 @@ namespace secJoin
                 Request(Request&&) = default;
                 Request& operator=(Request&&) = default;
 
-                std::shared_ptr<RequestState> mState;
+                std::shared_ptr<RequestState> mReqState;
 
                 macoro::task<> get(OtSend& d);
 
-                macoro::task<> start() { mState->start(); }
+                macoro::task<> start() { 
+                    if (mReqState->mStarted.exchange(true) == false)
+                        return mReqState->startReq();
+                    else
+                    {
+                        MC_BEGIN(macoro::task<>);
+                        MC_END();
+                    }
+                }
 
-                u64 batchCount() { mState->batchCount(); }
+                u64 batchCount() { return mReqState->batchCount(); }
 
-                u64 size() { mState->mSize; }
+                u64 size() { return mReqState->mSize; }
 
-                void clear() { mState->clear(); }
+                void clear() { mReqState->clear(); }
             };
 
             void init(
@@ -290,18 +356,20 @@ namespace secJoin
                 coproto::Socket& sock,
                 oc::PRNG& prng,
                 RecvBase& base,
+                u64 partyIdx,
                 bool mock)
             {
-                OtGenerator::init(batchSize, sock, prng, base, mock);
+                OtGenerator::init(batchSize, sock, prng, base, partyIdx, mock);
             }
 
-            Request request(u64 n) { return Request{ OtGenerator::request(n) }; }
+            Request request(u64 n) { return Request{ OtGenerator::request(true, n) }; }
         };
 
     }
 
 
-
+    using OtRecvGenerator = Corrlation::OtRecvGenerator;
+    using OtSendGenerator = Corrlation::OtSendGenerator;
     using OtRecvRequest = Corrlation::OtRecvGenerator::Request;
     using OtSendRequest = Corrlation::OtSendGenerator::Request;
     using OtRecv = Corrlation::OtRecv;

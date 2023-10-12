@@ -324,7 +324,7 @@ namespace secJoin
                 std::copy(cc.begin(), cc.end(), c.begin() + j);
                 std::copy(dd.begin(), dd.end(), d.begin() + j);
 
-                //if (mIdx == 0)
+                //if (mNextBatchIdx == 0)
                 //{
                 //    std::cout << "0 a " << a[j] << " * c = b " << b[j] << " ^ d" << std::endl;
                 //    std::cout << "0 a * c " << c[j] << " = b ^ d " << d[j] << std::endl;

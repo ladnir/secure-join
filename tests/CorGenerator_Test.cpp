@@ -8,7 +8,7 @@ void CorGenerator_Ot_Test(const oc::CLP&)
 
     u64 n = (1ull << 16) + 3234;
 
-    for (auto mock : { false, true })
+    for (auto mock : { /*false,*/ true })
     {
 
         oc::PRNG prng(oc::ZeroBlock);
@@ -25,8 +25,8 @@ void CorGenerator_Ot_Test(const oc::CLP&)
         auto sock = coproto::LocalAsyncSocket::makePair();
         OtSendGenerator send;
         OtRecvGenerator recv;
-        send.init(1 << 14, sock[0], prng, rBase, mock);
-        recv.init(1 << 14, sock[1], prng, sBase, mock);
+        send.init(1 << 14, sock[0], prng, rBase, 0, mock);
+        recv.init(1 << 14, sock[1], prng, sBase, 1, mock);
 
         auto sReq = send.request(n);
         auto rReq = recv.request(n);

@@ -42,6 +42,7 @@
         "SECUREJOIN_ENABLE_ASAN": false,
         "SECUREJOIN_ENABLE_FAKE_GEN": true,
         "SECUREJOIN_ENABLE_BOOST": false,
+        "SECUREJOIN_ENABLE_PAILLIER": false,
         "SECUREJOIN_STATIC_WRAPPER": true,
         "SECUREJOIN_DEV": true,
         "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}"
@@ -70,6 +71,7 @@
         "SECUREJOIN_ENABLE_ASAN": false,
         "SECUREJOIN_ENABLE_FAKE_GEN": true,
         "SECUREJOIN_ENABLE_BOOST": false,
+        "SECUREJOIN_ENABLE_PAILLIER": false,
         "SECUREJOIN_STATIC_WRAPPER": true,
         "SECUREJOIN_DEV": true,
         "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}"

@@ -10,12 +10,12 @@ namespace secJoin
         std::cout << str << std::endl;
     }
 
-    State* initState(std::string& csvPath, std::string& visaMetaDataPath, std::string& clientMetaDataPath,
+    GenState* initState(std::string& csvPath, std::string& visaMetaDataPath, std::string& clientMetaDataPath,
         std::string& visaJoinCols, std::string& clientJoinCols, std::string& selectVisaCols,
         std::string& selectClientCols, bool isUnique,
         bool verbose, bool mock)
     {
-        State* cState = new State;
+        GenState* cState = new GenState;
         oc::u64 lRowCount = 0, rRowCount = 0;
 
 
@@ -72,7 +72,7 @@ namespace secJoin
     }
 
 
-    std::vector<oc::u8> runJoin(State* cState, std::vector<oc::u8>& buff)
+    std::vector<oc::u8> runJoin(GenState* cState, std::vector<oc::u8>& buff)
     {
         cState->mSock.processInbound(buff);
 
@@ -89,18 +89,18 @@ namespace secJoin
 
     }
 
-    void releaseState(State* state)
+    void releaseState(GenState* state)
     {
         delete state;
     }
 
-    bool isProtocolReady(State* cState)
+    bool isProtocolReady(GenState* cState)
     {
         return cState->mProtocol.is_ready();
 
     }
 
-    void getOtherShare(State* cState, bool isUnique)
+    void getOtherShare(GenState* cState, bool isUnique)
     {
         // Assuming Visa always receives the client's share
         if (isUnique)
@@ -115,7 +115,7 @@ namespace secJoin
         }
     }
 
-    void getJoinTable(State* cState, std::string csvPath, std::string metaDataPath, bool isUnique)
+    void getJoinTable(GenState* cState, std::string csvPath, std::string metaDataPath, bool isUnique)
     {
         writeFileInfo(metaDataPath, cState->mOutTable);
         writeFileData(csvPath, cState->mOutTable);

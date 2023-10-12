@@ -9,13 +9,14 @@
 
 #include "secure-join/config.h"
 #include "secure-join/Defines.h"
-
 #include "secure-join/GMW/Circuit.h"
-#include <list>
-#include <cryptoTools/Network/Channel.h>
-#include <cryptoTools/Common/Matrix.h>
 #include "secure-join/CorGenerator/CorGenerator.h"
 #include "secure-join/Util/Matrix.h"
+
+#include <cryptoTools/Network/Channel.h>
+#include <cryptoTools/Common/Matrix.h>
+#include <cryptoTools/Common/Timer.h>
+#include <list>
 
 namespace secJoin
 {

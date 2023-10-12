@@ -51,10 +51,6 @@ namespace secJoin
             }
             for (; i < m; ++i)
             {
-                //oc::block m0 = std::array<u32, 4>{i, i, i, i};// prng.get();
-                //oc::block m1 = std::array<u32, 4>{i, i, i, i};//prng.get();
-                //oc::block a0 = std::array<u32, 4>{0, i, 0, i};//prng.get();
-                //auto a1 = std::array<u32, 4>{i, 0, i, 0};;// m0& m1^ a0;
                 mult[i] = oc::block(i, i);
                 add[i] = oc::block(0, i);
             }
@@ -97,7 +93,7 @@ namespace secJoin
         }
     }
 
-    void BinOleGenerator::Batch::init(std::shared_ptr<State>& state)
+    void BinOleGenerator::Batch::init(std::shared_ptr<GenState>& state)
     {
         mState = state;
         mSock = state->mSock.fork();
@@ -106,58 +102,42 @@ namespace secJoin
 
         if (state->mRole)
         {
-            mSender.setBaseOts(state->mRecvBase.get(), state->mRecvBase.mChoice);
-            mT = sendTask();
+            mSendRecv.emplace<0>();
+            SendBatch& sender = std::get<0>(mSendRecv);
+            sender.mSender.setBaseOts(state->mRecvBase.get(), state->mRecvBase.mChoice);
+            mT = sender.sendTask(*this);
         }
         else
         {
-            mReceiver.setBaseOts(state->mSendBase.get());
-            mT = recvTask();
+            mSendRecv.emplace<1>();
+            RecvBatch& recver = std::get<1>(mSendRecv);
+            recver.mReceiver.setBaseOts(state->mSendBase.get());
+            mT = recver.recvTask(*this);
         }
-        //mSize = size;
-        //mSock = sock.fork();
-        //mPrng = prng.get<oc::block>();
     }
 
-    //void BinOleGenerator::Batch::init(u64 size, coproto::Socket& sock, oc::PRNG& prng, SendBase& base)
-    //{
-    //    init(size, sock, prng);
-    //    mReceiver.setBaseOts(base.get());
-    //    mReceiver.configure(size);
-    //    mT = recvTask();
-    //}
-
-    //void BinOleGenerator::Batch::init(u64 size, coproto::Socket& sock, oc::PRNG& prng, RecvBase& base)
-    //{
-    //    init(size, sock, prng);
-    //    mSender.configure(size);
-    //    mSender.setBaseOts(base.get(), base.mChoice);
-    //    mT = sendTask();
-    //}
-
-    macoro::task<> BinOleGenerator::Batch::recvTask()
+    macoro::task<> BinOleGenerator::Batch::RecvBatch::recvTask(Batch& batch)
     {
-        MC_BEGIN(macoro::task<>, this);
+        MC_BEGIN(macoro::task<>, this,&batch);
         mChoice.resize(mReceiver.mRequestedNumOts);
         mMsg.resize(mReceiver.mRequestedNumOts);
 
-        MC_AWAIT(mReceiver.silentReceive(mChoice, mMsg, mPrng, mSock));
-        mAdd.resize(oc::divCeil(mMsg.size(), 128));
-        mMult.resize(oc::divCeil(mMsg.size(), 128));
-        compressRecver(mChoice, mMsg, mAdd, mMult);
+        MC_AWAIT(mReceiver.silentReceive(mChoice, mMsg, batch.mPrng, batch.mSock));
+        batch.mAdd.resize(oc::divCeil(mMsg.size(), 128));
+        batch.mMult.resize(oc::divCeil(mMsg.size(), 128));
+        compressRecver(mChoice, mMsg, batch.mAdd, batch.mMult);
         MC_END();
     }
 
-    macoro::task<> BinOleGenerator::Batch::sendTask()
+    macoro::task<> BinOleGenerator::Batch::SendBatch::sendTask(Batch& batch)
     {
-        MC_BEGIN(macoro::task<>, this);
-
+        MC_BEGIN(macoro::task<>, this, &batch);
 
         mMsg2.resize(mSender.mRequestNumOts);
-        MC_AWAIT(mSender.silentSend(mMsg2, mPrng, mSock));
-        mAdd.resize(oc::divCeil(mMsg2.size(), 128));
-        mMult.resize(oc::divCeil(mMsg2.size(), 128));
-        compressSender(mMsg2, mAdd, mMult);
+        MC_AWAIT(mSender.silentSend(mMsg2, batch.mPrng, batch.mSock));
+        batch.mAdd.resize(oc::divCeil(mMsg2.size(), 128));
+        batch.mMult.resize(oc::divCeil(mMsg2.size(), 128));
+        compressSender(mMsg2, batch.mAdd, batch.mMult);
         MC_END();
     }
 
@@ -167,7 +147,7 @@ namespace secJoin
         return std::move(mT);
     }
 
-    void BinOleGenerator::Batch::compressRecver(oc::BitVector& bv, span<oc::block> recvMsg, span<oc::block> add, span<oc::block> mult)
+    void BinOleGenerator::Batch::RecvBatch::compressRecver(oc::BitVector& bv, span<oc::block> recvMsg, span<oc::block> add, span<oc::block> mult)
     {
         auto aIter16 = (u16*)add.data();
         auto bIter16 = (u16*)mult.data();
@@ -248,7 +228,7 @@ namespace secJoin
     }
 
 
-    void BinOleGenerator::Batch::compressSender(span<std::array<oc::block, 2>> sendMsg, span<oc::block> add, span<oc::block> mult)
+    void BinOleGenerator::Batch::SendBatch::compressSender(span<std::array<oc::block, 2>> sendMsg, span<oc::block> add, span<oc::block> mult)
     {
 
         auto bIter16 = (u16*)add.data();
@@ -361,7 +341,7 @@ namespace secJoin
         Base& base,
         bool mock)
     {
-        mState = std::make_shared<State>();
+        mState = std::make_shared<GenState>();
         mState->mBatchSize = batchSize;
         mState->mMock = mock;
         mState->mSock = sock;
@@ -404,33 +384,34 @@ namespace secJoin
 
     void BinOleGenerator::Request::clear() {
         TODO("request . clear");
+        std::terminate();
     }
 
     macoro::task<> BinOleGenerator::Request::get(BinOle& d)
     {
         MC_BEGIN(macoro::task<>, this, &d);
 
-        if (mIdx >= mBatches.size())
+        if (mNextBatchIdx >= mBatches.size())
             throw RTE_LOC;
 
 
         if (mState->mMock)
         {
-            auto s = mBatches[mIdx].mSize;
+            auto s = mBatches[mNextBatchIdx].mSize;
             auto r = mState->mRole;
             d.mBatch = std::make_shared<Batch>();
 
             oc::block sid;
-            memcpy(&sid, &mBatches[mIdx].mBatch->mSock.mId, sizeof(oc::block));
+            memcpy(&sid, &mBatches[mNextBatchIdx].mBatch->mSock.mId, sizeof(oc::block));
             fakeFill(s, *d.mBatch, r, sid);
             d.mBatch->mDone.set();
         }
 
 
-        MC_AWAIT(mBatches[mIdx].mBatch->mDone);
-        d.mMult = std::move(mBatches[mIdx].mBatch->mMult.subspan(mBatches[mIdx].mOffset, mBatches[mIdx].mSize));
-        d.mAdd = std::move(mBatches[mIdx].mBatch->mAdd.subspan(mBatches[mIdx].mOffset, mBatches[mIdx].mSize));
-        ++mIdx;
+        MC_AWAIT(mBatches[mNextBatchIdx].mBatch->mDone);
+        d.mMult = std::move(mBatches[mNextBatchIdx].mBatch->mMult.subspan(mBatches[mNextBatchIdx].mOffset, mBatches[mNextBatchIdx].mSize));
+        d.mAdd = std::move(mBatches[mNextBatchIdx].mBatch->mAdd.subspan(mBatches[mNextBatchIdx].mOffset, mBatches[mNextBatchIdx].mSize));
+        ++mNextBatchIdx;
 
         MC_END();
     }

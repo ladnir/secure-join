@@ -252,7 +252,7 @@ namespace secJoin
     //         //Output* mOutputPtr = nullptr;
     //         int mInputIdx = -1;
     //         int mOutputIdx = -1;
-    //         int mIdx = -1;
+    //         int mNextBatchIdx = -1;
     //         bool mUsed = false;
 
     //         bool isInput() const { return mInputIdx != -1; }

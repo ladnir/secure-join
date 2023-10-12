@@ -19,7 +19,7 @@ namespace secJoin
 
     //     mem.mType = column.mCol.mType;
     //     mem.mInputIdx = (mInputs.size()) - 1;
-    //     mem.mIdx = (mMem.size()) - 1;
+    //     mem.mNextBatchIdx = (mMem.size()) - 1;
 
     //     if (&column.mTable == mLeftTable)
     //         mLeftInputs.push_back(&mInputs.back());
@@ -29,7 +29,7 @@ namespace secJoin
     //         throw RTE_LOC;
 
 
-    //     return { *this, mem.mIdx };
+    //     return { *this, mem.mNextBatchIdx };
     // }
 
     // SelectBundle SelectQuery::joinOn(SharedTable::ColRef left, SharedTable::ColRef right)
@@ -93,11 +93,11 @@ namespace secJoin
     //     mGates.push_back(gate);
 
     //     mem.mGate = &mGates.back();
-    //     mem.mIdx = (mMem.size());
+    //     mem.mNextBatchIdx = (mMem.size());
 
     //     mMem.push_back(mem);
 
-    //     return mem.mIdx;
+    //     return mem.mNextBatchIdx;
     // }
 
     // int SelectQuery::addOp(selectDetails::SelectOp op, int wire1)
@@ -121,10 +121,10 @@ namespace secJoin
     //     selectDetails::Mem mem;
     //     mem.mType = mMem[wire1].mType;
     //     mem.mGate = &mGates.back();
-    //     mem.mIdx = (mMem.size());
+    //     mem.mNextBatchIdx = (mMem.size());
     //     mMem.push_back(mem);
 
-    //     return mem.mIdx;
+    //     return mem.mNextBatchIdx;
     // }
 
     // void SelectQuery::addOutput(std::string name, const SelectBundle & column)
@@ -132,7 +132,7 @@ namespace secJoin
     //     if (mLeftTable == nullptr)
     //         throw std::runtime_error("call joinOn(...) first. " LOCATION);
 
-    //     mOutputs.emplace_back(mMem[column.mMemIdx].mIdx, name, -1);
+    //     mOutputs.emplace_back(mMem[column.mMemIdx].mNextBatchIdx, name, -1);
     //     mMem[column.mMemIdx].mOutputIdx = (mOutputs.size()) - 1;
 
 

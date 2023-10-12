@@ -3,4 +3,4 @@
 #include "cryptoTools/Common/CLP.h"
 
 void OmJoin_wrapper_test(const oc::CLP& cmd);
-void runProtocol(secJoin::State* visaState, secJoin::State* bankState, bool verbose);
+void runProtocol(secJoin::GenState* visaState, secJoin::GenState* bankState, bool verbose);

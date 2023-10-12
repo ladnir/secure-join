@@ -9,6 +9,7 @@
 #include "macoro/task.h"
 #include "macoro/channel.h"
 #include "macoro/macros.h"
+#include "macoro/manual_reset_event.h"
 
 #include "libOTe/TwoChooseOne/Silent/SilentOtExtSender.h"
 #include "libOTe/TwoChooseOne/Silent/SilentOtExtReceiver.h"
@@ -94,7 +95,7 @@ namespace secJoin
 
         struct Generator
         {
-            struct State;
+            struct GenState;
 
             struct Batch
             {
@@ -116,11 +117,11 @@ namespace secJoin
 
                 coproto::Socket mSock;
                 oc::PRNG mPrng;
-                std::shared_ptr<State> mState;
+                std::shared_ptr<GenState> mState;
 
                 std::atomic_bool mStarted;
 
-                void init(std::shared_ptr<State>& state);
+                void init(std::shared_ptr<GenState>& state);
                 macoro::task<> recvTask();
                 macoro::task<> sendTask();
                 macoro::task<> task();
@@ -176,8 +177,8 @@ namespace secJoin
                     u64 mOffset = 0, mSize = 0;
                 };
 
-                std::shared_ptr<State> mState;
-                u64 mIdx = 0;
+                std::shared_ptr<GenState> mState;
+                u64 mNextBatchIdx = 0;
                 std::vector<Offset> mOffsets;
 
                 macoro::task<> start();
@@ -201,11 +202,11 @@ namespace secJoin
                 }
             };
 
-            struct State
+            struct GenState
             {
-                State() = default;
-                State(const State&) = delete;
-                State(State&&) = delete;
+                GenState() = default;
+                GenState(const GenState&) = delete;
+                GenState(GenState&&) = delete;
 
                 std::vector<std::shared_ptr<Batch>> mCorrelations;
                 std::vector<Request> mRequests;
@@ -213,7 +214,7 @@ namespace secJoin
                 oc::PRNG mPrng;
                 coproto::Socket mSock;
 
-                u64 mIdx = 0, mSize = 0, mRole = 0, mBatchSize = 0;
+                u64 mNextBatchIdx = 0, mSize = 0, mRole = 0, mBatchSize = 0;
                 bool mStarted = false;
                 bool mMock = false;
 
@@ -225,7 +226,7 @@ namespace secJoin
                 void set(RecvBase& b) { mRecvBase = b.fork(); }
 
             };
-            std::shared_ptr<State> mState;
+            std::shared_ptr<GenState> mState;
 
             template<typename Base>
             void init(
