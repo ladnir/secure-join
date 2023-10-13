@@ -1,4 +1,5 @@
 #include "CorGenerator_Test.h"
+#include "secure-join/CorGenerator/CorGenerator2.h"
 #include "secure-join/CorGenerator/OtGenerator.h"
 #include "secure-join/CorGenerator/BinOleGenerator.h"
 
@@ -8,7 +9,7 @@ void CorGenerator_Ot_Test(const oc::CLP&)
 
     u64 n = (1ull << 16) + 3234;
 
-    for (auto mock : { /*false,*/ true })
+    for (auto mock : { false, true })
     {
 
         oc::PRNG prng(oc::ZeroBlock);
@@ -23,13 +24,13 @@ void CorGenerator_Ot_Test(const oc::CLP&)
         }
 
         auto sock = coproto::LocalAsyncSocket::makePair();
-        OtSendGenerator send;
-        OtRecvGenerator recv;
+        Corrlation2::CorGenerator2 send;
+        Corrlation2::CorGenerator2 recv;
         send.init(1 << 14, sock[0], prng, rBase, 0, mock);
         recv.init(1 << 14, sock[1], prng, sBase, 1, mock);
 
-        auto sReq = send.request(n);
-        auto rReq = recv.request(n);
+        auto sReq = send.requestSendOt(n);
+        auto rReq = recv.requestRecvOt(n);
         auto p0 = sReq.start() | macoro::make_eager();
         auto p1 = rReq.start() | macoro::make_eager();
 
@@ -37,8 +38,8 @@ void CorGenerator_Ot_Test(const oc::CLP&)
         u64 s = 0;
         while (s < n)
         {
-            OtSend sot;
-            OtRecv rot;
+            Corrlation2::OtSend sot;
+            Corrlation2::OtRecv rot;
 
             auto r = macoro::sync_wait(macoro::when_all_ready(
                 sReq.get(sot),
@@ -97,14 +98,14 @@ void CorGenerator_BinOle_Test(const oc::CLP&)
         }
 
         auto sock = coproto::LocalAsyncSocket::makePair();
-        BinOleGenerator send;
-        BinOleGenerator recv;
-        send.init(1 << 14, sock[0], prng, rBase, mock);
-        recv.init(1 << 14, sock[1], prng, sBase, mock);
+        Corrlation2::CorGenerator2  send;
+        Corrlation2::CorGenerator2  recv;
+        send.init(1 << 14, sock[0], prng, rBase, 0, mock);
+        recv.init(1 << 14, sock[1], prng, sBase, 1, mock);
 
 
-        auto sReq = send.request(n);
-        auto rReq = send.request(n);
+        auto sReq = send.requestBinOle(n);
+        auto rReq = recv.requestBinOle(n);
         auto p0 = sReq.start() | macoro::make_eager();
         auto p1 = rReq.start() | macoro::make_eager();
 
@@ -112,8 +113,8 @@ void CorGenerator_BinOle_Test(const oc::CLP&)
         u64 s = 0;
         while (s < n)
         {
-            BinOle sot;
-            BinOle rot;
+            Corrlation2::BinOle sot;
+            Corrlation2::BinOle rot;
 
             auto r = macoro::sync_wait(macoro::when_all_ready(
                 sReq.get(sot),

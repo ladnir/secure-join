@@ -6,6 +6,7 @@ set(SRCS
     "Prf/DarkMatter22Prf.cpp"
 
     "CorGenerator/CorGenerator.cpp"
+    "CorGenerator/CorGenerator2.cpp"
     "CorGenerator/OtGenerator.cpp"
     "CorGenerator/BinOleGenerator.cpp"
 

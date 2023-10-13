@@ -83,9 +83,9 @@ namespace secJoin
         // the binary triples used in by the protocol.
         BinOleRequest mTriples;
 
-        bool mHasPreprocessing;
+        bool mHasPreprocessing = 0;
 
-        bool mHasRequest;
+        bool mHasRequest = 0;
 
         macoro::task<> mPreproTask;
 
