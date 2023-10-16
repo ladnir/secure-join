@@ -50,9 +50,9 @@ void RadixSort_hadamardSum_test(const oc::CLP& cmd)
     auto comm = coproto::LocalAsyncSocket::makePair();
     RadixSort s0, s1;
     u64 cols = 1 << s0.mL;
-    u64 rows = 10;
+    u64 rows = cmd.getOr("n", 100);
 
-    oc::Matrix<u32> d0(rows, rows), d1(rows, rows);
+    oc::Matrix<u32> d0(rows, cols), d1(rows, cols);
 
 
     PRNG prng(block(0, 0));
@@ -135,7 +135,7 @@ void RadixSort_oneHot_test(const oc::CLP& cmd)
 {
 
     u64 L = 2;
-    u64 n = 324;
+    u64 n = cmd.getOr("n",324);
     u64 mod = 1ull << L;
     auto comm = coproto::LocalAsyncSocket::makePair();
     std::array<std::future<void>, 2> f;
@@ -193,7 +193,7 @@ void RadixSort_bitInjection_test(const oc::CLP& cmd)
 
     auto comm = coproto::LocalAsyncSocket::makePair();
     u64 L = 21;
-    u64 n = 128 * 7;
+    u64 n = cmd.getOr("n", 128 * 7);
 
 
     PRNG prng(block(0, 0));
@@ -265,7 +265,7 @@ void RadixSort_genValMasks2_test(const oc::CLP& cmd)
     //u64 L = 1;
     //u64 n = 128 * 8;
 
-    for (u64 n : { 10, 324, 3242 })
+    for (u64 n : { 10ull, 324ull, 1ull << cmd.getOr("nn", 10) })
     {
         for (u64 L : { 1, 2, 5 })
         {
@@ -429,7 +429,7 @@ void RadixSort_genBitPerm_test(const oc::CLP& cmd)
     //u64 n = 40;
     u64 trials = 1;
     for (auto m : { 3, 10, 15 })
-        for (auto n : { 10, 40, 100 })
+        for (auto n : { 10ull, 40ull, 1ull << cmd.getOr("nn", 10)  })
         {
             for (auto L : { 1, 3, 5 })
             {
@@ -539,7 +539,7 @@ void RadixSort_genPerm_test(const oc::CLP& cmd)
 
     u64 trials = 1;
 
-    for (auto n : { 6,100 })
+    for (auto n : { 6ull, 1ull<<cmd.getOr("nn", 10) })
     {
         for (auto bitCount : { 9,17 })
         {

@@ -3,7 +3,17 @@
 
 namespace secJoin
 {
-
+    template<typename T>
+    std::string whatError(macoro::result<T>& r)
+    {
+        try {
+            std::rethrow_exception(r.error());
+        }
+        catch (std::exception& e)
+        {
+            return e.what();
+        }
+    }
 
     macoro::task<> RadixSort::checkHadamardSum(
         BinMatrix& f,
@@ -56,8 +66,14 @@ namespace secJoin
         }
 
         for (u64 i = 0; i < exp.size(); ++i)
+        {
+
             if (exp[i] != dd[i])
+            {
+                std::cout << i << ": " << exp[i] << " " << dd[i] << std::endl;
                 throw RTE_LOC;
+            }
+        }
         MC_END();
     }
 
@@ -91,6 +107,7 @@ namespace secJoin
             a = std::vector<oc::AlignedUnVector<u32>>{},
             shares = std::vector<u32>{},
             diff = oc::BitVector{},
+            ec = macoro::result<void>{},
             //A = Matrix32{},
             //B = Matrix32{},
             i = u64{},
@@ -151,9 +168,13 @@ namespace secJoin
                     MC_AWAIT(comm.send(std::move(otRecv.mChoice)));
                 }
 
-                for (i = 0, r = 0; i < f.size();)
+                for (i = 0, r = 0; i < s.size();)
                 {
-                    MC_AWAIT(comm.recvResize(tt));
+                    MC_AWAIT_TRY(ec, comm.recvResize(tt));
+                    if (ec.has_error())
+                        std::cout << "ec: " << whatError(ec) << std::endl;
+                    ec.value();
+
                     m = std::min<u64>(s.size() - i, tt.size());
                     for (u64 j = 0; j < m; ++j, ++i)
                     {
@@ -167,7 +188,7 @@ namespace secJoin
             {
                 fIter = (block*)f.data();
                 // send
-                for (i = 0, r = 0; i < f.size();)
+                for (i = 0, r = 0; i < s.size();)
                 {
                     MC_AWAIT(otSendReq.get(otSend));
                     m = std::min<u64>(s.size() - i, otSend.size());
@@ -1052,31 +1073,11 @@ namespace secJoin
         MC_BEGIN(macoro::task<>, this, &comm, 
             g = prng.fork(),
             i = u64{},
-            socks = std::vector<coproto::Socket>{},
-            prngs = std::vector<oc::PRNG>{},
             tasks = std::vector<macoro::eager_task<>>{});
 
         if (hasRequest() == false)
             throw std::runtime_error("request must be called first. " LOCATION);
         {
-            socks.reserve(mRounds.size());
-            prngs.reserve(mRounds.size());
-
-            auto sock = [&]() -> coproto::Socket&
-            {
-                if (socks.capacity() == socks.size())
-                    throw std::runtime_error("not enough space reserved." LOCATION);
-                socks.emplace_back(comm.fork());
-                return socks.back();
-            };
-
-            auto prng = [&]() -> oc::PRNG&
-            {
-                if (prngs.capacity() == prngs.size())
-                    throw std::runtime_error("not enough space reserved." LOCATION);
-                prngs.emplace_back(g.fork());
-                return prngs.back();
-            };
 
             auto task = [&](macoro::task<>&& t) -> void
             {
@@ -1085,18 +1086,14 @@ namespace secJoin
 
             for (i = 0; i < mRounds.size(); ++i)
             {
-                if (mRounds[i].mPerm.hasRequest())
-                    task(mRounds[i].mPerm.preprocess());
-                task(mRounds[i].mBitInject.preprocess());
-                task(mRounds[i].mIndexToOneHotGmw.preprocess());
-                task(mRounds[i].mArithToBinGmw.preprocess());
-                task(mRounds[i].mHadamardSumRecvOts.start());
-                task(mRounds[i].mHadamardSumSendOts.start());
+                task(mRounds[i].preprocess());
             }
         }
 
         for (i = 0; i < tasks.size();++i)
+        {
             MC_AWAIT(tasks[i]);
+        }
 
         MC_END();
     }
@@ -1142,6 +1139,7 @@ namespace secJoin
 
         // generate the sorting permutation for the
         // first L bits of the key.
+
         MC_AWAIT(genBitPerm(mRounds[0], mL, sk, mRounds[0].mPerm, comm));
         setTimePoint("genBitPerm");
         //dst.validate(comm);
@@ -1400,6 +1398,33 @@ namespace secJoin
         // for (u64 i = 0; i < x.rows(); ++i)
         //     std::cout << i << ": " << hex(x[res[i]]) << std::endl;
         return res;
+    }
+
+    macoro::task<> RadixSort::Round::preprocess()
+    {
+        MC_BEGIN(macoro::task<>, this);
+        if (mPerm.hasRequest())
+        {
+            MC_AWAIT(macoro::when_all_ready(
+                mPerm.preprocess(),
+                mBitInject.preprocess(),
+                mIndexToOneHotGmw.preprocess(),
+                mArithToBinGmw.preprocess(),
+                mHadamardSumRecvOts.start(),
+                mHadamardSumSendOts.start()
+            ));
+        }
+        else
+        {
+            MC_AWAIT(macoro::when_all_ready(
+                mBitInject.preprocess(),
+                mIndexToOneHotGmw.preprocess(),
+                mArithToBinGmw.preprocess(),
+                mHadamardSumRecvOts.start(),
+                mHadamardSumSendOts.start()
+            ));
+        }
+        MC_END();
     }
 } // namespace secJoin
 

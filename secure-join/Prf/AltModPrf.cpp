@@ -40,7 +40,14 @@ namespace secJoin
         return r;
     }();
 
-
+    // input v.
+    // v will have m=256 rows. It will store the i'th value in
+    // bit decomposed/transposed manner. That is, the j'th bit of the i'th value is
+    // stored at v[j,i] where the indexing is into the bits of v.
+    //
+    // The result is written to y. y[i] will store the i'th output.
+    // It will *not* be in transposed format
+    //
     void compressB(
         u64 begin,
         u64 n,
@@ -49,15 +56,24 @@ namespace secJoin
     )
     {
         //auto n = y.size();
+        assert(begin % 128 == 0);
+
+        // the begin'th v value starts at block index begin128
         auto begin128 = oc::divCeil(begin, 128);
+        
+        // the number of 128 chunks
         auto n128 = oc::divCeil(n, 128);
+
+        // the number of 128 chunks given that there are at least 8 more.
         auto n1024 = n128 / 8 * 8;
+
+
         oc::Matrix<oc::block> yt(128, n128);
 
         //auto B = AltModPrf::mB;
         assert(begin % 128 == 0);
         // assert(n % 128 == 0);
-        assert(v.rows() == 256);
+        assert(v.rows() == AltModPrf::MidSize);
         assert(v.cols() >= begin128 + n128);
         assert(y.size() >= begin + n);
 
@@ -88,7 +104,7 @@ namespace secJoin
                     assert(vIter == v[j].data() + begin128);
                     oc::block* __restrict yti = ytIter;
                     oc::block* __restrict vj = vIter;
-                    u64 k = begin;
+                    u64 k = 0;
 
                     for (; k < n1024; k += 8)
                     {
@@ -153,7 +169,7 @@ namespace secJoin
         span<oc::block> y
     )
     {
-        u64 batch = 1ull << 16;
+        u64 batch = 1ull << 12;
         auto n = y.size();
         for (u64 i = 0; i < n; i += batch)
         {

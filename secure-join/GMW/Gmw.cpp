@@ -382,7 +382,7 @@ namespace secJoin
                 {
                     if (buff.size() == 0 && roundRem)
                     {
-                        auto min = oc::roundUpTo(std::min<u64>(batchSize, roundRem), mN128);
+                        auto min = oc::roundUpTo(std::min<u64>(batchSize, roundRem), mN128 * 2);
                         buff.resize(min);
                         roundRem -= min;
                         buffIter = buff.data();
@@ -441,7 +441,7 @@ namespace secJoin
 
                     if ((roundRem && buff.size() == 0) || buffIter == (buff.data() + buff.size()))
                     {
-                        buff.resize(oc::roundUpTo(std::min<u64>(batchSize, roundRem), mN128));
+                        buff.resize(oc::roundUpTo(std::min<u64>(batchSize, roundRem), mN128 * 2));
                         roundRem -= buff.size();
                         buffIter = buff.data();
                         MC_AWAIT(chl.recv(buff));

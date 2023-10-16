@@ -473,9 +473,9 @@ void AltModPrf_mod3BitDecompostion_test()
     }
 }
 
-void AltModPrf_BMult_test()
+void AltModPrf_BMult_test(const oc::CLP& cmd)
 {
-    u64 n = 256;
+    u64 n = 1ull<< cmd.getOr("nn", 16);
     u64 n128 = n / 128;
     oc::Matrix<oc::block> v(256, n128);
     std::vector<block256> V(n);
@@ -981,7 +981,8 @@ void AltModPrf_proto_test(const oc::CLP& cmd)
             }
 
 
-            //y = sender.mPrf.compress(w);
+            auto yy = sender.mPrf.compress(w);
+
             y = sender.mPrf.eval(x[ii]);
         }
         else
@@ -990,6 +991,7 @@ void AltModPrf_proto_test(const oc::CLP& cmd)
         auto yy = (y0[ii] ^ y1[ii]);
         if (yy != y)
         {
+            std::cout << "i   " << ii << std::endl;
             std::cout << "act " << yy << std::endl;
             std::cout << "exp " << y << std::endl;
             throw RTE_LOC;

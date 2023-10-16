@@ -79,6 +79,8 @@ namespace secJoin
             Round&operator=(Round&&) = default;
 
 
+            macoro::task<> preprocess();
+
             AdditivePerm mPerm;
             BitInject mBitInject;
             Gmw mIndexToOneHotGmw, mArithToBinGmw;

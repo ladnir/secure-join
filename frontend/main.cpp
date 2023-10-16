@@ -17,6 +17,11 @@ int main(int argc, char** argv)
             AltMod_benchmark(clp);
             return 0;
         }
+        if (clp.isSet("radix"))
+        {
+            Radix_benchmark(clp);
+            return 0;
+        }
         if (clp.isSet("CompressB"))
         {
             AltMod_compressB_benchmark(clp);
