@@ -9,9 +9,26 @@
 #include "libOTe/Tools/Tools.h"
 #include "macoro/optional.h"
 
+// TODO:
+// * replace sample mod 3 with lookup table. 3^5 = 243. 
+//   We can take a byte [0,1,...,255] and use it as a lookup.
+//   If we get less than 243, we produce 5 uniformly random 
+//   mod 3 values. Otherwise we reject that byte.
+// 
+// * Look into using mod 3 vole for the mod conversion.
+// 
+// * implement batching for large number of inputs. Will get 
+//   better data locality.
+//
+
 namespace secJoin
 {
-    
+
+    template<typename T>
+    int bit(T* x, u64 i)
+    {
+        return  *oc::BitIterator((u8*)x, i);
+    }
     template<typename T>
     int bit(T& x, u64 i)
     {
@@ -47,7 +64,7 @@ namespace secJoin
         span<oc::block> x1, span<oc::block> x0,
         span<oc::block> y0);
 
-    class DLpnPrf
+    class AltModPrf
     {
     public:
         static const std::array<block256, 128> mB, mBShuffled;
@@ -89,17 +106,17 @@ namespace secJoin
     };
 
 
-    class DLpnPrfSender : public oc::TimerAdapter
+    class AltModPrfSender : public oc::TimerAdapter
     {
     public:
-        static constexpr auto mDebug = false;
+        bool mDebug = false;
         static constexpr auto StepSize = 32;
 
         // The key OTs, one for each bit of the key mPrf.mKey
         std::vector<oc::PRNG> mKeyOTs;
 
         // The underlaying PRF
-        DLpnPrf mPrf;
+        AltModPrf mPrf;
 
         // The number of input we will have.
         u64 mInputSize = 0;
@@ -119,11 +136,14 @@ namespace secJoin
         // The base ot request that will be used for the key
         OtRecvRequest mKeyReq;
 
-        DLpnPrfSender() = default;
-        DLpnPrfSender(const DLpnPrfSender&) = default;
-        DLpnPrfSender(DLpnPrfSender&&) noexcept = default;
-        DLpnPrfSender& operator=(const DLpnPrfSender&) = default;
-        DLpnPrfSender& operator=(DLpnPrfSender&&) noexcept = default;
+        // variables that are used for debugging.
+        oc::Matrix<oc::block> mDebugXkShares, mDebugU0, mDebugU1,mDebugV;
+
+        AltModPrfSender() = default;
+        AltModPrfSender(const AltModPrfSender&) = default;
+        AltModPrfSender(AltModPrfSender&&) noexcept = default;
+        AltModPrfSender& operator=(const AltModPrfSender&) = default;
+        AltModPrfSender& operator=(AltModPrfSender&&) noexcept = default;
 
         // initialize the protocol to perform inputSize prf evals.
         // set keyGen if you explicitly want to perform (or not) the 
@@ -148,22 +168,28 @@ namespace secJoin
         }
 
         // return true if correlated randomness has been requested.
-        bool hasRequest()
+        bool hasRequest() const
         {
             return mOleReq.size() > 0;
+        }
+
+        // return true if correlated randomness has been requested.
+        bool hasPreprocessing() const
+        {
+            return mHasPrepro;
         }
 
         // request correlated randomness. init must be called first.
         void request(CorGenerator& ole)
         {
             if(mInputSize == 0)
-                throw std::runtime_error("DLpnPrfSender::init must be called first. " LOCATION);
+                throw std::runtime_error("AltModPrfSender::init must be called first. " LOCATION);
 
-            auto numOle = oc::roundUpTo(mInputSize, 128) * DLpnPrf::MidSize * 2;
+            auto numOle = oc::roundUpTo(mInputSize, 128) * AltModPrf::MidSize * 2;
             mOleReq = ole.binOleRequest(numOle);
             if (mDoKeyGen)
             {
-                mKeyReq = ole.otRecvRequest(DLpnPrf::KeySize);
+                mKeyReq = ole.recvOtRequest(AltModPrf::KeySize);
                 mDoKeyGen = false;
                 mHasKeyOts = true;
             }
@@ -173,7 +199,7 @@ namespace secJoin
         macoro::task<> preprocess()
         {
             if (mOleReq.size() == 0)
-                throw std::runtime_error("DLpnPrfReceiver::preprocess() was called without calling request. " LOCATION);
+                throw std::runtime_error("AltModPrfReceiver::preprocess() was called without calling request. " LOCATION);
 
             mHasPrepro = true;
             if (mKeyReq.size())
@@ -251,10 +277,10 @@ namespace secJoin
 
 
 
-    class DLpnPrfReceiver : public oc::TimerAdapter
+    class AltModPrfReceiver : public oc::TimerAdapter
     {
     public:
-        static constexpr auto mDebug = DLpnPrfSender::mDebug;
+        bool mDebug = false;
         static constexpr auto StepSize = 32;
 
         // base OTs, where the sender has the OT msg based on the bits of their key
@@ -278,17 +304,22 @@ namespace secJoin
         // The base ot request that will be used for the key
         OtSendRequest mKeyReq;
 
-        DLpnPrfReceiver() = default;
-        DLpnPrfReceiver(const DLpnPrfReceiver&) = default;
-        DLpnPrfReceiver(DLpnPrfReceiver&&)  = default;
-        DLpnPrfReceiver& operator=(const DLpnPrfReceiver&) = default;
-        DLpnPrfReceiver& operator=(DLpnPrfReceiver&&) noexcept = default;
+        // variables that are used for debugging.
+        oc::Matrix<oc::block> mDebugXkShares,mDebugU0, mDebugU1, mDebugV;
+
+        AltModPrfReceiver() = default;
+        AltModPrfReceiver(const AltModPrfReceiver&) = default;
+        AltModPrfReceiver(AltModPrfReceiver&&)  = default;
+        AltModPrfReceiver& operator=(const AltModPrfReceiver&) = default;
+        AltModPrfReceiver& operator=(AltModPrfReceiver&&) noexcept = default;
 
         // returns true if we have key OTs set.
         bool hasKeyOts() const {return mHasKeyOts; }
 
         // returns true if correlated randomness has been requested.
         bool hasRequest() const { return mOleReq.size() > 0; }
+
+        bool hasPreprocessing() const { return mHasPrepro; }
 
         // clears any internal state.
         void clear()
@@ -315,13 +346,13 @@ namespace secJoin
         void request(CorGenerator& ole)
         {
             if (mInputSize == 0)
-                throw std::runtime_error("DLpnPrfSender::init must be called first. " LOCATION);
+                throw std::runtime_error("AltModPrfSender::init must be called first. " LOCATION);
 
-            auto numOle = oc::roundUpTo(mInputSize, 128) * DLpnPrf::MidSize * 2;
+            auto numOle = oc::roundUpTo(mInputSize, 128) * AltModPrf::MidSize * 2;
             mOleReq = ole.binOleRequest(numOle);
             if (mDoKeyGen)
             {
-                mKeyReq = ole.otSendRequest(DLpnPrf::KeySize);
+                mKeyReq = ole.sendOtRequest(AltModPrf::KeySize);
                 mDoKeyGen = false;
                 mHasKeyOts = true;
             }
@@ -331,7 +362,7 @@ namespace secJoin
         macoro::task<> preprocess()
         {
             if (mOleReq.size() == 0)
-                throw std::runtime_error("DLpnPrfReceiver::preprocess() was called without calling request. " LOCATION);
+                throw std::runtime_error("AltModPrfReceiver::preprocess() was called without calling request. " LOCATION);
 
             mHasPrepro = true;
             if (mKeyReq.size())
@@ -362,17 +393,17 @@ namespace secJoin
         }
 
         // re-randomize the OTs seeds with the tweak.
-        void tweakKeyOts(oc::block tweak)
-        {
-            if (!mKeyOTs.size())
-                throw RTE_LOC;
-            oc::AES aes(tweak);
-            for (u64 i = 0; i < mKeyOTs.size(); ++i)
-            {
-                mKeyOTs[i][0].SetSeed(aes.hashBlock(mKeyOTs[i][0].getSeed()));
-                mKeyOTs[i][1].SetSeed(aes.hashBlock(mKeyOTs[i][1].getSeed()));
-            }
-        }
+        //void tweakKeyOts(oc::block tweak)
+        //{
+        //    if (!mKeyOTs.size())
+        //        throw RTE_LOC;
+        //    oc::AES aes(tweak);
+        //    for (u64 i = 0; i < mKeyOTs.size(); ++i)
+        //    {
+        //        mKeyOTs[i][0].SetSeed(aes.hashBlock(mKeyOTs[i][0].getSeed()));
+        //        mKeyOTs[i][1].SetSeed(aes.hashBlock(mKeyOTs[i][1].getSeed()));
+        //    }
+        //}
 
         // Run the prf protocol and write the result to y. If correlated randomness has
         // not been generated then it will be in the protocol.

@@ -11,10 +11,10 @@ namespace secJoin
     //    std::copy(shares.begin(), shares.end(), (u32*)mShare.data());
     //}
 
-    void AdditivePerm::init2(u8 partyIdx, u64 size, u64 bytesPer, macoro::optional<bool> dlpnKeyGen)
+    void AdditivePerm::init2(u8 partyIdx, u64 size, u64 bytesPer, macoro::optional<bool> AltModKeyGen)
     {
         mIsSetup = false;
-        mRandPi.init2(partyIdx, size, bytesPer, dlpnKeyGen);
+        mRandPi.init2(partyIdx, size, bytesPer ? bytesPer + 4 : 0, AltModKeyGen);
     }
 
     // generate the masking (replicated) permutation mRandPi
@@ -160,6 +160,8 @@ namespace secJoin
 
             dst.setKeyOts(k, recv, send);
         }
+
+        dst.mShare.resize(dst.size());
         return apply<u32>(PermOp::Regular, pi.mShare, dst.mShare, prng, chl);
     }
 
@@ -194,8 +196,8 @@ namespace secJoin
         mRandPi.request(ole);
     }
 
-    macoro::task<> AdditivePerm::preprocess(coproto::Socket& chl, oc::PRNG& prng)
+    macoro::task<> AdditivePerm::preprocess()
     {
-        return mRandPi.preprocess(chl, prng);
+        return mRandPi.preprocess();
     }
 }

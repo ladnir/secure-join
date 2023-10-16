@@ -20,13 +20,13 @@ void OmJoin_wrapper_test(const oc::CLP& cmd)
     std::string joinMetaPath = rootPath + "/tests/tables/joindata_meta.txt";
     bool isUnique = true;
     bool verbose = cmd.isSet("v");
-    bool mock = cmd.isSet("mock");
+    bool mock = cmd.getOr("mock", 1);
 
-    secJoin::GenState* visaState = secJoin::initState(visaCsvPath, visaMetaDataPath, clientMetaDataPath, joinVisaCols,
+    secJoin::WrapperState* visaState = secJoin::initState(visaCsvPath, visaMetaDataPath, clientMetaDataPath, joinVisaCols,
         joinClientCols, selectVisaCols, selectClientCols, isUnique, verbose, mock);
 
 
-    secJoin::GenState* bankState = secJoin::initState(bankCsvPath, visaMetaDataPath, clientMetaDataPath, joinVisaCols,
+    secJoin::WrapperState* bankState = secJoin::initState(bankCsvPath, visaMetaDataPath, clientMetaDataPath, joinVisaCols,
         joinClientCols, selectVisaCols, selectClientCols, !isUnique, verbose, mock);
 
     // auto select = visaState->selectCols;
@@ -61,10 +61,10 @@ void OmJoin_wrapper_test(const oc::CLP& cmd)
 
 
     // void *state = (void *) visaState;
-    // secJoin::GenState* vWrapperState = (secJoin::GenState*)state;
+    // secJoin::WrapperState* vWrapperState = (secJoin::WrapperState*)state;
 
     // void *state1 = (void *) bankState;
-    // secJoin::GenState* bWrapperState = (secJoin::GenState*)state1;
+    // secJoin::WrapperState* bWrapperState = (secJoin::WrapperState*)state1;
 
     // std::vector<secJoin::ColRef> selectCols;
 
@@ -102,7 +102,7 @@ void OmJoin_wrapper_test(const oc::CLP& cmd)
 }
 
 
-void runProtocol(secJoin::GenState* visaState, secJoin::GenState* bankState,
+void runProtocol(secJoin::WrapperState* visaState, secJoin::WrapperState* bankState,
     bool verbose)
 {
     std::vector<oc::u8> buff;

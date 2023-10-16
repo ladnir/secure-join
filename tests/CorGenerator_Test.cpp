@@ -1,7 +1,5 @@
 #include "CorGenerator_Test.h"
-#include "secure-join/CorGenerator/CorGenerator2.h"
-#include "secure-join/CorGenerator/OtGenerator.h"
-#include "secure-join/CorGenerator/BinOleGenerator.h"
+#include "secure-join/CorGenerator/CorGenerator.h"
 
 using namespace secJoin;
 void CorGenerator_Ot_Test(const oc::CLP&)
@@ -13,24 +11,24 @@ void CorGenerator_Ot_Test(const oc::CLP&)
     {
 
         oc::PRNG prng(oc::ZeroBlock);
-        SendBase sBase;sBase.resize(128);
-        RecvBase rBase;rBase.resize(128);
-        rBase.mChoice.randomize(prng);
-        for (u64 i = 0; i < 128; ++i)
-        {
-            sBase.mBase[i][0] = prng.get<oc::block>();
-            sBase.mBase[i][1] = prng.get<oc::block>();
-            rBase.mBase[i] = sBase.mBase[i][rBase.mChoice[i]].getSeed();
-        }
+        //SendBase sBase;sBase.resize(128);
+        //RecvBase rBase;rBase.resize(128);
+        //rBase.mChoice.randomize(prng);
+        //for (u64 i = 0; i < 128; ++i)
+        //{
+        //    sBase.mBase[i][0] = prng.get<oc::block>();
+        //    sBase.mBase[i][1] = prng.get<oc::block>();
+        //    rBase.mBase[i] = sBase.mBase[i][rBase.mChoice[i]].getSeed();
+        //}
 
         auto sock = coproto::LocalAsyncSocket::makePair();
-        Corrlation2::CorGenerator2 send;
-        Corrlation2::CorGenerator2 recv;
-        send.init(1 << 14, sock[0], prng, rBase, 0, mock);
-        recv.init(1 << 14, sock[1], prng, sBase, 1, mock);
+        CorGenerator send;
+        CorGenerator recv;
+        send.init(std::move(sock[0]), prng, 0, 1 << 14, mock);
+        recv.init(std::move(sock[1]), prng, 1, 1 << 14, mock);
 
-        auto sReq = send.requestSendOt(n);
-        auto rReq = recv.requestRecvOt(n);
+        auto sReq = send.sendOtRequest(n);
+        auto rReq = recv.recvOtRequest(n);
         auto p0 = sReq.start() | macoro::make_eager();
         auto p1 = rReq.start() | macoro::make_eager();
 
@@ -38,8 +36,8 @@ void CorGenerator_Ot_Test(const oc::CLP&)
         u64 s = 0;
         while (s < n)
         {
-            Corrlation2::OtSend sot;
-            Corrlation2::OtRecv rot;
+            OtSend sot;
+            OtRecv rot;
 
             auto r = macoro::sync_wait(macoro::when_all_ready(
                 sReq.get(sot),
@@ -87,25 +85,26 @@ void CorGenerator_BinOle_Test(const oc::CLP&)
 
 
         oc::PRNG prng(oc::ZeroBlock);
-        SendBase sBase;sBase.resize(128);
-        RecvBase rBase;rBase.resize(128);
-        rBase.mChoice.randomize(prng);
-        for (u64 i = 0; i < 128; ++i)
-        {
-            sBase.mBase[i][0] = prng.get<oc::block>();
-            sBase.mBase[i][1] = prng.get<oc::block>();
-            rBase.mBase[i] = sBase.mBase[i][rBase.mChoice[i]].getSeed();
-        }
+        //SendBase sBase;sBase.resize(128);
+        //RecvBase rBase;rBase.resize(128);
+        //rBase.mChoice.randomize(prng);
+        //for (u64 i = 0; i < 128; ++i)
+        //{
+        //    sBase.mBase[i][0] = prng.get<oc::block>();
+        //    sBase.mBase[i][1] = prng.get<oc::block>();
+        //    rBase.mBase[i] = sBase.mBase[i][rBase.mChoice[i]].getSeed();
+        //}
 
         auto sock = coproto::LocalAsyncSocket::makePair();
-        Corrlation2::CorGenerator2  send;
-        Corrlation2::CorGenerator2  recv;
-        send.init(1 << 14, sock[0], prng, rBase, 0, mock);
-        recv.init(1 << 14, sock[1], prng, sBase, 1, mock);
+        CorGenerator  send;
+        CorGenerator  recv;
+
+        send.init(std::move(sock[0]), prng, 0, 1 << 14, mock);
+        recv.init(std::move(sock[1]), prng, 1, 1 << 14, mock);
 
 
-        auto sReq = send.requestBinOle(n);
-        auto rReq = recv.requestBinOle(n);
+        auto sReq = send.binOleRequest(n);
+        auto rReq = recv.binOleRequest(n);
         auto p0 = sReq.start() | macoro::make_eager();
         auto p1 = rReq.start() | macoro::make_eager();
 
@@ -113,8 +112,8 @@ void CorGenerator_BinOle_Test(const oc::CLP&)
         u64 s = 0;
         while (s < n)
         {
-            Corrlation2::BinOle sot;
-            Corrlation2::BinOle rot;
+            BinOle sot;
+            BinOle rot;
 
             auto r = macoro::sync_wait(macoro::when_all_ready(
                 sReq.get(sot),

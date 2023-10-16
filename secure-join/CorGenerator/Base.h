@@ -5,6 +5,7 @@
 
 #include <vector>
 #include <memory>
+#include <numeric>
 
 #include "macoro/task.h"
 #include "macoro/channel.h"
@@ -66,8 +67,6 @@ namespace secJoin
             return r;
         }
 
-
-
         void resize(u64 n)
         {
             mBase.resize(n);
@@ -89,165 +88,29 @@ namespace secJoin
     };
 
 
-    namespace detail
+
+    struct BaseRequest
     {
+        // the choice bits requested for recv base OTs
+        oc::BitVector mChoice;
 
+        // the number of send OTs requested
+        u64 mSendSize = 0;
 
-        struct Generator
+        BaseRequest() = default;
+        BaseRequest(const BaseRequest&) = default;
+        BaseRequest(BaseRequest&&) = default;
+        BaseRequest& operator=(BaseRequest&&) = default;
+        BaseRequest(span<BaseRequest> reqs)
         {
-            struct GenState;
-
-            struct Batch
-            {
-                Batch() = default;
-                Batch(Batch&&) { throw RTE_LOC; };
-                oc::SilentOtExtReceiver mReceiver;
-                oc::SilentOtExtSender mSender;
-                oc::AlignedUnVector<oc::block> mMult, mAdd;
-
-                u64 mSize = 0;
-                oc::BitVector mChoice;
-                oc::AlignedUnVector<oc::block> mMsg;
-                oc::AlignedUnVector<std::array<oc::block, 2>> mMsg2;
-
-                macoro::eager_task<> mTask;
-                macoro::task<> mT;
-                macoro::async_manual_reset_event mDone;
-
-
-                coproto::Socket mSock;
-                oc::PRNG mPrng;
-                std::shared_ptr<GenState> mState;
-
-                std::atomic_bool mStarted;
-
-                void init(std::shared_ptr<GenState>& state);
-                macoro::task<> recvTask();
-                macoro::task<> sendTask();
-                macoro::task<> task();
-
-                void start()
-                {
-                    auto s = mStarted.exchange(true);
-                    if (s == false)
-                    {
-                        mTask = std::move(mT) | macoro::make_eager();
-                    }
-                }
-
-                void compressRecver(oc::BitVector& bv, span<oc::block> recvMsg, span<oc::block> add, span<oc::block> mult);
-                void compressSender(span<std::array<oc::block, 2>> sendMsg, span<oc::block> add, span<oc::block> mult);
-            };
-
-
-            struct BinOle
-            {
-
-                BinOle() = default;
-                BinOle(const BinOle&) = delete;
-                BinOle& operator=(const BinOle&) = delete;
-                BinOle(BinOle&&) = default;
-                BinOle& operator=(BinOle&&) = default;
-
-                std::shared_ptr<Batch> mBatch;
-                oc::span<oc::block> mMult, mAdd;
-                u64 size() const
-                {
-                    return mMult.size() * 128;
-                }
-
-                void clear()
-                {
-                    mBatch = {};
-                    mMult = {};
-                    mAdd = {};
-                }
-            };
-
-            struct Request
-            {
-                Request() = default;
-                Request(const Request&) = delete;
-                Request(Request&&) = default;
-                Request& operator=(Request&&) = default;
-
-                struct Offset
-                {
-                    std::shared_ptr<Batch> mBatch;
-                    u64 mOffset = 0, mSize = 0;
-                };
-
-                std::shared_ptr<GenState> mState;
-                u64 mNextBatchIdx = 0;
-                std::vector<Offset> mOffsets;
-
-                macoro::task<> start();
-                macoro::task<> get(BinOle& d);
-
-                u64 batchCount()
-                {
-                    return mState->mCorrelations.size();
-                }
-
-                u64 size()
-                {
-                    u64 s = 0;
-                    for (auto b : mOffsets)
-                        s += b.mSize;
-                    return s;
-                }
-
-                macoro::task<> close() {
-                    TODO("request . close");
-                }
-            };
-
-            struct GenState
-            {
-                GenState() = default;
-                GenState(const GenState&) = delete;
-                GenState(GenState&&) = delete;
-
-                std::vector<std::shared_ptr<Batch>> mCorrelations;
-                std::vector<Request> mRequests;
-
-                oc::PRNG mPrng;
-                coproto::Socket mSock;
-
-                u64 mNextBatchIdx = 0, mSize = 0, mRole = 0, mBatchSize = 0;
-                bool mStarted = false;
-                bool mMock = false;
-
-
-                SendBase mSendBase;
-                RecvBase mRecvBase;
-
-                void set(SendBase& b) { mSendBase = b.fork(); }
-                void set(RecvBase& b) { mRecvBase = b.fork(); }
-
-            };
-            std::shared_ptr<GenState> mState;
-
-            template<typename Base>
-            void init(
-                u64 batchSize,
-                coproto::Socket& sock,
-                oc::PRNG& prng,
-                Base& base,
-                bool mock);
-
-            Request request(u64 n);
-
-            bool started()
-            {
-                return mState && mState->mStarted;
-            }
-
-            bool initialized()
-            {
-                return mState.get();
-            }
-
-        };
-    }
+            u64 s = 0;
+            for (u64 i = 0; i < reqs.size(); ++i)
+                s += reqs[i].mChoice.size();
+            mChoice.reserve(s);
+            for (u64 i = 0; i < reqs.size(); ++i)
+                mChoice.append(reqs[i].mChoice);
+            mSendSize = std::accumulate(reqs.begin(), reqs.end(), 0ull,
+                [](auto c, auto& v) { return c + v.mSendSize; });
+        }
+    };
 }

@@ -165,7 +165,6 @@ namespace secJoin
         macoro::task<> genPerm(
             const BinMatrix& k,
             AdditivePerm& dst,
-            CorGenerator& gen,
             coproto::Socket& comm,
             oc::PRNG& prng);
 
@@ -202,7 +201,6 @@ namespace secJoin
         macoro::task<> mockSort(
             const BinMatrix& k,
             AdditivePerm& dst,
-            CorGenerator& ole,
             coproto::Socket& comm);
 
         macoro::task<> checkHadamardSum(

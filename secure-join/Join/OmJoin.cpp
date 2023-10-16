@@ -434,13 +434,13 @@ namespace secJoin
         gmw.setInput(1, temp);
 
         offsets.emplace_back(Offset{ 0,1 });
-        //MC_AWAIT(print(temp, choice, sock, (int)ole.mRole, "active", offsets));
+        //MC_AWAIT(print(temp, choice, sock, ole.partyIdx(), "active", offsets));
 
         MC_AWAIT(gmw.run(ole, sock, prng));
 
         gmw.getOutput(0, temp);
 
-        //MC_AWAIT(print(temp, choice, sock, (int)ole.mRole, "active out", offsets));
+        //MC_AWAIT(print(temp, choice, sock, ole.partyIdx(), "active out", offsets));
 
         out.resize(data.rows(), data.bitsPerEntry());
         for (u64 i = 0; i < data.rows(); ++i)
@@ -497,15 +497,19 @@ namespace secJoin
         if (mInsecurePrint)
         {
             offsets = { Offset{0,keys.bitsPerEntry(), "key"} };
-            MC_AWAIT(print(keys, controlBits, sock, (int)ole.mRole, "keys", offsets));
+            MC_AWAIT(print(keys, controlBits, sock, ole.partyIdx(), "keys", offsets));
         }
 
         sort.mInsecureMock = mInsecureMockSubroutines;
         sPerm.mInsecureMock = mInsecureMockSubroutines;
 
-        //sort.init((int)ole.mRole, keys.size())
+        sort.init(ole.partyIdx(), keys.rows(), keys.bitsPerEntry());
+        sort.request(ole);
+        MC_AWAIT(sort.preprocess(sock, prng));
+
+        //sort.init(ole.partyIdx(), keys.size())
         // get the stable sorting permutation sPerm
-        MC_AWAIT(sort.genPerm(keys, sPerm, ole, sock,prng));
+        MC_AWAIT(sort.genPerm(keys, sPerm, sock,prng));
         setTimePoint("sort");
 
         //std::cout << "genPerm done " << LOCATION << std::endl;
@@ -514,12 +518,12 @@ namespace secJoin
         // to that. So it will look something like:
         //     L | kL | 1
         //     0 | kR | 0
-        concatColumns(leftJoinCol, selects, rightJoinCol.mTable.rows(), keys, keyOffset, data, (u8)ole.mRole, offsets);
+        concatColumns(leftJoinCol, selects, rightJoinCol.mTable.rows(), keys, keyOffset, data, ole.partyIdx(), offsets);
         setTimePoint("concat");
         keys.mData = {};
 
         if (mInsecurePrint)
-            MC_AWAIT(print(data, controlBits, sock, (int)ole.mRole, "preSort", offsets));
+            MC_AWAIT(print(data, controlBits, sock, ole.partyIdx(), "preSort", offsets));
 
         // Apply the sortin permutation. What you end up with are the keys
         // in sorted order and the rows of L also in sorted order.
@@ -533,7 +537,7 @@ namespace secJoin
         //std::cout << "Perm::apply done " << LOCATION << std::endl;
 
         if (mInsecurePrint)
-            MC_AWAIT(print(data, controlBits, sock, (int)ole.mRole, "sort", offsets));
+            MC_AWAIT(print(data, controlBits, sock, ole.partyIdx(), "sort", offsets));
 
         // compare adjacent keys. controlBits[i] = 1 if k[i]==k[i-1].
         // put another way, controlBits[i] = 1 if keys[i] is from the
@@ -551,7 +555,7 @@ namespace secJoin
             data(i, keyOffset) = *oc::BitIterator(data.data(i), keyOffset * 8 + keys.bitsPerEntry());
 
         if (mInsecurePrint)
-            MC_AWAIT(print(data, controlBits, sock, (int)ole.mRole, "control", offsets));
+            MC_AWAIT(print(data, controlBits, sock, ole.partyIdx(), "control", offsets));
 
         // duplicate the rows in data that are from L into any matching
         // rows that correspond to R.
@@ -563,7 +567,7 @@ namespace secJoin
         //std::cout << "AggTree done " << LOCATION << std::endl;
 
         if (mInsecurePrint)
-            MC_AWAIT(print(data, controlBits, sock, (int)ole.mRole, "agg", offsets));
+            MC_AWAIT(print(data, controlBits, sock, ole.partyIdx(), "agg", offsets));
 
 
         MC_AWAIT(updateActiveFlag(data, controlBits, temp, ole, prng, sock));
@@ -571,7 +575,7 @@ namespace secJoin
         //std::cout << "Active done " << LOCATION << std::endl;
 
         if (mInsecurePrint)
-            MC_AWAIT(print(data, controlBits, sock, (int)ole.mRole, "isActive", offsets));
+            MC_AWAIT(print(data, controlBits, sock, ole.partyIdx(), "isActive", offsets));
 
 
         // appendChoiceBit(data, controlBits, temp);
@@ -595,7 +599,7 @@ namespace secJoin
 
 
         if (mInsecurePrint)
-            MC_AWAIT(print(data, controlBits, sock, (int)ole.mRole, "unsort", offsets));
+            MC_AWAIT(print(data, controlBits, sock, ole.partyIdx(), "unsort", offsets));
 
 
 

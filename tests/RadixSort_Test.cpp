@@ -6,7 +6,7 @@
 using namespace oc;
 using namespace secJoin;
 
-void RadixSort_aggregateSum_test()
+void RadixSort_aggregateSum_test(const oc::CLP& cmd)
 {
     u64 n = 123;
     u64 L = 1 << 5;
@@ -45,7 +45,7 @@ void RadixSort_aggregateSum_test()
             throw RTE_LOC;
 }
 
-void RadixSort_hadamardSum_test()
+void RadixSort_hadamardSum_test(const oc::CLP& cmd)
 {
     auto comm = coproto::LocalAsyncSocket::makePair();
     RadixSort s0, s1;
@@ -66,7 +66,8 @@ void RadixSort_hadamardSum_test()
 
     oc::Matrix<u32> r0(rows, cols), r1(rows, cols);
     AdditivePerm p0, p1;
-
+    p0.init2(0, rows);
+    p1.init2(1, rows);
 
     auto lIter = oc::BitIterator(l.data());
     for (u64 i = 0; i < rows; ++i)
@@ -83,14 +84,15 @@ void RadixSort_hadamardSum_test()
     share(r, r0, r1, prng);
 
     CorGenerator g0, g1;
-    g0.mock(CorGenerator::Role::Sender);
-    g1.mock(CorGenerator::Role::Receiver);
+
+    g0.init(comm[0].fork(), prng, 0, 1 << 14, cmd.getOr("mock", 1));
+    g1.init(comm[1].fork(), prng, 1, 1 << 14, cmd.getOr("mock", 1));
     s0.mDebug = true;
     s1.mDebug = true;
 
     //s0.request(
     s0.init(0, rows, s0.mL); s0.request(g0);
-    s1.init(0, rows, s0.mL); s1.request(g1);
+    s1.init(1, rows, s0.mL); s1.request(g1);
 
     macoro::sync_wait(macoro::when_all_ready(
         s0.preprocess(comm[0], prng),
@@ -129,7 +131,7 @@ void RadixSort_hadamardSum_test()
         }
 }
 
-void RadixSort_oneHot_test()
+void RadixSort_oneHot_test(const oc::CLP& cmd)
 {
 
     u64 L = 2;
@@ -138,10 +140,10 @@ void RadixSort_oneHot_test()
     auto comm = coproto::LocalAsyncSocket::makePair();
     std::array<std::future<void>, 2> f;
     std::array<CorGenerator, 2> g;
-    g[0].mock(CorGenerator::Role::Sender);
-    g[1].mock(CorGenerator::Role::Receiver);
-
     oc::PRNG prng(oc::ZeroBlock);
+    g[0].init(comm[0].fork(), prng, 0, 1 << 14, cmd.getOr("mock", 1));
+    g[1].init(comm[1].fork(), prng, 1, 1 << 14, cmd.getOr("mock", 1));
+
     Matrix<u8> kk(n, 1);
     for (u64 i = 0; i < n; ++i)
         kk(i) = prng.get<u8>() % mod;
@@ -186,7 +188,7 @@ void RadixSort_oneHot_test()
 }
 
 
-void RadixSort_bitInjection_test()
+void RadixSort_bitInjection_test(const oc::CLP& cmd)
 {
 
     auto comm = coproto::LocalAsyncSocket::makePair();
@@ -211,8 +213,8 @@ void RadixSort_bitInjection_test()
 
     }
     CorGenerator g0, g1;
-    g0.mock(CorGenerator::Role::Receiver);
-    g1.mock(CorGenerator::Role::Sender);
+    g0.init(comm[0].fork(), prng, 0, 1 << 14, cmd.getOr("mock", 1));
+    g1.init(comm[1].fork(), prng, 1, 1 << 14, cmd.getOr("mock", 1));
 
     share(k, L, k0, k1, prng);
 
@@ -224,6 +226,11 @@ void RadixSort_bitInjection_test()
 
     bi0.request(g0);
     bi1.request(g1);
+
+    macoro::sync_wait(macoro::when_all_ready(
+        bi0.preprocess(),
+        bi1.preprocess()
+        ));
 
     macoro::sync_wait(macoro::when_all_ready(
         bi0.bitInjection(k0, 32, f0, comm[0]),
@@ -251,7 +258,7 @@ void RadixSort_bitInjection_test()
     }
 }
 
-void RadixSort_genValMasks2_test()
+void RadixSort_genValMasks2_test(const oc::CLP& cmd)
 {
 
     auto comm = coproto::LocalAsyncSocket::makePair();
@@ -280,8 +287,8 @@ void RadixSort_genValMasks2_test()
             }
 
             CorGenerator g0, g1;
-            g0.mock(CorGenerator::Role::Receiver);
-            g1.mock(CorGenerator::Role::Sender);
+            g0.init(comm[0].fork(), prng, 0, 1 << 14, cmd.getOr("mock", 1));
+            g1.init(comm[1].fork(), prng, 1, 1 << 14, cmd.getOr("mock", 1));
 
             share(k, k0, k1, prng);
             s0.mL = L;
@@ -413,7 +420,7 @@ inline auto printDiff(oc::MatrixView<u8> x, oc::MatrixView<u8> y, u64 bitCount) 
 }
 
 
-void RadixSort_genBitPerm_test()
+void RadixSort_genBitPerm_test(const oc::CLP& cmd)
 {
 
     auto comm = coproto::LocalAsyncSocket::makePair();
@@ -440,8 +447,8 @@ void RadixSort_genBitPerm_test()
                     BinMatrix k(n, m);
                     BinMatrix sk[2];
                     CorGenerator g[2];
-                    g[0].mock(CorGenerator::Role::Sender);
-                    g[1].mock(CorGenerator::Role::Receiver);
+                    g[0].init(comm[0].fork(), prng, 0, 1 << 14, cmd.getOr("mock", 1));
+                    g[1].init(comm[1].fork(), prng, 1, 1 << 14, cmd.getOr("mock", 1));
 
                     //m = L;
                     auto ll = oc::divCeil(m, L);
@@ -526,7 +533,7 @@ void RadixSort_genBitPerm_test()
 }
 
 
-void RadixSort_genPerm_test()
+void RadixSort_genPerm_test(const oc::CLP& cmd)
 {
     auto comm = coproto::LocalAsyncSocket::makePair();
 
@@ -541,10 +548,11 @@ void RadixSort_genPerm_test()
                 for (u64 tt = 0; tt < trials; ++tt)
                 {
                     CorGenerator g0, g1;
-                    g0.mock(CorGenerator::Role::Sender);
-                    g1.mock(CorGenerator::Role::Receiver);
 
                     PRNG prng(block(0, 0));
+                    g0.init(comm[0].fork(), prng, 0, 1 << 14, cmd.getOr("mock", 1));
+                    g1.init(comm[1].fork(), prng, 1, 1 << 14, cmd.getOr("mock", 1));
+
                     RadixSort s0, s1;
                     s0.mL = L;
                     s1.mL = L;
@@ -580,15 +588,23 @@ void RadixSort_genPerm_test()
 
                     share(k, k0, k1, prng);
 
+                    s0.init(0, n, bitCount);
+                    s1.init(1, n, bitCount);
+                    s0.request(g0);
+                    s1.request(g1);
+
                     macoro::sync_wait(macoro::when_all_ready(
-                        s0.genPerm(k0, p0, g0, comm[0], prng),
-                        s1.genPerm(k1, p1, g1, comm[1], prng)
+                        s0.preprocess(comm[0], prng),
+                        s1.preprocess(comm[1], prng)
+                    ));
+                    macoro::sync_wait(macoro::when_all_ready(
+                        s0.genPerm(k0, p0, comm[0], prng),
+                        s1.genPerm(k1, p1, comm[1], prng)
                     ));
 
                     auto act = reveal(p0, p1);
 
 
-                    //std::cout << timer << std::endl;
                     if (exp != act)
                     {
                         std::cout << "n " << n << " b " << bitCount << " L " << L << std::endl;
@@ -604,7 +620,7 @@ void RadixSort_genPerm_test()
 }
 
 
-void RadixSort_mock_test()
+void RadixSort_mock_test(const oc::CLP& cmd)
 {
     auto comm = coproto::LocalAsyncSocket::makePair();
 
@@ -616,11 +632,11 @@ void RadixSort_mock_test()
         {
             for (u64 tt = 0; tt < trials; ++tt)
             {
-                CorGenerator g0, g1;
-                g0.mock(CorGenerator::Role::Sender);
-                g1.mock(CorGenerator::Role::Receiver);
-
                 PRNG prng(block(0, 0));
+                CorGenerator g0, g1;
+                g0.init(comm[0].fork(), prng, 0, 1 << 14, cmd.getOr("mock", 1));
+                g1.init(comm[1].fork(), prng, 1, 1 << 14, cmd.getOr("mock", 1));
+
                 RadixSort s0, s1;
                 s0.mInsecureMock = true;
                 s1.mInsecureMock = true;
@@ -655,9 +671,18 @@ void RadixSort_mock_test()
 
                 share(k, k0, k1, prng);
 
+                s0.init(0, n, bitCount);
+                s1.init(1, n, bitCount);
+                s0.request(g0);
+                s1.request(g1);
+
                 macoro::sync_wait(macoro::when_all_ready(
-                    s0.genPerm(k0, p0, g0, comm[0], prng),
-                    s1.genPerm(k1, p1, g1, comm[1], prng)
+                    s0.preprocess(comm[0], prng),
+                    s1.preprocess(comm[1], prng)
+                ));
+                macoro::sync_wait(macoro::when_all_ready(
+                    s0.genPerm(k0, p0, comm[0], prng),
+                    s1.genPerm(k1, p1, comm[1], prng)
                 ));
 
                 auto act = reveal(p0, p1);

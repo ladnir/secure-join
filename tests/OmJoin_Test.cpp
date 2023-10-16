@@ -75,11 +75,8 @@ void OmJoin_getControlBits_Test(const oc::CLP& cmd)
     share(k, kk[0], kk[1], prng);
 
     CorGenerator ole0, ole1;
-    ole0.mock(CorGenerator::Role::Sender);
-    ole1.mock(CorGenerator::Role::Receiver);
-    ole0.mMock = cmd.isSet("noMock") == false;
-    ole1.mMock = cmd.isSet("noMock") == false;
-
+    ole0.init(sock[0].fork(), prng, 0, 1 << 14, cmd.getOr("mock", 1));
+    ole1.init(sock[1].fork(), prng, 1, 1 << 14, cmd.getOr("mock", 1));
 
     auto r = macoro::sync_wait(macoro::when_all_ready(
         OmJoin::getControlBits(kk[0], offset, keyBitCount, sock[0], cc[0], ole0, prng),
@@ -269,7 +266,7 @@ void OmJoin_join_Test(const oc::CLP& cmd)
 
     u64 keySize = cmd.getOr("keySize", 21);
     bool printSteps = cmd.isSet("print");
-    bool mock = !cmd.isSet("noMock");
+    bool mock = cmd.getOr("mock", 1);
 
     auto mod = 1ull << keySize;
     Table L, R;
@@ -322,16 +319,13 @@ void OmJoin_join_Test(const oc::CLP& cmd)
     join0.mInsecureMockSubroutines = mock;
     join1.mInsecureMockSubroutines = mock;
 
+    auto sock = coproto::LocalAsyncSocket::makePair();
     CorGenerator ole0, ole1;
-    ole0.mock(CorGenerator::Role::Sender);
-    ole1.mock(CorGenerator::Role::Receiver);
-    ole0.mMock = mock;
-    ole1.mMock = mock;
-
+    ole0.init(sock[0].fork(), prng, 0, 1 << 14, mock);
+    ole1.init(sock[1].fork(), prng, 1, 1 << 14, mock);
 
     PRNG prng0(oc::ZeroBlock);
     PRNG prng1(oc::OneBlock);
-    auto sock = coproto::LocalAsyncSocket::makePair();
 
     Table out[2];
 
@@ -378,7 +372,7 @@ void OmJoin_join_BigKey_Test(const oc::CLP& cmd)
         nR = cmd.getOr("R", 8);
 
     bool printSteps = cmd.isSet("print");
-    bool mock = !cmd.isSet("noMock");
+    bool mock = cmd.getOr("mock", 1);
 
     Table L, R;
 
@@ -428,15 +422,13 @@ void OmJoin_join_BigKey_Test(const oc::CLP& cmd)
     join1.mInsecureMockSubroutines = mock;
 
     CorGenerator ole0, ole1;
-    ole0.mock(CorGenerator::Role::Sender);
-    ole1.mock(CorGenerator::Role::Receiver);
-    ole0.mMock = mock;
-    ole1.mMock = mock;
+    auto sock = coproto::LocalAsyncSocket::makePair();
+    ole0.init(sock[0].fork(), prng, 0, 1 << 14, mock);
+    ole1.init(sock[1].fork(), prng, 1, 1 << 14, mock);
 
 
     PRNG prng0(oc::ZeroBlock);
     PRNG prng1(oc::OneBlock);
-    auto sock = coproto::LocalAsyncSocket::makePair();
 
     Table out[2];
 
@@ -479,7 +471,7 @@ void OmJoin_join_Reveal_Test(const oc::CLP& cmd)
     u64 nL = 20,
         nR = 9;
     bool printSteps = cmd.isSet("print");
-    bool mock = !cmd.isSet("noMock");
+    bool mock = cmd.getOr("mock", 1);
 
     Table L, R, LP, RP;
 
@@ -528,15 +520,13 @@ void OmJoin_join_Reveal_Test(const oc::CLP& cmd)
     join1.mInsecureMockSubroutines = mock;
 
     CorGenerator ole0, ole1;
-    ole0.mock(CorGenerator::Role::Sender);
-    ole1.mock(CorGenerator::Role::Receiver);
-    ole0.mMock = mock;
-    ole1.mMock = mock;
+    auto sock = coproto::LocalAsyncSocket::makePair();
+    ole0.init(sock[0].fork(), prng, 0, 1 << 14, mock);
+    ole1.init(sock[1].fork(), prng, 1, 1 << 14, mock);
 
 
     PRNG prng0(oc::ZeroBlock);
     PRNG prng1(oc::OneBlock);
-    auto sock = coproto::LocalAsyncSocket::makePair();
 
     Table out[2];
 
@@ -692,7 +682,7 @@ void OmJoin_join_round_Test(const oc::CLP& cmd)
     u64 nL = 2000,
         nR = 999;
     bool printSteps = cmd.isSet("print");
-    bool mock = !cmd.isSet("noMock");
+    bool mock = cmd.getOr("mock", 1);
     auto verbose = cmd.isSet("v");
 
     Table L, R;
@@ -736,15 +726,13 @@ void OmJoin_join_round_Test(const oc::CLP& cmd)
     join1.mInsecureMockSubroutines = mock;
 
     CorGenerator ole0, ole1;
-    ole0.mock(CorGenerator::Role::Sender);
-    ole1.mock(CorGenerator::Role::Receiver);
-    ole0.mMock = mock;
-    ole1.mMock = mock;
+    std::array<coproto::BufferingSocket, 2> sock;
+    ole0.init(sock[0].fork(), prng, 0, 1 << 14, mock);
+    ole1.init(sock[1].fork(), prng, 1, 1 << 14, mock);
 
 
     PRNG prng0(oc::ZeroBlock);
     PRNG prng1(oc::OneBlock);
-    std::array<coproto::BufferingSocket, 2> sock;
 
     Table out[2];
 

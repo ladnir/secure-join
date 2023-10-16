@@ -1,6 +1,5 @@
 #pragma once
-#include "secure-join/Util/Util.h"
-#include "secure-join/Perm/AdditivePerm.h"
+#include "cryptoTools/Common/CLP.h"
 
-void AdditivePerm_xor_test();
-void AdditivePerm_prepro_test();
+void AdditivePerm_xor_test(const oc::CLP& cmd);
+void AdditivePerm_prepro_test(const oc::CLP& cmd);

@@ -172,20 +172,12 @@ namespace secJoin_Tests
         prng.get(input0.data(), input0.size());
         prng.get(input1.data(), input1.size());
 
-        CorGenerator ole0, ole1;
-        ole0.mock(CorGenerator::Role::Sender);
-        ole1.mock(CorGenerator::Role::Receiver);
-
         auto cir = isZeroCircuit(bc);
         cmp0.init(n * 128, cir);
         cmp1.init(n * 128, cir);
 
         std::vector<block> a0(n), b0(n), c0(n), d0(n);
-        //std::vector<block> a1(n), b1(n), c1(n), d1(n);
         makeTriple(a0, b0, c0, d0, prng);
-        //makeTriple(a1, b1, c1, d1, prng);
-        //cmp0.setTriples(a0, b0, c1, d1);
-        //cmp1.setTriples(a1, b1, c0, d0);
 
         std::vector<block> buff(n);
         auto iter = buff.data();
@@ -244,10 +236,6 @@ namespace secJoin_Tests
             prng.get(x[i].data(), n);
             prng.get(y[i].data(), n);
         }
-
-        CorGenerator ole0, ole1;
-        ole0.mock(CorGenerator::Role::Sender);
-        ole1.mock(CorGenerator::Role::Receiver);
 
         auto cir = isZeroCircuit(bc);
         cmp0.init(n * 128, cir);
@@ -402,15 +390,17 @@ namespace secJoin_Tests
         cir.mOutputs.push_back(io);
 
 
+        PRNG prng(block(0, 0));
         CorGenerator ole;
-        ole.mock(CorGenerator::Role::Sender);
+        ole.init(oc::Socket{}, prng, 0, 1 << 14, cmd.getOr("mock", 1));
+
+
         Gmw gmw;
         gmw.init(n, cir);
 
         Matrix<u8> in(n, oc::divCeil(w, 8));
         Matrix<u8> out(n, oc::divCeil(w, 8));
 
-        PRNG prng(block(0, 0));
         prng.get(in.data(), in.size());
         gmw.setInput(0, in);
         gmw.getOutput(0, out);
@@ -428,7 +418,9 @@ namespace secJoin_Tests
         BetaCircuit cir = *oc::BetaLibrary().int_int_bitwiseXor(w, w, w);
 
         CorGenerator ole;
-        ole.mock(CorGenerator::Role::Sender);
+        auto socks = coproto::LocalAsyncSocket::makePair();
+        PRNG prng(block(0, 0));
+        ole.init(std::move(socks[0]), prng, 0);
         Gmw gmw;
         gmw.init(n, cir);
 
@@ -436,7 +428,6 @@ namespace secJoin_Tests
         Matrix<u8> in1(n, oc::divCeil(w, 8));
         Matrix<u8> out(n, oc::divCeil(w, 8));
 
-        PRNG prng(block(0, 0));
         prng.get(in0.data(), in0.size());
         prng.get(in1.data(), in1.size());
 
@@ -465,8 +456,9 @@ namespace secJoin_Tests
         PRNG prng(block(0, 0));
 
         CorGenerator ole0, ole1;
-        ole0.mock(CorGenerator::Role::Sender);
-        ole1.mock(CorGenerator::Role::Receiver);
+        ole0.init(chls[0].fork(), prng, 0, 1 << 14, cmd.getOr("mock", 1));
+        ole1.init(chls[1].fork(), prng, 1, 1 << 14, cmd.getOr("mock", 1));
+
 
         //macoro::thread_pool tp;
         //auto ww = tp.make_work();
@@ -550,8 +542,9 @@ namespace secJoin_Tests
 
         PRNG prng(block(0, 0));
         CorGenerator ole0, ole1;
-        ole0.mock(CorGenerator::Role::Sender);
-        ole1.mock(CorGenerator::Role::Receiver);
+        ole0.init(sockets[0].fork(), prng, 0, 1 << 14, cmd.getOr("mock", 1));
+        ole1.init(sockets[1].fork(), prng, 1, 1 << 14, cmd.getOr("mock", 1));
+
         Gmw gmw0, gmw1;
         gmw0.init(n, cir);
         gmw1.init(n, cir);
@@ -642,8 +635,8 @@ namespace secJoin_Tests
 
         PRNG prng(block(0, 0));
         CorGenerator ole0, ole1;
-        ole0.mock(CorGenerator::Role::Sender);
-        ole1.mock(CorGenerator::Role::Receiver);
+        ole0.init(sockets[0].fork(), prng, 0, 1 << 14, cmd.getOr("mock", 1));
+        ole1.init(sockets[1].fork(), prng, 1, 1 << 14, cmd.getOr("mock", 1));
         Gmw gmw0, gmw1;
         gmw0.init(n, cir);
         gmw1.init(n, cir);
@@ -722,8 +715,8 @@ namespace secJoin_Tests
 
         PRNG prng(block(0, 0));
         CorGenerator ole0, ole1;
-        ole0.mock(CorGenerator::Role::Sender);
-        ole1.mock(CorGenerator::Role::Receiver);
+        ole0.init(sockets[0].fork(), prng, 0, 1 << 14, cmd.getOr("mock", 1));
+        ole1.init(sockets[1].fork(), prng, 1, 1 << 14, cmd.getOr("mock", 1));
         gmw0.init(n, cir);
         gmw1.init(n, cir);
         gmw0.mO.mDebug = true;
@@ -809,8 +802,8 @@ namespace secJoin_Tests
 
         PRNG prng(block(0, 0));
         CorGenerator ole0, ole1;
-        ole0.mock(CorGenerator::Role::Sender);
-        ole1.mock(CorGenerator::Role::Receiver);
+        ole0.init(sockets[0].fork(), prng, 0, 1 << 14, cmd.getOr("mock", 1));
+        ole1.init(sockets[1].fork(), prng, 1, 1 << 14, cmd.getOr("mock", 1));
         gmw0.init(n, cir);
         gmw1.init(n, cir);
         gmw0.mO.mDebug = true;
@@ -908,8 +901,8 @@ namespace secJoin_Tests
         } };
 
         CorGenerator ole0, ole1;
-        ole0.mock(CorGenerator::Role::Sender);
-        ole1.mock(CorGenerator::Role::Receiver);
+        ole0.init(sockets[0].fork(), prng, 0, 1 << 14, cmd.getOr("mock", 1));
+        ole1.init(sockets[1].fork(), prng, 1, 1 << 14, cmd.getOr("mock", 1));
 
         gmw0.init(n, cir);
         gmw1.init(n, cir);
@@ -975,8 +968,8 @@ namespace secJoin_Tests
 
 
         CorGenerator ole0, ole1;
-        ole0.mock(CorGenerator::Role::Sender);
-        ole1.mock(CorGenerator::Role::Receiver);
+        ole0.init(sockets[0].fork(), prng, 0, 1 << 14, cmd.getOr("mock", 1));
+        ole1.init(sockets[1].fork(), prng, 1, 1 << 14, cmd.getOr("mock", 1));
 
         gmw0.init(n, cir);
         gmw1.init(n, cir);

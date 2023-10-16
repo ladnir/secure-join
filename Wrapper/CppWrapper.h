@@ -5,19 +5,19 @@
 
 namespace secJoin
 {
-    struct GenState;
+    struct WrapperState;
 
     void testApi(std::string& str);
-    GenState* initState(std::string& csvPath, std::string& visaMetaDataPath, std::string& clientMetaDataPath,
+    WrapperState* initState(std::string& csvPath, std::string& visaMetaDataPath, std::string& clientMetaDataPath,
         std::string& visaJoinCols, std::string& clientJoinCols, std::string& selectVisaCols,
         std::string& selectClientCols, bool isUnique,
         bool verbose, bool mock);
 
-    std::vector<u8> runJoin(GenState* stateAddress, std::vector<u8>& buff);
-    void releaseState(GenState* memoryAddress);
-    bool isProtocolReady(GenState* stateAddress);
-    void getOtherShare(GenState* stateAddress, bool isUnique);
-    void getJoinTable(GenState* stateAddress, std::string csvPath, std::string metaDataPath, bool isUnique);
+    std::vector<u8> runJoin(WrapperState* stateAddress, std::vector<u8>& buff);
+    void releaseState(WrapperState* memoryAddress);
+    bool isProtocolReady(WrapperState* stateAddress);
+    void getOtherShare(WrapperState* stateAddress, bool isUnique);
+    void getJoinTable(WrapperState* stateAddress, std::string csvPath, std::string metaDataPath, bool isUnique);
 
 }
 

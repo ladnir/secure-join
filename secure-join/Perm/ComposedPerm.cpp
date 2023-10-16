@@ -9,16 +9,25 @@ namespace secJoin
         mReceiver.setKeyOts(key, rk);
     }
 
-    void ComposedPerm::init2(u8 partyIdx, u64 n, u64 bytesPer, macoro::optional<bool> dlpnKeyGen)
+    void ComposedPerm::init2(u8 partyIdx, u64 n, u64 bytesPer, macoro::optional<bool> AltModKeyGen)
     {
         mPartyIdx = partyIdx;
-        mSender.init(n, bytesPer, dlpnKeyGen);
-        mReceiver.init(n, bytesPer, dlpnKeyGen);
+        mSender.init(n, bytesPer, AltModKeyGen);
+        mReceiver.init(n, bytesPer, AltModKeyGen);
     }
 
     void ComposedPerm::request(CorGenerator& ole)
     {
-        mSender.request(ole);
+        if (mPartyIdx)
+        {
+            mSender.request(ole);
+            mReceiver.request(ole);
+        }
+        else
+        {
+            mReceiver.request(ole);
+            mSender.request(ole);
+        }
     }
 
     void ComposedPerm::setBytePerRow(u64 bytesPer)
@@ -27,21 +36,33 @@ namespace secJoin
         mReceiver.setBytePerRow(bytesPer);
     }
 
-    macoro::task<> ComposedPerm::preprocess(
+    macoro::task<> ComposedPerm::preprocess()
+    {
+        MC_BEGIN(macoro::task<>, this, 
+            t0 = macoro::task<>{},
+            t1 = macoro::task<>{}
+        );
+
+        MC_AWAIT(macoro::when_all_ready(mSender.preprocess(), mReceiver.preprocess()));
+
+        MC_END();
+    }
+
+
+    macoro::task<> ComposedPerm::setup(
         coproto::Socket& chl, PRNG& prng_)
     {
         MC_BEGIN(macoro::task<>, this, &chl,
             prng = oc::PRNG(prng_.get<oc::block>()),
-            //ole2 = CorGenerator{},
             chl2 = coproto::Socket{ },
             prng2 = prng_.fork(),
             t0 = macoro::task<>{},
             t1 = macoro::task<>{}
         );
 
-        if (hasPermutation())
+        if (hasPermutation() == false)
             throw std::runtime_error("ComposedPerm permutation share has not been set. " LOCATION);
-            
+
         chl2 = chl.fork();
 
         if (mPartyIdx)
@@ -51,7 +72,7 @@ namespace secJoin
         }
         else
         {
-            t0 = mReceiver.setup(prng, chl );
+            t0 = mReceiver.setup(prng, chl);
             t1 = mSender.setup(prng2, chl2);
         }
 
@@ -70,6 +91,9 @@ namespace secJoin
         oc::PRNG& prng
         )
     {
+
+        if (out.rows() != size())
+            throw RTE_LOC;
         MC_BEGIN(macoro::task<>, in, out, &chl, op, &prng,
             this,
             soutperm = oc::Matrix<u8>{}

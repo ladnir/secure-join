@@ -1,9 +1,9 @@
 #include "benchmark.h"
-#include "secure-join/Prf/DLpnPrf.h"
+#include "secure-join/Prf/AltModPrf.h"
 
 namespace secJoin
 {
-    void Dlpn_benchmark(const oc::CLP& cmd)
+    void AltMod_benchmark(const oc::CLP& cmd)
     {
 
 
@@ -13,8 +13,8 @@ namespace secJoin
 
         oc::Timer timer;
 
-        DLpnPrfSender sender;
-        DLpnPrfReceiver recver;
+        AltModPrfSender sender;
+        AltModPrfReceiver recver;
 
         sender.setTimer(timer);
         recver.setTimer(timer);
@@ -27,15 +27,15 @@ namespace secJoin
         oc::PRNG prng0(oc::ZeroBlock);
         oc::PRNG prng1(oc::OneBlock);
 
-        DLpnPrf dm;
+        AltModPrf dm;
         oc::block kk;
         kk = prng0.get();
         dm.setKey(kk);
         //sender.setKey(kk);
 
         CorGenerator ole0, ole1;
-        ole0.mock(CorGenerator::Role::Sender);
-        ole1.mock(CorGenerator::Role::Receiver);
+        ole0.init(sock[0].fork(), prng0, 0, 1 << 14, cmd.getOr("mock", 1));
+        ole1.init(sock[1].fork(), prng1, 1, 1 << 14, cmd.getOr("mock", 1));
 
 
         prng0.get(x.data(), x.size());
@@ -63,7 +63,7 @@ namespace secJoin
         }
         auto end = timer.setTimePoint("end");
 
-        std::cout << "DlpnPrf n:" << n << ", " <<
+        std::cout << "AltModPrf n:" << n << ", " <<
             std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "ms " <<
             sock[0].bytesSent() / double(n) << "+" << sock[0].bytesReceived() / double(n) << "=" <<
             (sock[0].bytesSent() + sock[0].bytesReceived()) / double(n) << " bytes/eval " << std::endl;
@@ -74,7 +74,7 @@ namespace secJoin
             std::cout << sock[0].bytesReceived() / 1000.0 << " " << sock[0].bytesSent() / 1000.0 << " kB " << std::endl;
         }
     }
-    void Dlpn_compressB_benchmark(const oc::CLP& cmd)
+    void AltMod_compressB_benchmark(const oc::CLP& cmd)
     {
         u64 n = cmd.getOr("n", 1ull << cmd.getOr("nn", 20));
         oc::AlignedUnVector<oc::block> y(n);

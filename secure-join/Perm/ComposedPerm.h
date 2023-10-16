@@ -2,7 +2,7 @@
 #include "secure-join/Perm/LowMCPerm.h"
 #include "secure-join/Perm/InsecurePerm.h"
 #include "secure-join/GMW/Gmw.h"
-#include "secure-join/Perm/DLpnPerm.h"
+#include "secure-join/Perm/AltModPerm.h"
 
 namespace secJoin
 {
@@ -15,10 +15,10 @@ namespace secJoin
         u64 mPartyIdx = -1;
 
         // The permutation protocol for mPi
-        DLpnPermSender mSender;
+        AltModPermSender mSender;
 
         // The permutation protocol for the other share.
-        DLpnPermReceiver mReceiver;
+        AltModPermReceiver mReceiver;
 
         // A flag that skips the actual protocol and insecurely permutes the data.
         bool mIsSecure = true;
@@ -30,20 +30,20 @@ namespace secJoin
         ComposedPerm& operator=(ComposedPerm&&) noexcept = default;
 
         //initializing the permutation
-        ComposedPerm(Perm perm, u8 partyIdx)
+        ComposedPerm(Perm perm, u8 partyIdx, u64 rowSize = 0)
         {
-            init2(partyIdx, perm.size());
+            init2(partyIdx, perm.size(), rowSize);
             mSender.setPermutation(std::move(perm));
         }
 
         // initializing with a random permutation.
-        ComposedPerm(u64 n, u8 partyIdx, PRNG& prng)
+        ComposedPerm(u64 n, u8 partyIdx, PRNG& prng, u64 rowSize = 0)
         {
-            init2(partyIdx, n);
+            init2(partyIdx, n, rowSize);
             samplePermutation(prng);
         }
 
-        // set the dlpn permutation protocol key OTs. These should be DLpn::KeySize OTs in both directions.
+        // set the AltMod permutation protocol key OTs. These should be AltMod::KeySize OTs in both directions.
         void setKeyOts(
             oc::block& key,
             std::vector<oc::block>& rk,
@@ -54,10 +54,10 @@ namespace secJoin
 
         // initialize the permutation to have the given size.
         // partyIdx should be in {0,1}, n is size, bytesPer can be
-        // set to how many bytes the user wants to permute. dlpnKeyGen
-        // can be set if the user wants to control if the DLpn kets 
+        // set to how many bytes the user wants to permute. AltModKeyGen
+        // can be set if the user wants to control if the AltMod kets 
         // should be sampled or not.
-        void init2(u8 partyIdx, u64 n, u64 bytesPer = 0, macoro::optional<bool> dlpnKeyGen = {});
+        void init2(u8 partyIdx, u64 n, u64 bytesPer = 0, macoro::optional<bool> AltModKeyGen = {});
 
         // Clear the set permutations and any correlated randomness 
         // that is assoicated to them.
@@ -67,9 +67,9 @@ namespace secJoin
             mReceiver.clearPermutation();
         }
 
-        // returns true if there is preprocessing that has not been derandomized
+        // returns true if there is permutation setup that has not been derandomized
         // to a user chosen permutation.
-        bool hasPreprocessing() const { return mSender.hasPreprocessing(); }
+        bool hasRandomSetup() const { return mSender.hasRandomSetup(); }
 
         //returns true if we have requested correlated randomness
         bool hasRequest() const { return mSender.hasRequest(); }
@@ -93,7 +93,10 @@ namespace secJoin
         void setBytePerRow(u64 bytesPer);
 
         // Generate the required correlated randomness.
-        macoro::task<> preprocess(
+        macoro::task<> preprocess();
+
+        // generate the permutation correlation
+        macoro::task<> setup(
             coproto::Socket& chl,
             PRNG& prng);
 

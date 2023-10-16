@@ -5,7 +5,7 @@
 
 namespace secJoin
 {
-    struct GenState
+    struct WrapperState
     {
         std::vector<ColumnInfo> mLColInfo, mRColInfo;
         std::vector<ColRef> selectCols; // Remove this later

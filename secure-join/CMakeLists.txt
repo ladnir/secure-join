@@ -2,20 +2,22 @@
 
 
 set(SRCS
-    "Prf/DLpnPrf.cpp"
+    "Prf/AltModPrf.cpp"
     "Prf/DarkMatter22Prf.cpp"
 
+    
     "CorGenerator/CorGenerator.cpp"
-    "CorGenerator/CorGenerator2.cpp"
-    "CorGenerator/OtGenerator.cpp"
-    "CorGenerator/BinOleGenerator.cpp"
+    "CorGenerator/Request.cpp"
+    "CorGenerator/Batch.cpp"
+    "CorGenerator/OtBatch.cpp"
+    "CorGenerator/BinOleBatch.cpp"
 
     
     "Perm/Permutation.cpp"
     "Perm/ComposedPerm.cpp"
     "Perm/LowMCPerm.cpp"
     "Perm/AdditivePerm.cpp"
-    "Perm/DLpnPerm.cpp"
+    "Perm/AltModPerm.cpp"
     
     "Perm/PaillierPerm.cpp"
 

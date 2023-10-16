@@ -48,9 +48,9 @@ namespace secJoin
 
         // initialize the permutation to be the given size. partyIdx should be in {0,1}.
         // bytesPer can be set to the number of bytes you will want to permute. This can
-        // later be set using setBytePerRow(). dlpnKeyGen can be set if you want to explicitly 
-        // control of the DLpn keygen should be performed.
-        void init2(u8 partyIdx, u64 size, u64 bytesPer = 0, macoro::optional<bool> dlpnKeyGen = {});
+        // later be set using setBytePerRow(). AltModKeyGen can be set if you want to explicitly 
+        // control of the AltMod keygen should be performed.
+        void init2(u8 partyIdx, u64 size, u64 bytesPer = 0, macoro::optional<bool> AltModKeyGen = {});
 
         // Set the XOR shared of the permutation.
         void setShares(span<u32> shares)
@@ -61,7 +61,7 @@ namespace secJoin
             memcpy<u32,u32>(mShare, shares);
         }
 
-        // set the dlpn permutation protocol key OTs. These should be DLpn::KeySize OTs in both directions.
+        // set the AltMod permutation protocol key OTs. These should be AltMod::KeySize OTs in both directions.
         void setKeyOts(
             oc::block& key,
             std::vector<oc::block>& rk,
@@ -72,7 +72,7 @@ namespace secJoin
 
         // Set the number of bytes we will be permuting. This will cause any correlated randomness
         // to be thrown out.
-        void setBytePerRow(u64 bytesPer) { mRandPi.setBytePerRow(bytesPer); }
+        void setBytePerRow(u64 bytesPer) { mRandPi.setBytePerRow(bytesPer + 4 * bool(mRho.size())); }
 
         // generate the masking (replicated) permutation mRandPi
         // and then reveal mRhoPP = mRandPi(mShares).
@@ -140,9 +140,7 @@ namespace secJoin
 
         void request(CorGenerator& ole);
 
-        macoro::task<> preprocess(
-            coproto::Socket& chl,
-            oc::PRNG& prng);
+        macoro::task<> preprocess();
 
         void clearPermutation()
         {
@@ -155,10 +153,10 @@ namespace secJoin
             return mRandPi.hasRequest();
         }
 
-        // return true if we have preprocessing that has not been derandomized.
-        bool hasPreprocessing()
+        // return true if we have permutation setup that has not been derandomized.
+        bool hasRandomSetup()
         {
-            return mRandPi.hasPreprocessing();
+            return mRandPi.hasRandomSetup();
         }
 
         bool hasSetup(u64 bytes) const

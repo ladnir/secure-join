@@ -1,22 +1,22 @@
 #pragma once
 
 #include "secure-join/Defines.h"
-#include "secure-join/Prf/DLpnPrf.h"
+#include "secure-join/Prf/AltModPrf.h"
 #include "secure-join/Perm/Permutation.h"
 
 namespace secJoin
 {
 
-    class DLpnPermSender
+    class AltModPermSender
     {
     public:
-        static constexpr auto mDebug = DLpnPrfSender::mDebug;
+        bool mDebug = false;
 
-        // The dlpn prf protocol
-        DLpnPrfReceiver mRecver;
+        // The AltMod prf protocol
+        AltModPrfReceiver mRecver;
 
-        // true if we have preprocessing that has not been derandimized to a chosen permutation.
-        bool mHasPreprocess = false;
+        // true if we have setup that has not been derandimized to a chosen permutation.
+        bool mHasRandomSetup = false;
 
         // The random permutation that is used for preprocessing. If we dont do 
         // preprocessing then this will be empty.
@@ -41,15 +41,17 @@ namespace secJoin
         // If the sender passed in the permutation mPi by value, we store it here.
         Perm mPermStorage;
 
-        DLpnPermSender() = default;
-        DLpnPermSender(const DLpnPermSender&) = default;
-        DLpnPermSender(DLpnPermSender&&) noexcept = default;
-        DLpnPermSender& operator=(const DLpnPermSender&) = default;
-        DLpnPermSender& operator=(DLpnPermSender&&) noexcept = default;
+        macoro::optional<bool> mKeyGen;
+
+        AltModPermSender() = default;
+        AltModPermSender(const AltModPermSender&) = default;
+        AltModPermSender(AltModPermSender&&) noexcept = default;
+        AltModPermSender& operator=(const AltModPermSender&) = default;
+        AltModPermSender& operator=(AltModPermSender&&) noexcept = default;
 
         // initialize this sender to have a permutation of size n, where 
         // bytesPerRow bytes can be permuted per position. keyGen can be 
-        // set if the caller wants to explicitly ask to perform dlpn keygen or not.
+        // set if the caller wants to explicitly ask to perform AltMod keygen or not.
         void init(u64 n, u64 bytesPerRow = 0, macoro::optional<bool> keyGen = {});
 
         void setBytePerRow(u64 bytesPer)
@@ -67,8 +69,7 @@ namespace secJoin
             mRecver.init(oc::divCeil(bytesPer, sizeof(oc::block)) * mNumElems, mRecver.mDoKeyGen);
         }
 
-        // returns true of we have requested correlated randomness.
-        bool hasRequest();
+        bool hasPreprocessing() const;
 
         // clears the internal state
         void clear();
@@ -84,15 +85,13 @@ namespace secJoin
         // clear the permutation and any of its correlated randomness.
         void clearPermutation()
         {
-            if (hasPreprocessing() == false)
-            {
-                clear();
-            }
+            clearCorrelatedRandomness();
+            mPi = nullptr;
         }
 
         void clearCorrelatedRandomness()
         {
-            mHasPreprocess = 0;
+            mHasRandomSetup = 0;
             mByteOffset = mBytesPerRow;
             mDelta.resize(0, 0);
         }
@@ -117,11 +116,11 @@ namespace secJoin
             coproto::Socket& chl
         );
 
-        // set the dlpn key OTs
+        // set the AltMod key OTs
         void setKeyOts(std::vector<std::array<oc::block, 2>>& sk);
 
         // return true if we have preprocessing that has not yet been derandomized.
-        bool hasPreprocessing() const { return mHasPreprocess; }
+        bool hasRandomSetup() const { return mHasRandomSetup; }
 
         //returns true if we have requested correlated randomness
         bool hasRequest() const { return mRecver.hasRequest(); }
@@ -137,7 +136,7 @@ namespace secJoin
 
         // Invoke the preprocessing protocol. This will sample a random permutation
         // that we can later derandomize.
-        //macoro::task<> preprocess(oc::PRNG& prng, coproto::Socket& chl);
+        macoro::task<> preprocess();
 
         // for debugging, check that the correlated randomness is correct.
         macoro::task<> validateShares(coproto::Socket& sock, Perm p);
@@ -150,16 +149,16 @@ namespace secJoin
     };
 
 
-    class DLpnPermReceiver
+    class AltModPermReceiver
     {
     public:
-        static constexpr auto mDebug = DLpnPrfSender::mDebug;
+        bool mDebug = false;
 
-        // The dlpn prf sender protocol.
-        DLpnPrfSender mSender;
+        // The AltMod prf sender protocol.
+        AltModPrfSender mSender;
 
         // true if we have preprocessing that has not been derandomized to a chosen permutation.
-        bool mHasPreprocess = false;
+        bool mHasRandomSetup = false;
 
         // The shares held by the receiver. mDelta ^ mB = mPi(mA)
         oc::Matrix<oc::block> mA, mB;
@@ -174,18 +173,21 @@ namespace secJoin
         // This allows us to perform setup one and permute multiple inputs shares.
         u64 mByteOffset = 0;
 
-        DLpnPermReceiver() = default;
-        DLpnPermReceiver(const DLpnPermReceiver&) = default;
-        DLpnPermReceiver(DLpnPermReceiver&&) noexcept = default;
-        DLpnPermReceiver& operator=(const DLpnPermReceiver&) = default;
-        DLpnPermReceiver& operator=(DLpnPermReceiver&&) noexcept = default;
+        macoro::optional<bool> mKeyGen;
+
+        AltModPermReceiver() = default;
+        AltModPermReceiver(const AltModPermReceiver&) = default;
+        AltModPermReceiver(AltModPermReceiver&&) noexcept = default;
+        AltModPermReceiver& operator=(const AltModPermReceiver&) = default;
+        AltModPermReceiver& operator=(AltModPermReceiver&&) noexcept = default;
 
         void init(u64 n, u64 bytesPer = 0, macoro::optional<bool> keyGen = {})
         {
             clear();
             mNumElems = n;
             mBytesPerRow = bytesPer;
-            mSender.init(oc::divCeil(bytesPer, sizeof(oc::block)) * mNumElems, keyGen);
+            mByteOffset = bytesPer;
+            mKeyGen = keyGen;
         }
 
         void setBytePerRow(u64 bytesPer)
@@ -196,12 +198,14 @@ namespace secJoin
             clearCorrelatedRandomness();
             mBytesPerRow = bytesPer;
             mByteOffset = bytesPer;
-            mSender.init(oc::divCeil(bytesPer, sizeof(oc::block)) * mNumElems, mSender.mDoKeyGen);
         }
 
         void setKeyOts(oc::block& key, std::vector<oc::block>& rk);
 
-        bool hasRequest() { return mSender.hasRequest(); }
+        bool hasRequest() const { return mSender.hasRequest(); }
+
+        bool hasPreprocessing() const { return mSender.hasPreprocessing(); }
+
 
         void clear()
         {
@@ -211,13 +215,13 @@ namespace secJoin
             mByteOffset = 0;
             mNumElems = 0;
             mBytesPerRow = 0;
-            mHasPreprocess = 0;
+            mHasRandomSetup = 0;
         }
 
 
         void clearCorrelatedRandomness()
         {
-            mHasPreprocess = 0;
+            mHasRandomSetup = 0;
             mByteOffset = mBytesPerRow;
             mA.resize(0, 0);
             mB.resize(0, 0);
@@ -236,13 +240,12 @@ namespace secJoin
 
         // If we have derandomized random correlations, then clear
         void clearPermutation() {
-            if (hasPreprocessing() == false)
-                clear();
+            clearCorrelatedRandomness();
         }
 
         // returns true if we have preprocessing for a random permutation. 
         // This random permutation can be later derandomized to a chosen perm.
-        bool hasPreprocessing() const { return mHasPreprocess; }
+        bool hasRandomSetup() const { return mHasRandomSetup; }
 
         // returns how must correlated randomness is left in bytes. 
         u64 remainingSetup() const { return mBytesPerRow - mByteOffset; }
@@ -254,7 +257,7 @@ namespace secJoin
         void request(CorGenerator& ole);
 
         // generete preprocessing for a rnadom permutation. This can be derandomized to a chosen perm later.
-        //macoro::task<> preprocess(oc::PRNG& prng, coproto::Socket& chl);
+        macoro::task<> preprocess();
 
         // For debugging. Check that the correlated randomness is correct.
         macoro::task<> validateShares(coproto::Socket& sock);
@@ -267,7 +270,7 @@ namespace secJoin
     };
 
     //template <>
-    //macoro::task<> DLpnPermSender::apply<u8>(
+    //macoro::task<> AltModPermSender::apply<u8>(
     //    const Perm& pi,
     //    PermOp op,
     //    oc::MatrixView<u8> sout,
@@ -276,7 +279,7 @@ namespace secJoin
     //    CorGenerator& ole);
 
     //template <typename T>
-    //macoro::task<> DLpnPermSender::apply(
+    //macoro::task<> AltModPermSender::apply(
     //    const Perm& pi,
     //    PermOp op,
     //    oc::MatrixView<T> sout,
@@ -289,14 +292,14 @@ namespace secJoin
 
 
     template <>
-    macoro::task<> DLpnPermSender::apply<u8>(
+    macoro::task<> AltModPermSender::apply<u8>(
         PermOp op,
         oc::MatrixView<u8> sout,
         oc::PRNG& prng,
         coproto::Socket& chl);
 
     template <typename T>
-    macoro::task<> DLpnPermSender::apply(
+    macoro::task<> AltModPermSender::apply(
         PermOp op,
         oc::MatrixView<T> sout,
         oc::PRNG& prng,
@@ -307,7 +310,7 @@ namespace secJoin
 
     // Generic version of below method
     //template <>
-    //macoro::task<> DLpnPermSender::apply<u8>(
+    //macoro::task<> AltModPermSender::apply<u8>(
     //    const Perm& pi,
     //    PermOp op,
     //    oc::MatrixView<const u8> in,
@@ -318,7 +321,7 @@ namespace secJoin
 
     //// Generic version of below method
     //template <typename T>
-    //macoro::task<> DLpnPermSender::apply(
+    //macoro::task<> AltModPermSender::apply(
     //    const Perm& pi,
     //    PermOp op,
     //    oc::MatrixView<const T> in,
@@ -332,7 +335,7 @@ namespace secJoin
 
     // Generic version of below method
     template <>
-    macoro::task<> DLpnPermSender::apply<u8>(
+    macoro::task<> AltModPermSender::apply<u8>(
         PermOp op,
         oc::MatrixView<const u8> in,
         oc::MatrixView<u8> sout,
@@ -341,7 +344,7 @@ namespace secJoin
 
     // Generic version of below method
     template <typename T>
-    macoro::task<> DLpnPermSender::apply(
+    macoro::task<> AltModPermSender::apply(
         PermOp op,
         oc::MatrixView<const T> in,
         oc::MatrixView<T> sout,
@@ -352,7 +355,7 @@ namespace secJoin
     }
 
     template <>
-    macoro::task<> DLpnPermReceiver::apply<u8>(
+    macoro::task<> AltModPermReceiver::apply<u8>(
         PermOp op,
         oc::MatrixView<const u8> in,
         oc::MatrixView<u8> sout,
@@ -362,7 +365,7 @@ namespace secJoin
 
     // Generic version of below method
     template <typename T>
-    macoro::task<> DLpnPermReceiver::apply(
+    macoro::task<> AltModPermReceiver::apply(
         PermOp op,
         oc::MatrixView<const T> in,
         oc::MatrixView<T> sout,

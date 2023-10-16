@@ -3,13 +3,13 @@
 #include "LowMCPerm_Test.h"
 #include "PaillierPerm_Test.h"
 #include "ComposedPerm_Test.h"
-#include "DarkMatterPrf_Test.h"
+#include "AltModPrf_Test.h"
 #include "GMW_Test.h"
 #include "RadixSort_Test.h"
 
 #include <functional>
 
-#include "DlpnPerm_Test.h"
+#include "AltModPerm_Test.h"
 #include "PaillierPerm_Test.h"
 #include "ComposedPerm_Test.h"
 #include "AdditivePerm_Test.h"
@@ -46,22 +46,23 @@ namespace secJoin_Tests
             t.add("Gmw_noLevelize_test                           ", Gmw_noLevelize_test);
 
             // t.add("PaillierPerm_basic_test                       ", PaillierPerm_basic_test);
-            t.add("DLpnPrf_mod3BitDecompostion_test              ", DLpnPrf_mod3BitDecompostion_test);
+            t.add("AltModPrf_mod3BitDecompostion_test              ", AltModPrf_mod3BitDecompostion_test);
 
 
-            t.add("DLpnPrf_BMult_test                            ", DLpnPrf_BMult_test);
-            t.add("DLpnPrf_mod3_test                             ", DLpnPrf_mod3_test);
-            t.add("DLpnPrf_mod2_test                             ", DLpnPrf_mod2_test);
-            t.add("DLpnPrf_plain_test                            ", DLpnPrf_plain_test);
-            t.add("DLpnPrf_proto_test                            ", DLpnPrf_proto_test);
+            t.add("AltModPrf_BMult_test                            ", AltModPrf_BMult_test);
+            t.add("AltModPrf_mod3_test                             ", AltModPrf_mod3_test);
+            t.add("AltModPrf_mod2_test                             ", AltModPrf_mod2_test);
+            t.add("AltModPrf_plain_test                            ", AltModPrf_plain_test);
+            t.add("AltModPrf_proto_test                            ", AltModPrf_proto_test);
 
-            t.add("DlpnPerm_setup_test                           ", DlpnPerm_setup_test);
-            t.add("DlpnPerm_apply_test                           ", DlpnPerm_apply_test);
-            t.add("DlpnPerm_sharedApply_test                     ", DlpnPerm_sharedApply_test);
-            t.add("DlpnPerm_prepro_test                          ", DlpnPerm_prepro_test);
+            t.add("AltModPerm_setup_test                           ", AltModPerm_setup_test);
+            t.add("AltModPerm_apply_test                           ", AltModPerm_apply_test);
+            t.add("AltModPerm_sharedApply_test                     ", AltModPerm_sharedApply_test);
+            t.add("AltModPerm_prepro_test                          ", AltModPerm_prepro_test);
 
             t.add("LocMC_eval_test                               ", LocMC_eval_test);
 
+            t.add("plaintext_perm_test                           ", plaintext_perm_test);
             t.add("LowMCPerm_perm_test                           ", LowMCPerm_perm_test);
             t.add("LowMCPerm_secret_shared_input_perm_test       ", LowMCPerm_secret_shared_input_perm_test);
             t.add("ComposedPerm_basic_test                       ", ComposedPerm_basic_test);

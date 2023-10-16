@@ -30,8 +30,8 @@ void LocMC_eval_test(const oc::CLP& cmd)
 
     auto chls = coproto::LocalAsyncSocket::makePair();
     CorGenerator ole0, ole1;
-    ole0.mock(CorGenerator::Role::Sender);
-    ole1.mock(CorGenerator::Role::Receiver);
+    ole0.init(chls[0].fork(), prng0, 0, 1 << 14, cmd.getOr("mock", 1));
+    ole1.init(chls[1].fork(), prng1, 1, 1 << 14, cmd.getOr("mock", 1));
     Gmw gmw0, gmw1;
     gmw0.init(n, cir);
     gmw1.init(n, cir);
@@ -73,8 +73,8 @@ void LowMCPerm_perm_test(const oc::CLP& cmd)
 
     auto chls = coproto::LocalAsyncSocket::makePair();
     CorGenerator ole0, ole1;
-    ole0.mock(CorGenerator::Role::Sender);
-    ole1.mock(CorGenerator::Role::Receiver);
+    ole0.init(chls[0].fork(), prng, 0, 1 << 14, cmd.getOr("mock", 1));
+    ole1.init(chls[1].fork(), prng, 1, 1 << 14, cmd.getOr("mock", 1));
 
 
     // Initializing the vector x & permutation pi
@@ -104,7 +104,7 @@ void LowMCPerm_perm_test(const oc::CLP& cmd)
     }
 }
 
-void LowMCPerm_secret_shared_input_perm_test()
+void LowMCPerm_secret_shared_input_perm_test(const oc::CLP& cmd)
 {
     // User input
     u64 n = 144;    // total number of rows
@@ -121,8 +121,8 @@ void LowMCPerm_secret_shared_input_perm_test()
     Perm pi(n,prng);
 
     CorGenerator ole0, ole1;
-    ole0.mock(CorGenerator::Role::Sender);
-    ole1.mock(CorGenerator::Role::Receiver);
+    ole0.init(chls[0].fork(), prng, 0, 1 << 14, cmd.getOr("mock", 1));
+    ole1.init(chls[1].fork(), prng, 1, 1 << 14, cmd.getOr("mock", 1));
 
     // Initializing the vector x & permutation pi
     prng.get(x.data(), x.size());

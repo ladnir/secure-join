@@ -45,12 +45,12 @@ set(SRCS
 	ComposedPerm_Test.cpp
 	PaillierPerm_Test.cpp
 	AdditivePerm_Test.cpp
-	DarkMatterPrf_Test.cpp
+	"AltModPrf_Test.cpp"
 	CorGenerator_Test.cpp
 	GMW_Test.cpp
 	RadixSort_Test.cpp
 	AggTree_Tests.cpp
-	DlpnPerm_Test.cpp
+	AltModPerm_Test.cpp
 	CSVParser_Test.cpp
 	OmJoin_Test.cpp
 	CWrapper_Test.cpp

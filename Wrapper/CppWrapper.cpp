@@ -10,12 +10,12 @@ namespace secJoin
         std::cout << str << std::endl;
     }
 
-    GenState* initState(std::string& csvPath, std::string& visaMetaDataPath, std::string& clientMetaDataPath,
+    WrapperState* initState(std::string& csvPath, std::string& visaMetaDataPath, std::string& clientMetaDataPath,
         std::string& visaJoinCols, std::string& clientJoinCols, std::string& selectVisaCols,
         std::string& selectClientCols, bool isUnique,
         bool verbose, bool mock)
     {
-        GenState* cState = new GenState;
+        WrapperState* cState = new WrapperState;
         oc::u64 lRowCount = 0, rRowCount = 0;
 
 
@@ -58,9 +58,11 @@ namespace secJoin
         // Current assumption are that Visa always provides table with unique keys 
         // Which means Visa always has to be left Table
         if (isUnique)
-            cState->mOle.mock(CorGenerator::Role::Sender);
+            cState->mOle.init(cState->mSock.fork(), cState->mPrng, 0, 1 << 14, mock);
+            //cState->mOle.mock(CorGenerator::Role::Sender);
         else
-            cState->mOle.mock(CorGenerator::Role::Receiver);
+            cState->mOle.init(cState->mSock.fork(), cState->mPrng, 1, 1 << 14, mock);
+            //cState->mOle.mock(CorGenerator::Role::Receiver);
 
 
         cState->mProtocol =
@@ -72,7 +74,7 @@ namespace secJoin
     }
 
 
-    std::vector<oc::u8> runJoin(GenState* cState, std::vector<oc::u8>& buff)
+    std::vector<oc::u8> runJoin(WrapperState* cState, std::vector<oc::u8>& buff)
     {
         cState->mSock.processInbound(buff);
 
@@ -89,18 +91,18 @@ namespace secJoin
 
     }
 
-    void releaseState(GenState* state)
+    void releaseState(WrapperState* state)
     {
         delete state;
     }
 
-    bool isProtocolReady(GenState* cState)
+    bool isProtocolReady(WrapperState* cState)
     {
         return cState->mProtocol.is_ready();
 
     }
 
-    void getOtherShare(GenState* cState, bool isUnique)
+    void getOtherShare(WrapperState* cState, bool isUnique)
     {
         // Assuming Visa always receives the client's share
         if (isUnique)
@@ -115,7 +117,7 @@ namespace secJoin
         }
     }
 
-    void getJoinTable(GenState* cState, std::string csvPath, std::string metaDataPath, bool isUnique)
+    void getJoinTable(WrapperState* cState, std::string csvPath, std::string metaDataPath, bool isUnique)
     {
         writeFileInfo(metaDataPath, cState->mOutTable);
         writeFileData(csvPath, cState->mOutTable);

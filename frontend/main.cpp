@@ -12,14 +12,14 @@ int main(int argc, char** argv)
 
     if (clp.isSet("bench"))
     {
-        if (clp.isSet("Dlpn"))
+        if (clp.isSet("AltMod"))
         {
-            Dlpn_benchmark(clp);
+            AltMod_benchmark(clp);
             return 0;
         }
         if (clp.isSet("CompressB"))
         {
-            Dlpn_compressB_benchmark(clp);
+            AltMod_compressB_benchmark(clp);
             return 0;
         }
     }

@@ -1,14 +1,14 @@
-#include "DLpnPerm.h"
+#include "AltModPerm.h"
 #include "secure-join/Util/Matrix.h"
 namespace secJoin
 {
 
-    void DLpnPermReceiver::setKeyOts(oc::block& key, std::vector<oc::block>& rk)
+    void AltModPermReceiver::setKeyOts(oc::block& key, std::vector<oc::block>& rk)
     {
         mSender.setKeyOts(key, rk);
     }
 
-    void DLpnPermSender::setKeyOts(std::vector<std::array<oc::block, 2>>& sk)
+    void AltModPermSender::setKeyOts(std::vector<std::array<oc::block, 2>>& sk)
     {
         mRecver.setKeyOts(sk);
     }
@@ -39,67 +39,72 @@ namespace secJoin
     }
 
     // generate the preprocessing when all inputs are unknown.
-    void DLpnPermSender::request(CorGenerator& ole)
+    void AltModPermSender::request(CorGenerator& ole)
     {
         if (mNumElems == 0)
-            throw std::runtime_error("DLpnPermSender::init must be called before request. " LOCATION);
+            throw std::runtime_error("AltModPermSender::init must be called before request. " LOCATION);
+        if (mByteOffset == 0)
+            throw std::runtime_error("the number of bytes per element is not set. call setBytePerRow(...). " LOCATION);
         if(hasRequest())
             throw std::runtime_error("the correlated randomness has already been requested. " LOCATION);
 
+        mRecver.init(oc::divCeil(mBytesPerRow, sizeof(oc::block)) * mNumElems, mKeyGen);
         mRecver.request(ole);
     }
 
-    void DLpnPermReceiver::request(CorGenerator& ole)
+    void AltModPermReceiver::request(CorGenerator& ole)
     {
         if (mNumElems == 0)
-            throw std::runtime_error("DLpnPermReceiver::init must be called before request. " LOCATION);
+            throw std::runtime_error("AltModPermReceiver::init must be called before request. " LOCATION);
+        if (mByteOffset == 0)
+            throw std::runtime_error("the number of bytes per element is not set. call setBytePerRow(...). " LOCATION);
         if (hasRequest())
             throw std::runtime_error("the correlated randomness has already been requested. " LOCATION);
 
+        mSender.init(oc::divCeil(mBytesPerRow, sizeof(oc::block)) * mNumElems, mKeyGen);
         mSender.request(ole);
     }
 
-    //macoro::task<> DLpnPermReceiver::preprocess(oc::PRNG& prng, coproto::Socket& chl)
-    //{
-    //    if (hasRequest() == false)
-    //        throw std::runtime_error("DLpnPermReceiver::request() must be called before DLpnPermReceiver::preprocess() " LOCATION);
+    macoro::task<> AltModPermReceiver::preprocess()
+    {
+        if (hasRequest() == false)
+            throw std::runtime_error("AltModPermReceiver::request() must be called before AltModPermReceiver::preprocess() " LOCATION);
 
-    //    return setup(prng, chl);
-    //}
+        return mSender.preprocess();
+    }
 
-    //macoro::task<> DLpnPermSender::preprocess(oc::PRNG& prng, coproto::Socket& chl)
-    //{
-    //    if (hasRequest() == false)
-    //        throw std::runtime_error("DLpnPermReceiver::request() must be called before DLpnPermSender::preprocess() " LOCATION);
+    macoro::task<> AltModPermSender::preprocess()
+    {
+        if (hasRequest() == false)
+            throw std::runtime_error("AltModPermReceiver::request() must be called before AltModPermSender::preprocess() " LOCATION);
 
-    //    return setup(prng, chl);
-    //}
+        return mRecver.preprocess();
+    }
 
 
 
     // initialize this sender to have a permutation of size n, where 
     // bytesPerRow bytes can be permuted per position. keyGen can be 
-    // set if the caller wants to explicitly ask to perform dlpn keygen or not.
-    void DLpnPermSender::init(u64 n, u64 bytesPerRow, macoro::optional<bool> keyGen)
+    // set if the caller wants to explicitly ask to perform AltMod keygen or not.
+    void AltModPermSender::init(u64 n, u64 bytesPerRow, macoro::optional<bool> keyGen)
     {
         clear();
         mNumElems = n;
         mBytesPerRow = bytesPerRow;
         mByteOffset = bytesPerRow;
-        mRecver.init(oc::divCeil(bytesPerRow, sizeof(oc::block)) * n, keyGen);
+        mKeyGen = keyGen;
     }
 
-    // returns true of we have requested correlated randomness.
-    bool DLpnPermSender::hasRequest()
+    bool AltModPermSender::hasPreprocessing()const
     {
-        return mRecver.hasRequest();
+        return mRecver.hasPreprocessing();
     }
 
     // clears the internal state
-    void DLpnPermSender::clear()
+    void AltModPermSender::clear()
     {
         mRecver.clear();
-        mHasPreprocess = false;
+        mHasRandomSetup = false;
         mPrePerm.clear();
         mPi = nullptr;
         mPermStorage.clear();
@@ -107,31 +112,24 @@ namespace secJoin
         mNumElems = 0;
         mBytesPerRow = 0;
         mByteOffset = 0;
-        mHasPreprocess = 0;
     }
 
     // sets the permutation of the sender
-    void DLpnPermSender::setPermutation(Perm&& p)
+    void AltModPermSender::setPermutation(Perm&& p)
     {
         mPermStorage = std::move(p);
         setPermutation(mPermStorage);
     }
 
     // sets the permutation of the sender
-    void DLpnPermSender::setPermutation(const Perm& p)
+    void AltModPermSender::setPermutation(const Perm& p)
     {
         if (p.size() != mNumElems)
             throw std::runtime_error("setPermutation called with the wrong size permutation. " LOCATION);
 
-        if (mHasPreprocess)
-        {
-            if (p.size() != mDelta.rows())
-                throw RTE_LOC;
-        }
-        else
-        {
-            clear();
-        }
+        if (mPi)
+            throw std::runtime_error("setPermutation was called when there is already a permutation set. " LOCATION);
+
         mPi = &p;
     }
 
@@ -140,10 +138,10 @@ namespace secJoin
         oc::block mKey;
         u8 mPrepro;
     };
-    // DLpn Receiver calls this setup
+    // AltMod Receiver calls this setup
     // generate random mDelta such that
     // mDelta ^ mB = pi(mA)
-    macoro::task<> DLpnPermSender::setup(
+    macoro::task<> AltModPermSender::setup(
         oc::PRNG& prng,
         coproto::Socket& chl)
     {
@@ -152,22 +150,30 @@ namespace secJoin
             blocksPerRow = u64{},
             aes = oc::AES(),
             meta = SetupMeta(),
-            pi = (const Perm*)nullptr);
+            pi = (const Perm*)nullptr,
+            eager = macoro::eager_task<>{});
 
         if (mNumElems == 0)
-            throw std::runtime_error("DLpnPermSender::init() must be called before setup. " LOCATION);
+            throw std::runtime_error("AltModPermSender::init() must be called before setup. " LOCATION);
 
         if(hasRequest() == false)
-            throw std::runtime_error("DLpnPermSender::request() must be called before setup. " LOCATION);
+            throw std::runtime_error("AltModPermSender::request() must be called before setup. " LOCATION);
+
+        if (hasPreprocessing() == false)
+        {
+            eager = preprocess() | macoro::make_eager();
+        }
+
+        //if(hasPreprocessing())
 
         if (mPi)
         {
-            mHasPreprocess = false;
+            mHasRandomSetup = false;
             pi = mPi;
         }
         else
         {
-            mHasPreprocess = true;
+            mHasRandomSetup = true;
             mPrePerm.randomize(mNumElems, prng);
             pi = &mPrePerm;
         }
@@ -179,12 +185,9 @@ namespace secJoin
         blocksPerRow = oc::divCeil(mBytesPerRow, sizeof(oc::block));
         mByteOffset = 0;
 
-        meta.mPrepro = mHasPreprocess;
+        meta.mPrepro = mHasRandomSetup;
         meta.mKey = prng.get();
         aes.setKey(meta.mKey);
-
-        if (mRecver.hasKeyOts())
-            mRecver.tweakKeyOts(meta.mKey);
 
         MC_AWAIT(chl.send(std::move(meta)));
 
@@ -201,45 +204,55 @@ namespace secJoin
 
         MC_AWAIT(mRecver.evaluate(mDelta, mDelta, chl, prng));
 
+        
+        if (eager.handle())
+            MC_AWAIT(eager);
+
         MC_END();
     }
 
-    // DLpn Receiver calls this setup
+    // AltMod Receiver calls this setup
     // generate random mA, mB such that
     // mDelta ^ mB = pi(mA)
-    macoro::task<> DLpnPermReceiver::setup(
+    macoro::task<> AltModPermReceiver::setup(
         oc::PRNG& prng,
         coproto::Socket& chl)
     {
         MC_BEGIN(macoro::task<>, &chl, &prng, this,
             aesPlaintext = oc::Matrix<oc::block>(),
             aesCipher = oc::Matrix<oc::block>(),
-            preProsdlpnCipher = oc::Matrix<oc::block>(),
-            dlpnCipher = oc::Matrix<oc::block>(),
+            preProsAltModCipher = oc::Matrix<oc::block>(),
+            AltModCipher = oc::Matrix<oc::block>(),
             blocksPerRow = u64(),
             aes = oc::AES(),
-            meta = SetupMeta());
+            meta = SetupMeta(),
+            eager = macoro::eager_task<>{});
 
         if (mNumElems == 0)
-            throw std::runtime_error("DLpnPermReceiver::init() must be called before setup. " LOCATION);
+            throw std::runtime_error("AltModPermReceiver::init() must be called before setup. " LOCATION);
 
         if (hasRequest() == false)
-            throw std::runtime_error("DLpnPermReceiver::request() must be called before setup. " LOCATION);
+            throw std::runtime_error("AltModPermReceiver::request() must be called before setup. " LOCATION);
+
+        if (hasPreprocessing() == false)
+        {
+            eager = preprocess() | macoro::make_eager();
+        }
 
         blocksPerRow = oc::divCeil(mBytesPerRow, sizeof(oc::block));
         mByteOffset = 0;
 
         MC_AWAIT(chl.recv(meta));
 
-        mHasPreprocess = meta.mPrepro;
-        if (mSender.hasKeyOts())
-            mSender.tweakKeyOts(meta.mKey);
+        mHasRandomSetup = meta.mPrepro;
+        //if (mSender.hasKeyOts())
+        //    mSender.tweakKeyOts(meta.mKey);
 
-        // B = (DLPN(k,AES(k', pi(0))), ..., (DLPN(k,AES(k', pi(n-1)))))
+        // B = (AltMod(k,AES(k', pi(0))), ..., (AltMod(k,AES(k', pi(n-1)))))
         mB.resize(mNumElems, blocksPerRow);
         MC_AWAIT(mSender.evaluate(mB, chl, prng));
 
-        // A = (DLPN(k,AES(k', 0)), ..., (DLPN(k,AES(k', n-1))))
+        // A = (AltMod(k,AES(k', 0)), ..., (AltMod(k,AES(k', n-1))))
         aes.setKey(meta.mKey);
 
         mA.resize(mNumElems, blocksPerRow);
@@ -247,10 +260,14 @@ namespace secJoin
             mA(i) = oc::block(0, i);
         aes.ecbEncBlocks(mA, mA);
         mSender.mPrf.eval(mA, mA);
+
+        if (eager.handle())
+            MC_AWAIT(eager);
+
         MC_END();
     }
 
-    macoro::task<> DLpnPermReceiver::validateShares(coproto::Socket& sock)
+    macoro::task<> AltModPermReceiver::validateShares(coproto::Socket& sock)
     {
         //assert(hasSetup());
         MC_BEGIN(macoro::task<>, this, &sock);
@@ -261,7 +278,7 @@ namespace secJoin
         MC_END();
     }
 
-    macoro::task<> DLpnPermSender::validateShares(coproto::Socket& sock, Perm p)
+    macoro::task<> AltModPermSender::validateShares(coproto::Socket& sock, Perm p)
     {
         //assert(hasSetup());
         MC_BEGIN(macoro::task<>, this, &sock, p,
@@ -287,7 +304,7 @@ namespace secJoin
     }
 
     template <>
-    macoro::task<> DLpnPermSender::apply<u8>(
+    macoro::task<> AltModPermSender::apply<u8>(
         PermOp op,
         oc::MatrixView<u8> sout,
         oc::PRNG& prng,
@@ -308,19 +325,16 @@ namespace secJoin
         if (mPi == nullptr)
             throw std::runtime_error("permutation has not been set." LOCATION);
 
-        if (hasRequest() == false)
-            throw std::runtime_error("the correlated randomness must be requested before calling apply. " LOCATION);
-
         if (mNumElems != mPi->mPi.size())
             throw RTE_LOC;
 
-        if (hasSetup(mBytesPerRow) == false)
+        if (hasSetup(sout.cols()) == false)
             MC_AWAIT(setup(prng, chl));
 
         if (mDelta.rows() != mNumElems)
             throw RTE_LOC;
 
-        if (mHasPreprocess)
+        if (mHasRandomSetup)
         {
             // delta = pi o pre^-1
             // they are going to update their correlation using delta
@@ -332,7 +346,7 @@ namespace secJoin
             MC_AWAIT(chl.send(std::move(delta.mPi)));
             //MC_AWAIT(validateShares(chl, /*mInverse  ? mPi->inverse() : */*mPi));
 
-            mHasPreprocess = false;
+            mHasRandomSetup = false;
         }
 
         xPermuted.resize(mNumElems, sout.cols());
@@ -356,18 +370,18 @@ namespace secJoin
         //mDelta.resize(0, 0);
 
         if (remainingSetup() == false)
-            clear();
+            clearCorrelatedRandomness();
 
         MC_END();
     }
 
 
 
-    // If DLPN receiver only wants to call apply
+    // If AltMod receiver only wants to call apply
     // when it also has inputs
     // this will internally call setup for it
     template <>
-    macoro::task<> DLpnPermSender::apply<u8>(
+    macoro::task<> AltModPermSender::apply<u8>(
         PermOp op,
         oc::MatrixView<const u8> in,
         oc::MatrixView<u8> sout,
@@ -376,7 +390,8 @@ namespace secJoin
     {
         MC_BEGIN(macoro::task<>, &chl, &prng, this, sout, in, op,
             xPermuted = oc::Matrix<u8>());
-
+        if (!mPi)
+            throw std::runtime_error("permutation has not been set. " LOCATION);
         xPermuted.resize(in.rows(), in.cols());
 
         MC_AWAIT(apply(op, sout, prng, chl));
@@ -387,10 +402,10 @@ namespace secJoin
         MC_END();
     }
 
-    // If DLPN sender only wants to call apply
+    // If AltMod sender only wants to call apply
     // this will internally call setup for it
     template <>
-    macoro::task<> DLpnPermReceiver::apply<u8>(
+    macoro::task<> AltModPermReceiver::apply<u8>(
         PermOp op,
         oc::MatrixView<const u8> input,
         oc::MatrixView<u8> sout,
@@ -407,11 +422,8 @@ namespace secJoin
         if (mNumElems == 0)
             throw std::runtime_error("init has not been called. " LOCATION);
 
-        if (mNumElems == input.rows())
+        if (mNumElems != input.rows())
             throw std::runtime_error("input rows do not match init(n). " LOCATION);
-
-        if (hasRequest() == false)
-            throw std::runtime_error("the correlated randomness must be requested before calling apply. " LOCATION);
 
         if (hasSetup(input.cols()) == false)
             MC_AWAIT(setup(prng, chl));
@@ -421,7 +433,7 @@ namespace secJoin
         if (mA.cols() * sizeof(oc::block) < input.cols())
             throw RTE_LOC;
 
-        if (mHasPreprocess)
+        if (mHasRandomSetup)
         {
             // we current have the correlation 
             // 
@@ -448,7 +460,7 @@ namespace secJoin
                 std::swap(mA, AA);
             }
             //MC_AWAIT(validateShares(chl));
-            mHasPreprocess = false;
+            mHasRandomSetup = false;
         }
 
         // MC_AWAIT(apply(input, sout, chl));
@@ -472,7 +484,7 @@ namespace secJoin
         mByteOffset += sout.cols();
 
         if (remainingSetup() == false)
-            clear();
+            clearCorrelatedRandomness();
 
         MC_END();
     }

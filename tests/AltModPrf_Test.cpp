@@ -1,7 +1,7 @@
-#include "DarkMatterPrf_Test.h"
+#include "AltModPrf_Test.h"
 #include "secure-join/Prf/DarkMatter22Prf.h"
 #include "secure-join/Prf/DarkMatter32Prf.h"
-#include "secure-join/Prf/DLpnPrf.h"
+#include "secure-join/Prf/AltModPrf.h"
 #include "cryptoTools/Crypto/PRNG.h"
 #include "cryptoTools/Common/Matrix.h"
 
@@ -443,7 +443,7 @@ void mult(oc::DenseMtx& C, std::vector<u64>& X, std::vector<u64>& Y)
 }
 
 
-void DLpnPrf_mod3BitDecompostion_test()
+void AltModPrf_mod3BitDecompostion_test()
 {
     u64 n = 256;
     u64 m = 1024;
@@ -473,7 +473,7 @@ void DLpnPrf_mod3BitDecompostion_test()
     }
 }
 
-void DLpnPrf_BMult_test()
+void AltModPrf_BMult_test()
 {
     u64 n = 256;
     u64 n128 = n / 128;
@@ -494,14 +494,14 @@ void DLpnPrf_BMult_test()
 
     for (u64 i = 0; i < n; ++i)
     {
-        auto Y = DLpnPrf::compress(V[i]);
+        auto Y = AltModPrf::compress(V[i]);
         if (y[i] != Y)
             throw RTE_LOC;
 
     }
 }
 
-void DLpnPrf_mod2_test(const oc::CLP& cmd)
+void AltModPrf_mod2_test(const oc::CLP& cmd)
 {
 
 
@@ -517,8 +517,8 @@ void DLpnPrf_mod2_test(const oc::CLP& cmd)
     oc::PRNG prng1(oc::OneBlock);
     oc::Timer timer;
 
-    DLpnPrfSender sender;
-    DLpnPrfReceiver recver;
+    AltModPrfSender sender;
+    AltModPrfReceiver recver;
 
     //sender.mPrintI = printI;
     //sender.mPrintJ = printJ;
@@ -577,24 +577,26 @@ void DLpnPrf_mod2_test(const oc::CLP& cmd)
 
 
     CorGenerator ole0, ole1;
-    ole0.mock(CorGenerator::Role::Sender);
-    ole1.mock(CorGenerator::Role::Receiver);
+    auto chls = coproto::LocalAsyncSocket::makePair();
+    ole0.init(chls[0].fork(), prng0, 0, 1 << 14, cmd.getOr("mock", 1));
+    ole1.init(chls[1].fork(), prng1, 1, 1 << 14, cmd.getOr("mock", 1));
 
 
-    //BinOleRequest req0, req1;
-    //macoro::sync_wait(macoro::when_all_ready(
-    //    ole0.binOleRequest(req0, 2 * n * m, sock[0], prng0),
-    //    ole1.binOleRequest(req1, 2 * n * m, sock[1], prng1)
-    //));
     sender.init(n);
     recver.init(n);
-    sender.request(ole0);
-    recver.request(ole1);
+//    sender.request(ole0);
+//    recver.request(ole1);
+    sender.mOleReq = ole0.binOleRequest(u0s[0].rows() * u0s[0].cols() * 256);
+    recver.mOleReq = ole1.binOleRequest(u0s[0].rows() * u0s[0].cols() * 256);
+
+    auto s0 = sender.mOleReq.start() | macoro::make_eager();
+    auto s1 = recver.mOleReq.start() | macoro::make_eager();
 
     macoro::sync_wait(macoro::when_all_ready(
         sender.mod2(u0s[0], u1s[0], outs[0], sock[0]),
         recver.mod2(u0s[1], u1s[1], outs[1], sock[1])
     ));
+    macoro::sync_wait(macoro::when_all_ready(std::move(s0), std::move(s1)));
 
     auto out = reveal(outs);
 
@@ -620,7 +622,7 @@ void DLpnPrf_mod2_test(const oc::CLP& cmd)
     }
 }
 
-void DLpnPrf_mod3_test(const oc::CLP& cmd)
+void AltModPrf_mod3_test(const oc::CLP& cmd)
 {
 
 
@@ -694,28 +696,28 @@ void DLpnPrf_mod3_test(const oc::CLP& cmd)
 }
 
 
-void DLpnPrf_plain_test()
+void AltModPrf_plain_test()
 {
 
 
-    u64 n = DLpnPrf::KeySize;
+    u64 n = AltModPrf::KeySize;
     u64 m = 256;
     u64 t = 128;
     oc::PRNG prng(oc::ZeroBlock);
     oc::block kk = prng.get();
     oc::block xx = prng.get();
 
-    std::array<oc::block, DLpnPrf::KeySize / 128> x;
+    std::array<oc::block, AltModPrf::KeySize / 128> x;
     if (x.size() > 1) {
 
         for (u64 i = 0; i < x.size(); ++i)
             x[i] = xx ^ oc::block(i, i);
-        oc::mAesFixedKey.hashBlocks<DLpnPrf::KeySize / 128>(x.data(), x.data());
+        oc::mAesFixedKey.hashBlocks<AltModPrf::KeySize / 128>(x.data(), x.data());
     }
     else
         x[0] = xx;
 
-    DLpnPrf prf;
+    AltModPrf prf;
 
     prf.setKey(kk);
 
@@ -829,17 +831,20 @@ void DLpnPrf_plain_test()
 
 }
 
-void DLpnPrf_proto_test(const oc::CLP& cmd)
+void AltModPrf_proto_test(const oc::CLP& cmd)
 {
 
 
     u64 n = cmd.getOr("n", 1024);
     bool noCheck = cmd.isSet("nc");
+    bool debug = cmd.isSet("debug");
 
     oc::Timer timer;
 
-    DLpnPrfSender sender;
-    DLpnPrfReceiver recver;
+    AltModPrfSender sender;
+    AltModPrfReceiver recver;
+    sender.mDebug = debug;
+    recver.mDebug = debug;
 
     sender.setTimer(timer);
     recver.setTimer(timer);
@@ -852,15 +857,16 @@ void DLpnPrf_proto_test(const oc::CLP& cmd)
     oc::PRNG prng0(oc::ZeroBlock);
     oc::PRNG prng1(oc::OneBlock);
 
-    DLpnPrf dm;
+    AltModPrf dm;
     oc::block kk;
     kk = prng0.get();
     dm.setKey(kk);
     //sender.setKey(kk);
 
     CorGenerator ole0, ole1;
-    ole0.mock(CorGenerator::Role::Sender);
-    ole1.mock(CorGenerator::Role::Receiver);
+    ole0.init(sock[0].fork(), prng0, 0, 1 << 14, cmd.getOr("mock", 1));
+    ole1.init(sock[1].fork(), prng1, 1, 1 << 14, cmd.getOr("mock", 1));
+
 
 
     prng0.get(x.data(), x.size());
@@ -871,7 +877,7 @@ void DLpnPrf_proto_test(const oc::CLP& cmd)
     {
         sk[i][0] = oc::block(i, 0);
         sk[i][1] = oc::block(i, 1);
-        rk[i] = oc::block(i, *oc::BitIterator((u8*)&sender.mPrf.mKey, i));
+        rk[i] = oc::block(i, *oc::BitIterator((u8*)&kk, i));
     }
     sender.setKeyOts(kk,rk);
     recver.setKeyOts(sk);
@@ -897,72 +903,88 @@ void DLpnPrf_proto_test(const oc::CLP& cmd)
     for (u64 ii = 0; ii < n; ++ii)
     {
         oc::block y;
-        //if (sender.mU.size())
-        //{
+        if (debug)
+        {
 
-        //    std::array<u16, sender.mPrf.KeySize> h;
-        //    std::array<oc::block, sender.mPrf.KeySize / 128> X;
-        //    if (sender.mPrf.KeySize / 128 > 1)
-        //    {
-        //        for (u64 i = 0; i < X.size(); ++i)
-        //            X[i] = x[ii] ^ oc::block(i, i);
-        //        oc::mAesFixedKey.hashBlocks<X.size()>(X.data(), X.data());
-        //    }
-        //    else
-        //    {
-        //        X[0] = x[ii];
-        //    }
+            std::array<u16, sender.mPrf.KeySize> h;
+            std::array<oc::block, sender.mPrf.KeySize / 128> X;
+            if (sender.mPrf.KeySize / 128 > 1)
+            {
+                for (u64 i = 0; i < X.size(); ++i)
+                    X[i] = x[ii] ^ oc::block(i, i);
+                oc::mAesFixedKey.hashBlocks<X.size()>(X.data(), X.data());
+            }
+            else
+            {
+                X[0] = x[ii];
+            }
 
-        //    auto kIter = oc::BitIterator((u8*)sender.mPrf.mKey.data());
-        //    auto xIter = oc::BitIterator((u8*)X.data());
-        //    for (u64 i = 0; i < sender.mPrf.KeySize; ++i)
-        //    {
-        //        u8 xi = *xIter;
-        //        u8 ki = *kIter;
-        //        h[i] = ki & xi;
+            auto kIter = oc::BitIterator((u8*)sender.mPrf.mKey.data());
+            auto xIter = oc::BitIterator((u8*)X.data());
+            for (u64 i = 0; i < sender.mPrf.KeySize; ++i)
+            {
+                u8 xi = *xIter;
+                u8 ki = *kIter;
+                h[i] = ki & xi;
 
-        //        assert(recver.mH.cols() == x.size());
-        //        auto r = recver.mH(i, ii);
-        //        auto s = sender.mH(i, ii);
-        //        //auto neg = (3 - r) % 3;
-        //        auto act = (s + r) % 3;
-        //        if (act != h[i])
-        //            throw RTE_LOC;
-
-        //        ++kIter;
-        //        ++xIter;
-        //    }
-
-        //    block256m3 u;
-        //    sender.mPrf.compressH(h, u);
-
-        //    for (u64 i = 0; i < 256; ++i)
-        //    {
-        //        if ((sender.mU[i][ii] + recver.mU[i][ii]) % 3 != u.mData[i])
-        //        {
-        //            throw RTE_LOC;
-        //        }
-
-        //    }
-
-        //    block256 w;
-        //    for (u64 i = 0; i < u.mData.size(); ++i)
-        //    {
-        //        *oc::BitIterator((u8*)&w, i) = u.mData[i] % 2;
-
-        //        auto v0 = bit(sender.mV(i, 0), ii);
-        //        auto v1 = bit(recver.mV(i, 0), ii);
-
-        //        if ((v0 ^ v1) != u.mData[i] % 2)
-        //        {
-        //            throw RTE_LOC;
-        //        }
-        //    }
+                assert(recver.mDebugXkShares.cols() == oc::divCeil(x.size(), 128));
+                auto r0 = bit(recver.mDebugXkShares.data(i * 2 + 0), ii);
+                auto r1 = bit(recver.mDebugXkShares.data(i * 2 + 1), ii);
+                auto s0 = bit(sender.mDebugXkShares.data(i * 2 + 0), ii);
+                auto s1 = bit(sender.mDebugXkShares.data(i * 2 + 1), ii);
 
 
-        //    y = sender.mPrf.compress(w);
-        //}
-        //else
+                auto s = 2 * s1 + s0;
+                auto r = 2 * r1 + r0;
+
+                //auto neg = (3 - r) % 3;
+                auto act = (s + r) % 3;
+                if (act != h[i])
+                    throw RTE_LOC;
+
+                ++kIter;
+                ++xIter;
+            }
+
+            block256m3 u;
+            sender.mPrf.compressH(h, u);
+
+            for (u64 i = 0; i < 256; ++i)
+            {
+                auto r0 = bit(recver.mDebugU0.data(i), ii);
+                auto r1 = bit(recver.mDebugU1.data(i), ii);
+                auto s0 = bit(sender.mDebugU0.data(i), ii);
+                auto s1 = bit(sender.mDebugU1.data(i), ii);
+
+                auto s = 2 * s1 + s0;
+                auto r = 2 * r1 + r0;
+
+                if ((s + r) % 3 != u.mData[i])
+                {
+                    throw RTE_LOC;
+                }
+
+            }
+
+            block256 w;
+            for (u64 i = 0; i < u.mData.size(); ++i)
+            {
+                *oc::BitIterator((u8*)&w, i) = u.mData[i] % 2;
+
+                auto v0 = bit(sender.mDebugV(i, 0), ii);
+                auto v1 = bit(recver.mDebugV(i, 0), ii);
+
+                if ((v0 ^ v1) != u.mData[i] % 2)
+                {
+                    throw RTE_LOC;
+                }
+            }
+
+
+            //y = sender.mPrf.compress(w);
+            y = sender.mPrf.eval(x[ii]);
+        }
+        else
             y = sender.mPrf.eval(x[ii]);
 
         auto yy = (y0[ii] ^ y1[ii]);

@@ -79,6 +79,9 @@ namespace secJoin
         AdditivePerm& dst,
         coproto::Socket& comm)
     {
+
+        if (dst.size() != s.rows())
+            throw RTE_LOC;
         MC_BEGIN(macoro::task<>, this, &f, &s, &dst, &comm, &round,
 
             otRecvReq = OtRecvRequest{},
@@ -100,6 +103,8 @@ namespace secJoin
             bitCount = u64{}
         );
 
+
+
         // A = f + a
         // B = s + b
         //A.resize(f.rows(), f.cols());
@@ -111,13 +116,13 @@ namespace secJoin
         otSendReq = std::move(round.mHadamardSumSendOts);
         //if (gen.mRole == CorGenerator::Role::Sender)
         //{
-        //    MC_AWAIT_SET(otRecvReq, gen.otRecvRequest(s.size()));
-        //    MC_AWAIT_SET(otSendReq, gen.otSendRequest(s.size()));
+        //    MC_AWAIT_SET(otRecvReq, gen.recvOtRequest(s.size()));
+        //    MC_AWAIT_SET(otSendReq, gen.sendOtRequest(s.size()));
         //}
         //else
         //{
-        //    MC_AWAIT_SET(otSendReq, gen.otSendRequest(s.size()));
-        //    MC_AWAIT_SET(otRecvReq, gen.otRecvRequest(s.size()));
+        //    MC_AWAIT_SET(otSendReq, gen.sendOtRequest(s.size()));
+        //    MC_AWAIT_SET(otRecvReq, gen.recvOtRequest(s.size()));
         //}
 
         //initArith2BinCircuit(shares.size());
@@ -398,15 +403,32 @@ namespace secJoin
             //cir = oc::BetaCircuit{}
         );
 
+        if (bitCount != mL)
+            throw RTE_LOC;
+        if (k.rows() != mSize)
+            throw RTE_LOC;
+
         if (mRole > 1)
             throw RTE_LOC;
         // we oversized fBin to make sure we have trailing zeros.
-        fBin.resize(k.rows() + sizeof(block), 1ull << bitCount, 1, oc::AllocType::Uninitialized);
-        fBin.resize(k.rows(), 1ull << bitCount, 1, oc::AllocType::Uninitialized);
+        fBin.resize(mSize + sizeof(block), 1ull << bitCount, 1, oc::AllocType::Uninitialized);
+        fBin.resize(mSize, 1ull << bitCount, 1, oc::AllocType::Uninitialized);
+
 
         if (bitCount == 1)
         {
-            for (u64 i = 0; i < k.rows(); ++i)
+            // For k = [ 1 1 0 1 0 ]
+            //
+            //  fBin = [ 0 0 1 0 1 ]
+            //         [ 1 1 0 1 0 ]
+            //
+            // but we store them packed so we have
+            //
+            // fBin = [ 01 01 10 01 10 ]
+            // 
+            // Each of these elements will be a row. 
+            // This is the code that does the packing
+            for (u64 i = 0; i < mSize; ++i)
             {
                 assert(k(i) < 2);
                 if (mRole)
@@ -419,22 +441,38 @@ namespace secJoin
         }
         else
         {
-            //cir = indexToOneHotCircuit(bitCount);
-            //if(mOneHotCirBitCount != biTC)
-            //initIndexToOneHotCircuit(bitCount);
-            //eval.init(k.rows(), mIndexToOneHotCircuit);
-
-
+            // When we have more than one bit, we have to use MPC 
+            //
+            // for k = [ 0 2 1 3 0 1 ]
+            // 
+            //  fBin = [ 1 0 0 0 1 0 ]
+            //         [ 0 0 1 0 0 1 ]
+            //         [ 0 1 0 0 0 0 ]
+            //         [ 0 0 0 1 0 0 ]
+            // 
+            // in packed format we have
+            // 
+            // fBin = [ 1000 0010 0100 0001 1000 0100]
+            // 
+            // Each of these elements will be a row. 
             round.mIndexToOneHotGmw.setInput(0, k);
             MC_AWAIT(round.mIndexToOneHotGmw.run(comm));
             round.mIndexToOneHotGmw.getOutput(0, fBin);
         }
 
+
+        // we have a special case for 1 and 2 bits keys.
+        // Overall we want to pack these fBin bits together 
+        // because thats what BitIject is expecting.
+        // However, for 1 and 2 bit keys each (byte aligned) 
+        // row only holds 2 or 4 bits of data. Therefore
+        // for 1 bit keys we will pack 4 rows into 1 row.
         if (bitCount == 1)
         {
+            
             auto src = fBin.data();
             auto dst = fBin.data();
-            auto main = fBin.rows() / 4;
+            auto main = mSize / 4;
             for (u64 i = 0; i < main; ++i)
             {
                 *dst =
@@ -447,18 +485,21 @@ namespace secJoin
                 src += 4;
             }
 
-            for (u64 j = 0; j < (fBin.rows() % 4); ++j)
+            for (u64 j = 0; j < (mSize % 4); ++j)
             {
                 *dst = ((src[j] & 3) << (2 * j)) | (bool(j) * (*dst));
             }
 
-            fBin.resize(1, fBin.rows() * 2);
+            // fBin will now how "one row" with mSize * 2 bits in it. 
+            // Each pair of bits correspond to a key.
+            fBin.resize(1, mSize * 2);
         }
         else if (bitCount == 2)
         {
+            // for 2 bit keys we will pack 2 rows into 1 row.
             auto src = fBin.data();
             auto dst = fBin.data();
-            auto main = fBin.rows() / 2;
+            auto main = mSize / 2;
             for (u64 i = 0; i < main; ++i)
             {
                 *dst =
@@ -469,21 +510,27 @@ namespace secJoin
                 src += 2;
             }
 
-            for (u64 j = 0; j < (fBin.rows() % 2); ++j)
+            for (u64 j = 0; j < (mSize % 2); ++j)
             {
                 *dst = ((src[j] & 15) << (4 * j)) | (bool(j) * (*dst));
             }
-            fBin.resize(1, fBin.rows() * 4);
+
+
+            // fBin will now how "one row" with mSize * 4 bits in it. 
+            // Each set of 4 bits correspond to a key.
+            fBin.resize(1, mSize * 4);
         }
         else
         {
-            fBin.resize(1, fBin.rows() * fBin.cols() * 8);
+            // for 3 bits or more, we can just resize because the rows dont have any padding.
+            fBin.resize(1, mSize * fBin.cols() * 8);
         }
 
         // we oversized fBin at the start of this fn to make sure we have trailing zeros.
         // here is where we set the zero value.
         memset(fBin.data() + fBin.size(), 0, sizeof(block));
 
+        
         TODO("determine min bit count required. currently 32");
         //MC_AWAIT(round.mBitInjects.bitInjection((1ull << bitCount) * k.rows(), fBin.mData, 32, f, comm));
         MC_AWAIT(round.mBitInject.bitInjection(fBin.mData, 32, f, comm));
@@ -962,7 +1009,7 @@ namespace secJoin
         for (u64 i = 0, j = 0; i < ll; ++i)
         {
             // the amount of correlated randomness for the permutations we will require.
-            u64 permutationByteSize = oc::divCeil(std::min<u64>(mL, mBitCount - i * mL), 8) + 2 * sizeof(u32);
+            u64 permutationByteSize = oc::divCeil(mL, 8) + sizeof(u32);
 
             // for the last one, we use the requested number of bytes
             if (i == ll - 1)
@@ -972,7 +1019,7 @@ namespace secJoin
             if (permutationByteSize)
                 mRounds[i].mPerm.request(gen);
 
-            mRounds[i].mBitInject.init(mSize, pow2L);
+            mRounds[i].mBitInject.init(1, mSize * pow2L);
             mRounds[i].mBitInject.request(gen);
 
             mRounds[i].mIndexToOneHotGmw.init(mSize, mIndexToOneHotCircuit);
@@ -983,13 +1030,13 @@ namespace secJoin
 
             if (mRole)
             {
-                mRounds[i].mHadamardSumRecvOts = gen.otRecvRequest(mSize * pow2L);
-                mRounds[i].mHadamardSumSendOts = gen.otSendRequest(mSize * pow2L);
+                mRounds[i].mHadamardSumRecvOts = gen.recvOtRequest(mSize * pow2L);
+                mRounds[i].mHadamardSumSendOts = gen.sendOtRequest(mSize * pow2L);
             }
             else
             {
-                mRounds[i].mHadamardSumSendOts = gen.otSendRequest(mSize * pow2L);
-                mRounds[i].mHadamardSumRecvOts = gen.otRecvRequest(mSize * pow2L);
+                mRounds[i].mHadamardSumSendOts = gen.sendOtRequest(mSize * pow2L);
+                mRounds[i].mHadamardSumRecvOts = gen.recvOtRequest(mSize * pow2L);
             }
 
         }
@@ -1012,6 +1059,9 @@ namespace secJoin
         if (hasRequest() == false)
             throw std::runtime_error("request must be called first. " LOCATION);
         {
+            socks.reserve(mRounds.size());
+            prngs.reserve(mRounds.size());
+
             auto sock = [&]() -> coproto::Socket&
             {
                 if (socks.capacity() == socks.size())
@@ -1036,7 +1086,7 @@ namespace secJoin
             for (i = 0; i < mRounds.size(); ++i)
             {
                 if (mRounds[i].mPerm.hasRequest())
-                    task(mRounds[i].mPerm.preprocess(sock(), prng()));
+                    task(mRounds[i].mPerm.preprocess());
                 task(mRounds[i].mBitInject.preprocess());
                 task(mRounds[i].mIndexToOneHotGmw.preprocess());
                 task(mRounds[i].mArithToBinGmw.preprocess());
@@ -1054,12 +1104,11 @@ namespace secJoin
     macoro::task<> RadixSort::genPerm(
         const BinMatrix& k,
         AdditivePerm& dst,
-        CorGenerator& gen,
         coproto::Socket& comm,
         oc::PRNG& prng)
     {
 
-        MC_BEGIN(macoro::task<>, this, &k, &dst, &gen, &comm, &prng,
+        MC_BEGIN(macoro::task<>, this, &k, &dst, &comm, &prng,
             ll = u64{},
             kIdx = u64{},
             sk = BinMatrix{},
@@ -1080,7 +1129,7 @@ namespace secJoin
 
         if (mInsecureMock)
         {
-            MC_AWAIT(mockSort(k, dst, gen, comm));
+            MC_AWAIT(mockSort(k, dst, comm));
             MC_RETURN_VOID();
         }
 
@@ -1128,9 +1177,12 @@ namespace secJoin
             if (mTimer)
                 mRounds[i-1].mPerm.setTimer(getTimer());
 
+            // consumes 4 cor-rand.
+            MC_AWAIT(mRounds[i-1].mPerm.setup(comm, prng));
+
             // apply the partial sort that we have so far 
             // to the next L bits of the key.
-            // 4 + 1 bytes
+            // consumes 1 cor-rand
             assert(mRounds[i-1].mPerm.hasSetup(sk.bytesPerEntry()));
             MC_AWAIT(mRounds[i-1].mPerm.apply<u8>(
                 PermOp::Inverse, sk.mData, ssk.mData, prng, comm));
@@ -1138,12 +1190,13 @@ namespace secJoin
 
             // generate the sorting permutation for the
             // next L bits of the key.
+            rho.init2(mRole, mSize, 0);
             MC_AWAIT(genBitPerm(mRounds[i], mL, ssk, rho, comm));
             setTimePoint("genBitPerm");
 
             // compose the current partial sort with
             // the permutation that sorts the next L bits
-            // 4 bytes
+            // consumes 4 cor-rand
             assert(mRounds[i-1].mPerm.hasSetup(4));
             MC_AWAIT(mRounds[i-1].mPerm.compose(rho, mRounds[i].mPerm, prng, comm));
             setTimePoint("compose");
@@ -1155,7 +1208,7 @@ namespace secJoin
         }
         setTimePoint("genPerm end");
 
-        dst = std::move(mRounds[i].mPerm);
+        dst = std::move(mRounds.back().mPerm);
         MC_END();
     }
 
@@ -1286,10 +1339,9 @@ namespace secJoin
     macoro::task<> RadixSort::mockSort(
         const BinMatrix& k,
         AdditivePerm& dst,
-        CorGenerator& ole,
         coproto::Socket& comm)
     {
-        MC_BEGIN(macoro::task<>, &k, &dst, &ole, &comm, this,
+        MC_BEGIN(macoro::task<>, &k, &dst, &comm, this,
             data = BinMatrix{},
             perm = Perm{});
 
@@ -1311,6 +1363,7 @@ namespace secJoin
         else {
             MC_AWAIT(comm.send(coproto::copy(k)));
             dst.init2(mRole, k.numEntries());
+            dst.mShare.resize(dst.size());
         }
 
         MC_END();

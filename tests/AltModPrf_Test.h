@@ -11,10 +11,10 @@ void DarkMatter32Prf_proto_test(const oc::CLP& cmd);
 
 
 
-void DLpnPrf_mod3BitDecompostion_test();
-void DLpnPrf_BMult_test();
-void DLpnPrf_mod2_test(const oc::CLP& cmd);
-void DLpnPrf_mod3_test(const oc::CLP& cmd);
-void DLpnPrf_plain_test();
-void DLpnPrf_proto_test(const oc::CLP& cmd);
+void AltModPrf_mod3BitDecompostion_test();
+void AltModPrf_BMult_test();
+void AltModPrf_mod2_test(const oc::CLP& cmd);
+void AltModPrf_mod3_test(const oc::CLP& cmd);
+void AltModPrf_plain_test();
+void AltModPrf_proto_test(const oc::CLP& cmd);
 

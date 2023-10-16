@@ -22,7 +22,7 @@ namespace secJoin
 
         if (mCir.mLevelCounts.size() == 0)
             mCir.levelByAndDepth(mLevelize);
-
+        
         mNumRounds = mCir.mLevelCounts.size();
         mGates = mCir.mGates;
         mWords.resize(0);
@@ -37,6 +37,7 @@ namespace secJoin
         if (mCir.mGates.size() == 0)
             throw std::runtime_error("inint was not been called." LOCATION);
 
+        mRole = gen.partyIdx();
         mHasRequest = true;
         if(mCir.mNonlinearGateCount)
             mTriples = gen.binOleRequest(2 * mCir.mNonlinearGateCount * oc::roundUpTo(mN, 128));
@@ -161,7 +162,7 @@ namespace secJoin
             MC_END();
         }
 
-        if (mTriples.mState == nullptr)
+        if (mTriples.initialized() == false)
             throw std::runtime_error("request(gen) not called. " LOCATION);
 
         return mTriples.start();
@@ -238,6 +239,8 @@ namespace secJoin
             pre = macoro::eager_task<>{}
         );
 
+        if (mRole > 1)
+            std::terminate();
         if (mCir.mGates.size() == 0ull)
             throw std::runtime_error("Gmw::init(...) was not called");
 
@@ -579,8 +582,6 @@ namespace secJoin
 
         }
 
-        if (mTriples.mState)
-            mTriples.clear();
         mTriples = {};
         mHasPreprocessing = 0;
         mHasRequest = 0;

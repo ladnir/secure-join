@@ -1,16 +1,16 @@
 
 
-#include "DLpnPrf.h"
+#include "AltModPrf.h"
 #include "secure-join/AggTree/PerfectShuffle.h"
 
-#define DLPN_NEW
+#define AltMod_NEW
 
 namespace secJoin
 {
 
 
-    const std::array<block256, 128> DLpnPrf::mB = oc::PRNG(oc::block(2134, 5437)).get<std::array<block256, 128>>();
-    const std::array<block256, 128> DLpnPrf::mBShuffled = []() {
+    const std::array<block256, 128> AltModPrf::mB = oc::PRNG(oc::block(2134, 5437)).get<std::array<block256, 128>>();
+    const std::array<block256, 128> AltModPrf::mBShuffled = []() {
 
         std::array<block256, 128> shuffled;
         for (u64 i = 0; i < shuffled.size(); ++i)
@@ -27,7 +27,7 @@ namespace secJoin
         return shuffled;
     }();
 
-    const std::array<std::array<u8, 256>, 128> DLpnPrf::mBExpanded = []() {
+    const std::array<std::array<u8, 256>, 128> AltModPrf::mBExpanded = []() {
 
         std::array<std::array<u8, 256>, 128> r;
         for (u64 i = 0; i < mB.size(); ++i)
@@ -54,7 +54,7 @@ namespace secJoin
         auto n1024 = n128 / 8 * 8;
         oc::Matrix<oc::block> yt(128, n128);
 
-        //auto B = DLpnPrf::mB;
+        //auto B = AltModPrf::mB;
         assert(begin % 128 == 0);
         // assert(n % 128 == 0);
         assert(v.rows() == 256);
@@ -69,7 +69,7 @@ namespace secJoin
         for (u64 i = 0; i < 128; ++i)
         {
             u64 j = 0;
-            while (DLpnPrf::mBExpanded[i][j] == 0)
+            while (AltModPrf::mBExpanded[i][j] == 0)
                 ++j;
 
             auto vIter = v.data() + begin128 + j * vStep;
@@ -82,7 +82,7 @@ namespace secJoin
             //memcpy(yt[i], v[j++].subspan(begin128, n128));
             while (j < 256)
             {
-                if (DLpnPrf::mBExpanded[i][j])
+                if (AltModPrf::mBExpanded[i][j])
                 {
                     assert(yt[i].data() == ytIter);
                     assert(vIter == v[j].data() + begin128);
@@ -469,12 +469,12 @@ namespace secJoin
         //    out[i] = out[i] ^ hi1[j];
     }
 
-    void  DLpnPrf::setKey(oc::block k)
+    void  AltModPrf::setKey(oc::block k)
     {
         mKey[0] = k;
     }
 
-    void  DLpnPrf::compressH(const std::array<u16, KeySize>& hj, block256m3& uj)
+    void  AltModPrf::compressH(const std::array<u16, KeySize>& hj, block256m3& uj)
     {
         //for (u64 k = 0; k < KeySize; ++k)
         //{
@@ -529,11 +529,11 @@ namespace secJoin
         }
     }
 
-    oc::block  DLpnPrf::eval(oc::block x)
+    oc::block  AltModPrf::eval(oc::block x)
     {
         std::array<u16, KeySize> h;
         std::array<oc::block, KeySize / 128> X;
-        if constexpr (DLpnPrf::KeySize / 128 > 1)
+        if constexpr (AltModPrf::KeySize / 128 > 1)
         {
 
             for (u64 i = 0; i < X.size(); ++i)
@@ -572,17 +572,17 @@ namespace secJoin
         return compress(w);
     }
 
-    oc::block  DLpnPrf::compress(block256& w)
+    oc::block  AltModPrf::compress(block256& w)
     {
         return compress(w, mB);
     }
 
-    oc::block  DLpnPrf::shuffledCompress(block256& w)
+    oc::block  AltModPrf::shuffledCompress(block256& w)
     {
         return compress(w, mBShuffled);
     }
 
-    oc::block  DLpnPrf::compress(block256& w, const std::array<block256, 128>& B)
+    oc::block  AltModPrf::compress(block256& w, const std::array<block256, 128>& B)
     {
         alignas(32) std::array<std::array<oc::block, 128>, 2> bw;
 
@@ -703,14 +703,14 @@ namespace secJoin
     }
 
 
-    void DLpnPrfSender::setKeyOts(oc::block k, span<oc::block> ots)
+    void AltModPrfSender::setKeyOts(oc::block k, span<oc::block> ots)
     {
-        if (ots.size() != DLpnPrf::KeySize)
+        if (ots.size() != AltModPrf::KeySize)
             throw RTE_LOC;
 
         mPrf.setKey(k);
-        mKeyOTs.resize(DLpnPrf::KeySize);
-        for (u64 i = 0; i < DLpnPrf::KeySize; ++i)
+        mKeyOTs.resize(AltModPrf::KeySize);
+        for (u64 i = 0; i < AltModPrf::KeySize; ++i)
         {
             mKeyOTs[i].SetSeed(ots[i]);
         }
@@ -770,7 +770,7 @@ namespace secJoin
     }
 
 
-    coproto::task<> DLpnPrfSender::evaluate(
+    coproto::task<> AltModPrfSender::evaluate(
         span<oc::block> y,
         coproto::Socket& sock,
         oc::PRNG& prng,
@@ -789,7 +789,7 @@ namespace secJoin
     }
 
 
-    coproto::task<> DLpnPrfSender::evaluate(
+    coproto::task<> AltModPrfSender::evaluate(
         span<oc::block> y,
         coproto::Socket& sock,
         oc::PRNG& prng)
@@ -813,7 +813,7 @@ namespace secJoin
             otRecv = OtRecv{}
         );
 
-        if (mOleReq.size() != oc::roundUpTo(y.size(), 128) * DLpnPrf::MidSize * 2)
+        if (mOleReq.size() != oc::roundUpTo(y.size(), 128) * AltModPrf::MidSize * 2)
             throw std::runtime_error("do not have enough preprocessing. Call request(...) first. " LOCATION);
 
         // If no one has started the preprocessing, then lets start it.
@@ -830,7 +830,7 @@ namespace secJoin
 
         // make sure we have a key.
         if (!mHasKeyOts)
-            throw std::runtime_error("dlpn was called without a key and keyGen was not requested. " LOCATION);
+            throw std::runtime_error("AltMod was called without a key and keyGen was not requested. " LOCATION);
 
         // debugging, make sure we have the correct key OTs.
         if (mDebug)
@@ -853,9 +853,9 @@ namespace secJoin
 
         // for each bit of the key, perform an OT derandomization where we get a share
         // of the input x times the key mod 3. We store the LSB and MSB of the share separately.
-        // Hence we need 2 * DLpnPrf::KeySize rows in xkShares
-        xkShares.resize(2 * DLpnPrf::KeySize, oc::divCeil(y.size(), 128));
-        for (i = 0; i < DLpnPrf::KeySize;)
+        // Hence we need 2 * AltModPrf::KeySize rows in xkShares
+        xkShares.resize(2 * AltModPrf::KeySize, oc::divCeil(y.size(), 128));
+        for (i = 0; i < AltModPrf::KeySize;)
         {
             msg.resize(StepSize, xkShares.cols() * 2); // y.size() * 256 * 2 bits
             MC_AWAIT(sock.recv(msg));
@@ -884,15 +884,31 @@ namespace secJoin
             }
         }
 
+        if (mDebug)
+        {
+            mDebugXkShares = xkShares;
+        }
+
         // Compute u = H * xkShare mod 3
         buffer = {};
-        u0.resize(DLpnPrf::MidSize, oc::divCeil(y.size(), 128), oc::AllocType::Uninitialized);
-        u1.resize(DLpnPrf::MidSize, oc::divCeil(y.size(), 128), oc::AllocType::Uninitialized);
+        u0.resize(AltModPrf::MidSize, oc::divCeil(y.size(), 128), oc::AllocType::Uninitialized);
+        u1.resize(AltModPrf::MidSize, oc::divCeil(y.size(), 128), oc::AllocType::Uninitialized);
         compressH2(std::move(xkShares), u1, u0);
 
+        if (mDebug)
+        {
+            mDebugU0 = u0;
+            mDebugU1 = u1;
+        }
+
         // Compute v = u mod 2
-        v.resize(DLpnPrf::MidSize, u0.cols());
+        v.resize(AltModPrf::MidSize, u0.cols());
         MC_AWAIT(mod2(u0, u1, v, sock));
+
+        if (mDebug)
+        {
+            mDebugV = v;
+        }
 
         // Compute y = B * v
         compressB(v, y);
@@ -901,17 +917,19 @@ namespace secJoin
         if (pre.handle())
             MC_AWAIT(pre);
         mHasPrepro = false;
+        mOleReq = {};
+        mKeyReq = {};
         mInputSize = 0;
 
         MC_END();
     }
 
-    void DLpnPrfReceiver::setKeyOts(span<std::array<oc::block, 2>> ots)
+    void AltModPrfReceiver::setKeyOts(span<std::array<oc::block, 2>> ots)
     {
-        if (ots.size() != DLpnPrf::KeySize)
+        if (ots.size() != AltModPrf::KeySize)
             throw RTE_LOC;
-        mKeyOTs.resize(DLpnPrf::KeySize);
-        for (u64 i = 0; i < DLpnPrf::KeySize; ++i)
+        mKeyOTs.resize(AltModPrf::KeySize);
+        for (u64 i = 0; i < AltModPrf::KeySize; ++i)
         {
             mKeyOTs[i][0].SetSeed(ots[i][0]);
             mKeyOTs[i][1].SetSeed(ots[i][1]);
@@ -920,7 +938,7 @@ namespace secJoin
         mDoKeyGen = false;
     }
 
-    coproto::task<> DLpnPrfReceiver::evaluate(
+    coproto::task<> AltModPrfReceiver::evaluate(
         span<oc::block> x,
         span<oc::block> y,
         coproto::Socket& sock,
@@ -939,7 +957,7 @@ namespace secJoin
         return evaluate(x, y, sock, prng);
     }
 
-    coproto::task<> DLpnPrfReceiver::evaluate(
+    coproto::task<> AltModPrfReceiver::evaluate(
         span<oc::block> x,
         span<oc::block> y,
         coproto::Socket& sock,
@@ -965,7 +983,7 @@ namespace secJoin
         if (x.size() != y.size())
             throw std::runtime_error("input output lengths do not match. " LOCATION);
 
-        if (mOleReq.size() != oc::roundUpTo(y.size(), 128) * DLpnPrf::MidSize * 2)
+        if (mOleReq.size() != oc::roundUpTo(y.size(), 128) * AltModPrf::MidSize * 2)
             throw std::runtime_error("do not have enough preprocessing. Call request(...) first. " LOCATION);
 
         // If no one has started the preprocessing, then lets start it.
@@ -981,7 +999,7 @@ namespace secJoin
 
         // make sure we have a key.
         if (!mHasKeyOts)
-            throw std::runtime_error("dlpn was called without a key and keyGen was not requested. " LOCATION);
+            throw std::runtime_error("AltMod was called without a key and keyGen was not requested. " LOCATION);
 
         // debugging, make sure we have the correct key OTs.
         if (mDebug)
@@ -1020,15 +1038,15 @@ namespace secJoin
             }
         }
 
-        static_assert(DLpnPrf::KeySize % StepSize == 0, "we dont handle remainders. Should be true.");
+        static_assert(AltModPrf::KeySize % StepSize == 0, "we dont handle remainders. Should be true.");
 
         // for each bit of the key, perform an OT derandomization where we get a share
         // of the input x times the key mod 3. We store the LSB and MSB of the share separately.
-        // Hence we need 2 * DLpnPrf::KeySize rows in xkShares
-        xkShares.resize(2 * DLpnPrf::KeySize, oc::divCeil(x.size(), 128));
-        for (i = 0; i < DLpnPrf::KeySize;)
+        // Hence we need 2 * AltModPrf::KeySize rows in xkShares
+        xkShares.resize(2 * AltModPrf::KeySize, oc::divCeil(x.size(), 128));
+        for (i = 0; i < AltModPrf::KeySize;)
         {
-            assert(DLpnPrf::KeySize % StepSize == 0);
+            assert(AltModPrf::KeySize % StepSize == 0);
             msg.resize(StepSize, xkShares.cols() * 2);
 
             for (u64 k = 0; k < StepSize; ++i, ++k)
@@ -1051,16 +1069,31 @@ namespace secJoin
 
             MC_AWAIT(sock.send(std::move(msg)));
         }
+        if (mDebug)
+        {
+            mDebugXkShares = xkShares;
+        }
 
         // Compute u = H * xkShare mod 3
         buffer = {};
-        u0.resize(DLpnPrf::MidSize, oc::divCeil(x.size(), 128));
-        u1.resize(DLpnPrf::MidSize, oc::divCeil(x.size(), 128));
+        u0.resize(AltModPrf::MidSize, oc::divCeil(x.size(), 128));
+        u1.resize(AltModPrf::MidSize, oc::divCeil(x.size(), 128));
         compressH2(std::move(xkShares), u1, u0);
 
+        if (mDebug)
+        {
+            mDebugU0 = u0;
+            mDebugU1 = u1;
+        }
+
         // Compute v = u mod 2
-        v.resize(DLpnPrf::MidSize, u0.cols());
+        v.resize(AltModPrf::MidSize, u0.cols());
         MC_AWAIT(mod2(u0, u1, v, sock));
+
+        if (mDebug)
+        {
+            mDebugV = v;
+        }
 
         // Compute y = B * v
         compressB(v, y);
@@ -1069,6 +1102,8 @@ namespace secJoin
         if (pre.handle())
             MC_AWAIT(pre);
         mHasPrepro = false;
+        mOleReq = {};
+        mKeyReq = {};
         mInputSize = 0;
 
         MC_END();
@@ -1214,7 +1249,7 @@ namespace secJoin
     // out will have 256 rows.
     // each row will hold packed bits.
     // 
-    macoro::task<> DLpnPrfSender::mod2(
+    macoro::task<> AltModPrfSender::mod2(
         oc::MatrixView<oc::block> u0,
         oc::MatrixView<oc::block> u1,
         oc::MatrixView<oc::block> out,
@@ -1317,16 +1352,16 @@ namespace secJoin
                     ++u0Iter;
                     ++u1Iter;
 
-                    if (mDebug)// && i == mPrintI && (j == (mPrintJ / 128)))
-                    {
-                        auto mPrintJ = 0;
-                        auto bitIdx = mPrintJ % 128;
-                        std::cout << j << " m  " << bit(m0, bitIdx) << " " << bit(m1, bitIdx) << " " << bit(m2, bitIdx) << std::endl;
-                        std::cout << j << " u " << bit(u1(i, j), bitIdx) << bit(u0(i, j), bitIdx) << " = " <<
-                            (bit(u1(i, j), bitIdx) * 2 + bit(u0(i, j), bitIdx)) << std::endl;
-                        std::cout << j << " r  " << bit(m0, bitIdx) << std::endl;
-                        std::cout << j << " t  " << bit(t0, bitIdx) << " " << bit(t1, bitIdx) << " " << bit(t2, bitIdx) << std::endl;
-                    }
+                    //if (mDebug)// && i == mPrintI && (j == (mPrintJ / 128)))
+                    //{
+                    //    auto mPrintJ = 0;
+                    //    auto bitIdx = mPrintJ % 128;
+                    //    std::cout << j << " m  " << bit(m0, bitIdx) << " " << bit(m1, bitIdx) << " " << bit(m2, bitIdx) << std::endl;
+                    //    std::cout << j << " u " << bit(u1(i, j), bitIdx) << bit(u0(i, j), bitIdx) << " = " <<
+                    //        (bit(u1(i, j), bitIdx) * 2 + bit(u0(i, j), bitIdx)) << std::endl;
+                    //    std::cout << j << " r  " << bit(m0, bitIdx) << std::endl;
+                    //    std::cout << j << " t  " << bit(t0, bitIdx) << " " << bit(t1, bitIdx) << " " << bit(t2, bitIdx) << std::endl;
+                    //}
 
                     // r
                     assert(outIter == &out(i, j));
@@ -1350,7 +1385,7 @@ namespace secJoin
 
 
 
-    macoro::task<> DLpnPrfReceiver::mod2(
+    macoro::task<> AltModPrfReceiver::mod2(
         oc::MatrixView<oc::block> u0,
         oc::MatrixView<oc::block> u1,
         oc::MatrixView<oc::block> out,
@@ -1379,8 +1414,16 @@ namespace secJoin
         triple.reserve(mOleReq.batchCount());
         tIdx = 0;
         tSize = 0;
+        
+        // the format of u is that it should have AltModPrf::MidSize rows.
         rows = u0.rows();
+
+        // cols should be the number of inputs.
         cols = u0.cols();
+
+        // we are performing mod 2. u0 is the lsb, u1 is the msb. these are packed into 128 bit blocks. 
+        // we then have a matrix of these with `rows` rows and `cols` columns. We mod requires
+        // 2 OLEs. So in total we need rows * cols * 128 * 2 OLEs.
         assert(mOleReq.size() == rows * cols * 128 * 2);
 
         u0Iter = u0.data();
@@ -1469,15 +1512,15 @@ namespace secJoin
                         (*u1Iter++ & buff.data()[tIdx + 1]) ^ // t2
                         add.data()[tIdx + 0] ^ add.data()[tIdx + 1];// m_u
 
-                    if (mDebug)// && i == mPrintI && (j == (mPrintJ / 128)))
-                    {
-                        auto mPrintJ = 0;
-                        auto bitIdx = mPrintJ % 128;
-                        std::cout << j << " u " << bit(u1(i, j), bitIdx) << bit(u0(i, j), bitIdx) << " = " <<
-                            (bit(u1(i, j), bitIdx) * 2 + bit(u0(i, j), bitIdx)) << std::endl;
-                        std::cout << j << " t  _ " << bit(buff[tIdx + 0], bitIdx) << " " << bit(buff[tIdx + 1], bitIdx) << std::endl;
-                        std::cout << j << " w  " << bit(w, bitIdx) << std::endl;
-                    }
+                    //if (mDebug)// && i == mPrintI && (j == (mPrintJ / 128)))
+                    //{
+                    //    auto mPrintJ = 0;
+                    //    auto bitIdx = mPrintJ % 128;
+                    //    std::cout << j << " u " << bit(u1(i, j), bitIdx) << bit(u0(i, j), bitIdx) << " = " <<
+                    //        (bit(u1(i, j), bitIdx) * 2 + bit(u0(i, j), bitIdx)) << std::endl;
+                    //    std::cout << j << " t  _ " << bit(buff[tIdx + 0], bitIdx) << " " << bit(buff[tIdx + 1], bitIdx) << std::endl;
+                    //    std::cout << j << " w  " << bit(w, bitIdx) << std::endl;
+                    //}
 
                     assert(outIter == &out(i, j));
                     *outIter++ = w;

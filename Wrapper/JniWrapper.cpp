@@ -27,7 +27,7 @@ JNIEXPORT jlong JNICALL Java_com_visa_secureml_wrapper_SecJoinWrapper_initState
   std::string cppselectVisaCols = env->GetStringUTFChars(selectVisaCols, NULL);
   std::string cppselectClientCols = env->GetStringUTFChars(selectClientCols, NULL);
 
-  static_assert(sizeof(jlong) == sizeof(GenState*), "jlong must be pointer size");
+  static_assert(sizeof(jlong) == sizeof(WrapperState*), "jlong must be pointer size");
   return (jlong)secJoin::initState(cppCSVPath, cppVisaMetaDataPath, cppClientMetaDataPath, cppVisaJoinCols,
     cppClientJoinCols, cppselectVisaCols, cppselectClientCols, isUnique);
 
@@ -43,7 +43,7 @@ JNIEXPORT jbyteArray JNICALL Java_com_visa_secureml_wrapper_SecJoinWrapper_runJo
   std::vector<oc::u8> buff(dataSize);
   memcpy(buff.data(), elements, dataSize);
 
-  auto b = secJoin::runJoin((GenState*)stateAddress, buff);
+  auto b = secJoin::runJoin((WrapperState*)stateAddress, buff);
 
   jbyteArray byteArray = (*env).NewByteArray(b.size());
   (*env).SetByteArrayRegion(byteArray, 0, b.size(), reinterpret_cast<const signed char*>(b.data()));
@@ -76,13 +76,13 @@ JNIEXPORT jboolean JNICALL Java_com_visa_secureml_wrapper_SecJoinWrapper_isProto
 (JNIEnv* env, jobject obj, jlong stateAddress)
 {
 
-  return secJoin::isProtocolReady((GenState*)stateAddress);
+  return secJoin::isProtocolReady((WrapperState*)stateAddress);
 }
 
 JNIEXPORT void JNICALL Java_com_visa_secureml_wrapper_SecJoinWrapper_getOtherShare
 (JNIEnv* env, jobject obj, jlong stateAddress, jboolean isUnique)
 {
-  secJoin::getOtherShare((GenState*)stateAddress, isUnique);
+  secJoin::getOtherShare((WrapperState*)stateAddress, isUnique);
 }
 
 
@@ -95,5 +95,5 @@ JNIEXPORT void JNICALL Java_com_visa_secureml_wrapper_SecJoinWrapper_getJoinTabl
   std::string cppCSVPath = env->GetStringUTFChars(csvPath, NULL);
   std::string cppMetaPath = env->GetStringUTFChars(metaDataPath, NULL);
 
-  secJoin::getJoinTable((GenState*)stateAddress, cppCSVPath, cppMetaPath, isUnique);
+  secJoin::getJoinTable((WrapperState*)stateAddress, cppCSVPath, cppMetaPath, isUnique);
 }

@@ -1,10 +1,30 @@
 #include "secure-join/Perm/ComposedPerm.h"
 #include "ComposedPerm_Test.h"
-using namespace secJoin;
 #include "secure-join/Util/Util.h"
+using namespace secJoin;
+
+void plaintext_perm_test(const oc::CLP& cmd)
+{
+    PRNG prng(oc::ZeroBlock);
+    u64 n = 100;
+    Perm p0(n, prng), p1(n, prng);
+
+    auto p10 = p1.compose(p0);
+
+    std::vector<u64> v(n);
+    prng.get(v.data(), v.size());
+
+    auto p0v = p0.apply(v);
+    auto p1p0v = p1.apply(p0v);
+
+    auto p10v = p10.apply(v);
+
+    if (p10v != p1p0v)
+        throw RTE_LOC;
+}
 
 // This is the insecure perm test
-void ComposedPerm_basic_test()
+void ComposedPerm_basic_test(const oc::CLP& cmd)
 {
 
 
@@ -18,8 +38,8 @@ void ComposedPerm_basic_test()
 
     auto chls = coproto::LocalAsyncSocket::makePair();
     CorGenerator ole0, ole1;
-    ole0.mock(CorGenerator::Role::Sender);
-    ole1.mock(CorGenerator::Role::Receiver);
+    ole0.init(chls[0].fork(), prng, 0, 1 << 14, cmd.getOr("mock", 1));
+    ole1.init(chls[1].fork(), prng, 1, 1 << 14, cmd.getOr("mock", 1));
     // std::vector<u64> pi0(n), pi1(n);
     prng.get(x.data(), x.size());
 
@@ -34,8 +54,8 @@ void ComposedPerm_basic_test()
 
     ComposedPerm perm1(p0, 0); 
     ComposedPerm perm2(p1, 1);
-    perm1.mIsSecure = false;
-    perm2.mIsSecure = false;
+    //perm1.mIsSecure = false;
+    //perm2.mIsSecure = false;
 
     for(auto invPerm : { PermOp::Regular,PermOp::Inverse })
     {
@@ -58,8 +78,9 @@ void ComposedPerm_basic_test()
         sout[0].resize(n, rowSize);
         sout[1].resize(n, rowSize);
 
-        perm1.init2(0, n, rowSize);
-        perm2.init2(1, n, rowSize);
+        perm1.setBytePerRow(xShares[0].cols());
+        perm2.setBytePerRow(xShares[0].cols());
+
         perm1.request(ole0);
         perm2.request(ole1);
 
@@ -78,7 +99,7 @@ void ComposedPerm_basic_test()
 }
 
 // this is the secure replicated perm test
-void ComposedPerm_shared_test()
+void ComposedPerm_shared_test(const oc::CLP& cmd)
 {
     // u64 n = cmd.getOr("n", 1000);
     // u64 rowSize = cmd.getOr("m",63);
@@ -99,9 +120,8 @@ void ComposedPerm_shared_test()
     auto chls = coproto::LocalAsyncSocket::makePair();
      // Fake Setup
     CorGenerator ole0, ole1;
-    // macoro::thread_pool tp;
-    ole0.mock(CorGenerator::Role::Sender);
-    ole1.mock(CorGenerator::Role::Receiver);
+    ole0.init(chls[0].fork(), prng0, 0, 1 << 14, cmd.getOr("mock", 1));
+    ole1.init(chls[1].fork(), prng1, 1, 1 << 14, cmd.getOr("mock", 1));
 
     std::array<oc::Matrix<u8>, 2> sout;
     std::array<oc::Matrix<u8>, 2> xShares = share(x,prng0);
@@ -131,8 +151,9 @@ void ComposedPerm_shared_test()
     for(auto invPerm : { PermOp::Regular,PermOp::Inverse })
     {
 
-        perm1.init2(0, n, rowSize);
-        perm2.init2(1, n, rowSize);
+        perm1.setBytePerRow(rowSize);
+        perm2.setBytePerRow(rowSize);
+        
         perm1.request(ole0);
         perm2.request(ole1);
 
@@ -170,7 +191,7 @@ void ComposedPerm_shared_test()
 
 }
 
-void ComposedPerm_prepro_test()
+void ComposedPerm_prepro_test(const oc::CLP& cmd)
 {
 
     // u64 n = cmd.getOr("n", 1000);
@@ -192,9 +213,8 @@ void ComposedPerm_prepro_test()
     auto chls = coproto::LocalAsyncSocket::makePair();
     // Fake Setup
     CorGenerator ole0, ole1;
-    // macoro::thread_pool tp;
-    ole0.mock(CorGenerator::Role::Sender);
-    ole1.mock(CorGenerator::Role::Receiver);
+    ole0.init(chls[0].fork(), prng0, 0, 1 << 14, cmd.getOr("mock", 1));
+    ole1.init(chls[1].fork(), prng1, 1, 1 << 14, cmd.getOr("mock", 1));
 
     std::array<oc::Matrix<u8>, 2> sout;
     std::array<oc::Matrix<u8>, 2> xShares = share(x, prng0);
@@ -204,8 +224,8 @@ void ComposedPerm_prepro_test()
     Perm pi = p0.composeSwap(p1);
 
 
-    ComposedPerm perm1(p0, 0);
-    ComposedPerm perm2(p1, 1);
+    ComposedPerm perm1(p0, 0, rowSize);
+    ComposedPerm perm2(p1, 1, rowSize);
 
 
     // Setuping up the OT Keys
@@ -223,15 +243,12 @@ void ComposedPerm_prepro_test()
 
     for (auto invPerm : { PermOp::Regular,PermOp::Inverse })
     {
-
-        perm1.init2(0, n, rowSize);
-        perm2.init2(1, n, rowSize);
         perm1.request(ole0);
         perm2.request(ole1);
 
         auto res0 = macoro::sync_wait(macoro::when_all_ready(
-            perm1.preprocess(chls[0], prng0),
-            perm2.preprocess(chls[1], prng1)
+            perm1.setup(chls[0], prng0),
+            perm2.setup(chls[1], prng1)
         ));
         std::get<1>(res0).result();
         std::get<0>(res0).result();

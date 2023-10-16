@@ -7,85 +7,107 @@
 #include <memory>
 
 #include "macoro/task.h"
-#include "macoro/macros.h"
-#include "secure-join/CorGenerator/OtGenerator.h"
-#include "secure-join/CorGenerator/BinOleGenerator.h"
 #include <utility>
 
 namespace secJoin
 {
     
 
-    struct ArithTriple {
+    struct RequestState;
+    enum class CorType
+    {
+        SendOt,
+        RecvOt,
+        Ole
+    };
+
+    struct Cor {
+        Cor(CorType t)
+            :mType(t)
+        {}
+        Cor(const Cor&) = default;
+        Cor(Cor&&) = default;
+        Cor& operator=(const Cor&) = default;
+        Cor& operator=(Cor&&) = default;
+
+        CorType mType;
+
+        // The request associated with this correlation.
+        std::shared_ptr<RequestState> mRequest;
+    };
+
+    // A receiver OT correlation.
+    struct OtRecv : Cor
+    {
+
+        OtRecv() : Cor(CorType::RecvOt) {}
+        OtRecv(const OtRecv&) = delete;
+        OtRecv& operator=(const OtRecv&) = delete;
+        OtRecv(OtRecv&&) = default;
+        OtRecv& operator=(OtRecv&&) = default;
 
 
-        //ArithTriple() = default;
-        //ArithTriple(const ArithTriple&) = delete;
-        //ArithTriple& operator=(const ArithTriple&) = delete;
-        //ArithTriple(ArithTriple&&) = default;
-        //ArithTriple& operator=(ArithTriple&&) = default;
+        // The choice bits 
+        oc::BitVector mChoice;
 
-        u64 mBitCount = 0;
-        oc::AlignedUnVector<u32> mA, mB, mC;
+        // the OT messages
+        oc::span<oc::block> mMsg;
 
-        u64 size() { return mA.size(); }
+        // the number of correlations this chunk has.
+        u64 size() const { return mMsg.size(); }
+
+        // The choice bits 
+        oc::BitVector& choice() { return mChoice; }
+
+        // the OT messages
+        oc::span<oc::block> msg() { return mMsg; }
     };
 
 
-    //template<typename T>
-    //struct Request2
-    //{
-    //    Request2() = default;
-    //    Request2(const Request2&) = delete;
-    //    Request2(Request2&& o) noexcept
-    //        , mSize(std::exchange(o.mSize, 0))
-    //        , mNextBatchIdx(std::exchange(o.mNextBatchIdx, 0))
-    //        , mCorrelations(std::move(o.mCorrelations))
-    //    {}
+
+    // A sender OT correlation.
+    struct OtSend : Cor
+    {
+
+        OtSend() : Cor(CorType::SendOt) {}
+        OtSend(const OtSend&) = delete;
+        OtSend& operator=(const OtSend&) = delete;
+        OtSend(OtSend&&) = default;
+        OtSend& operator=(OtSend&&) = default;
+
+        // the OT messages
+        oc::span<std::array<oc::block, 2>> mMsg;
+
+        u64 size() const
+        {
+            return mMsg.size();
+        }
+
+        oc::span<std::array<oc::block, 2>> msg() { return mMsg; }
+    };
 
 
-    //    Request2& operator=(Request2&& o)
-    //    {
-    //        mSize = std::exchange(o.mSize, 0);
-    //        mNextBatchIdx = std::exchange(o.mNextBatchIdx, 0);
-    //        mCorrelations = std::move(o.mCorrelations);
-    //        return *this;
-    //    }
+    // A sender OT correlation.
+    struct BinOle : Cor
+    {
 
-    //    using value_type = T;
-    //    using TGen = typename value_type::gen;
-
-    //    u64 mSize = 0, mNextBatchIdx = 0;
-    //    std::vector<std::unique_ptr<TGen>> mCorrelations;
-    //    //std::unique_ptr<macoro::mpsc::channel<std::pair<u64, T>>> mChl;
-
-    //    auto get(T& d)
-    //    {
-
-    //        if (mNextBatchIdx >= mCorrelations.size())
-    //            throw std::runtime_error("Out of correlations. " LOCATION);
-
-    //        return mCorrelations[mNextBatchIdx].get(d);
-    //        //MC_BEGIN(macoro::task<T>, this,
-    //        //    t = std::pair<u64, T>{}
-    //        //);
-
-    //        //if (mNextBatchIdx >= mCorrelations.size())
-    //        //    throw std::runtime_error("Out of correlations. " LOCATION);
+        BinOle() : Cor(CorType::Ole) {}
+        BinOle(const BinOle&) = delete;
+        BinOle& operator=(const BinOle&) = delete;
+        BinOle(BinOle&&) = default;
+        BinOle& operator=(BinOle&&) = default;
 
 
-    //        ////while (!mCorrelations[mNextBatchIdx])
-    //        ////{
-    //        ////    MC_AWAIT_SET(t, mChl->pop());
-    //        ////    mCorrelations[t.first] = std::make_unique<T>(std::move(t.second));
-    //        ////    //if (mRemReq.size())
-    //        ////    //{
-    //        ////    //    MC_AWAIT(mGen->mControlQueue->push(CorGenerator::Command{ std::move(mRemReq.back()) }));
-    //        ////    //    mRemReq.pop_back();
-    //        ////    //}
-    //        ////}
-    //        ////MC_RETURN(std::move(*mCorrelations[mNextBatchIdx++]));
-    //        //MC_END();
-    //    }
-    //};
+        // the ole's
+        oc::span<oc::block> mAdd, mMult;
+
+        u64 size() const
+        {
+            return mMult.size() * 128;
+        }
+
+        //oc::span<std::array<oc::block, 2>> msg() { return mMsg; }
+    };
+
+
 }

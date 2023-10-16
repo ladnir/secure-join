@@ -47,24 +47,27 @@ namespace secJoin
         if (mRowCount == 0 || mInBitCount == 0)
             throw std::runtime_error("init has not been called. " LOCATION);
 
-        mRole = (u64)gen.mRole;
-        if (gen.mRole == CorGenerator::Role::Receiver)
-            mRecvReq = gen.otRecvRequest(mRowCount * mInBitCount);
+        mRole = (u64)gen.partyIdx();
+        if (gen.partyIdx())
+            mRecvReq = gen.recvOtRequest(mRowCount * mInBitCount);
         else
-            mSendReq = gen.otSendRequest(mRowCount * mInBitCount);
+            mSendReq = gen.sendOtRequest(mRowCount * mInBitCount);
         mRequested = true;
     }
 
     macoro::task<> BitInject::preprocess()
     {
+        mHasPreprocessing = true;
         if (mRecvReq.size())
             return mRecvReq.start();
         else if (mSendReq.size())
             return mSendReq.start();
         else
+        {
+            mHasPreprocessing = false;
             throw std::runtime_error("BitInject::request() must be called before preprocess() " LOCATION);
+        }
 
-        mHasPreprocessing = true;
     }
 
     //macoro::task<> BitInject::preprocess(
@@ -85,11 +88,11 @@ namespace secJoin
 
     //    if (gen.mRole == CorGenerator::Role::Receiver)
     //    {
-    //        MC_AWAIT(gen.otRecvRequest(mRecvReq, n * mInBitCount, sock, prng));
+    //        MC_AWAIT(gen.recvOtRequest(mRecvReq, n * mInBitCount, sock, prng));
     //    }
     //    else
     //    {
-    //        MC_AWAIT(gen.otSendRequest(mSendReq, n * mInBitCount, sock, prng));
+    //        MC_AWAIT(gen.sendOtRequest(mSendReq, n * mInBitCount, sock, prng));
     //    }
 
     //    MC_END();
@@ -196,10 +199,16 @@ namespace secJoin
             i = 0; k = 0;
             while (i < out.size())
             {
-                m = recvs[k].size();
+                m = recvs[k].mChoice.size();
                 buff.resize(m * oc::divCeil(outBitCount, 8));
-                MC_AWAIT(sock.recv(buff));
-
+                MC_AWAIT_TRY(ec, sock.recv(buff));
+                if (ec.has_error()) {
+                    try { std::rethrow_exception(ec.error()); }
+                    catch (std::exception& e) {
+                        std::cout << e.what() << std::endl;
+                        throw;
+                    }
+                }
                 updates.resize(m);
                 unpack(buff, outBitCount, updates);
 

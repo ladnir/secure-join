@@ -1,13 +1,12 @@
 #include "AdditivePerm_Test.h"
 
+#include "secure-join/Util/Util.h"
+#include "secure-join/Perm/AdditivePerm.h"
+
 using namespace secJoin;
 
-void AdditivePerm_setup_test()
-{
 
-}
-
-void AdditivePerm_xor_test()
+void AdditivePerm_xor_test(const oc::CLP& cmd)
 {
     // User input
     u64 n = 500;    // total number of rows
@@ -28,8 +27,10 @@ void AdditivePerm_xor_test()
     AdditivePerm vecPerm2;vecPerm2.init2(1, n, rowSize * 2); vecPerm2.setShares(sShares[1]);
 
     CorGenerator ole0, ole1;
-    ole0.mock(CorGenerator::Role::Sender);
-    ole1.mock(CorGenerator::Role::Receiver);
+
+    ole0.init(chls[0].fork(), prng, 0, 1 << 14, cmd.getOr("mock", 1));
+    ole1.init(chls[1].fork(), prng, 1, 1 << 14, cmd.getOr("mock", 1));
+
 
     // Setuping up the OT Keys
     oc::block kk = prng.get();
@@ -98,7 +99,7 @@ void AdditivePerm_xor_test()
 }
 
 
-void AdditivePerm_prepro_test()
+void AdditivePerm_prepro_test(const oc::CLP& cmd)
 {
     // User input
     u64 n = 500;    // total number of rows
@@ -120,16 +121,16 @@ void AdditivePerm_prepro_test()
 
 
     CorGenerator ole0, ole1;
-    ole0.mock(CorGenerator::Role::Sender);
-    ole1.mock(CorGenerator::Role::Receiver);
+    ole0.init(chls[0].fork(), prng, 0, 1 << 14, cmd.getOr("mock", 1));
+    ole1.init(chls[1].fork(), prng, 1, 1 << 14, cmd.getOr("mock", 1));
 
 
     vecPerm1.request(ole0);
     vecPerm2.request(ole1);
 
     auto res0 = macoro::sync_wait(macoro::when_all_ready(
-        vecPerm1.preprocess(chls[0], prng),
-        vecPerm2.preprocess(chls[1], prng)
+        vecPerm1.preprocess(),
+        vecPerm2.preprocess()
     ));
 
     std::get<0>(res0).result();
