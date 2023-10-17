@@ -144,7 +144,7 @@ namespace secJoin
     {
         u64 n = cmd.getOr("n", 1ull << cmd.getOr("nn", 20));
 
-        if(cmd.isSet("single"))
+        if (cmd.isSet("single"))
         {
             oc::AlignedUnVector<oc::block> y(n);
             oc::AlignedUnVector<oc::block> v(n);
@@ -182,6 +182,36 @@ namespace secJoin
                 std::chrono::duration_cast<std::chrono::milliseconds>(e - b).count() << "ms " << std::endl;;
 
             std::cout << bb << std::endl;
+        }
+    }
+
+    void AltMod_sampleMod3_benchmark(const oc::CLP& cmd)
+    {
+        u64 n = cmd.getOr("n", 1ull << cmd.getOr("nn", 16));
+
+        oc::AlignedUnVector<block> msb(n), lsb(n);
+        PRNG prng(oc::ZeroBlock);
+
+        {
+
+            oc::Timer timer;
+            auto b = timer.setTimePoint("begin");
+            sampleMod3Lookup(prng, msb, lsb);
+            auto e = timer.setTimePoint("end");
+
+            std::cout << "mod3lookup n:" << n << ", " <<
+                std::chrono::duration_cast<std::chrono::milliseconds>(e - b).count() << "ms " << std::endl;;
+        }
+        if(cmd.isSet("old"))
+        {
+            oc::AlignedUnVector<u8> bb;
+            oc::Timer timer;
+            auto b = timer.setTimePoint("begin");
+            sampleMod3(prng, msb, lsb, bb);
+            auto e = timer.setTimePoint("end");
+
+            std::cout << "mod3 old n:" << n << ", " <<
+                std::chrono::duration_cast<std::chrono::milliseconds>(e - b).count() << "ms " << std::endl;;
         }
     }
 

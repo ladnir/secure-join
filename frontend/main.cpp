@@ -1,7 +1,10 @@
 #include "tests/UnitTests.h"
 #include "cryptoTools/Common/CLP.h"
 #include "benchmark.h"
+#include "secure-join/Defines.h"
+
 using namespace secJoin;
+
 
 int main(int argc, char** argv)
 {
@@ -30,6 +33,11 @@ int main(int argc, char** argv)
         if (clp.isSet("transpose"))
         {
             transpose_benchmark(clp);
+            return 0;
+        }
+        if (clp.isSet("mod3"))
+        {
+            AltMod_sampleMod3_benchmark(clp);
             return 0;
         }
     }

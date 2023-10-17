@@ -22,12 +22,12 @@ namespace secJoin
     }();
 
 
-    LinearCode AltModPrf::mBCode = []() { 
+    LinearCode AltModPrf::mBCode = []() {
 
         oc::Matrix<u8> g(128, sizeof(block)), gt(128, sizeof(block));
         g.resize(128, sizeof(block));
         for (u64 i = 0; i < 128; ++i)
-            memcpy(g[i], span<const block>(&mB[i],1));
+            memcpy(g[i], span<const block>(&mB[i], 1));
         oc::transpose(g, gt);
         LinearCode r;
         r.init(gt);
@@ -84,7 +84,7 @@ namespace secJoin
 
         // the begin'th v value starts at block index begin128
         auto begin128 = oc::divCeil(begin, 128);
-        
+
         // the number of 128 chunks
         auto n128 = oc::divCeil(n, 128);
 
@@ -123,7 +123,7 @@ namespace secJoin
             vIter = v.data() + begin128 + j * vStep;
             while (j < 256)
             {
-                if (AltModPrf::mBExpanded[i][j-128])
+                if (AltModPrf::mBExpanded[i][j - 128])
                 {
                     assert(yt[i].data() == ytIter);
                     assert(vIter == v[j].data() + begin128);
@@ -196,29 +196,25 @@ namespace secJoin
     {
         if (1)
         {
+            // rownd down
             auto n = y.size();
-            if (n % 128)
-                throw RTE_LOC;
-            if ((u64)y.data() % 16)
-                throw RTE_LOC;
-            oc::AlignedArray<block, 128> tt;
+
+            oc::AlignedArray<block, 128> tt, yy;
             //auto v1 = v[1];
             block* v0Iter = v[0].data();
             block* v1Iter = v[128].data();
             auto vStep = v.cols();
-            for (u64 i = 0, ii = 0; i < n; i += 128, ++ii)
+            u64 i = 0, ii = 0;
+
+            for (; i < n; i += 128, ++ii)
             {
-                auto yIter = y.data() + i;
                 for (u64 j = 0; j < 128; ++j)
                 {
-                    yIter[j] = v0Iter[j * vStep];
+                    yy[j] = v0Iter[j * vStep];
                 }
                 ++v0Iter;
 
-                oc::transpose128(yIter);
-
-                //auto m = std::min<u64>(n - i, 128);
-                //memcpy(y.data() + i, tt.data(), m * sizeof(block));
+                oc::transpose128(yy);
 
                 for (u64 j = 0; j < 128; ++j)
                 {
@@ -227,16 +223,29 @@ namespace secJoin
                 ++v1Iter;
 
                 oc::transpose128(tt.data());
-                //for (u64 j = 0;j < 128; j += 1)
-                //{
-                //    AltModPrf::mBCode.encode((u8*)(tt.data()+ j), (u8*)(tt.data() +j));
-                //}
-                for (u64 j = 0; j < 128; ++j)
+
+                if (i + 128 < n)
                 {
-                    AltModPrf::mBCode.encode((u8*)(tt.data() + j), (u8*)(tt.data() + j));
-                    yIter[j] = yIter[j] ^ tt[j];
+                    auto yIter = y.data() + i;
+                    for (u64 j = 0; j < 128; ++j)
+                    {
+                        AltModPrf::mBCode.encode((u8*)(tt.data() + j), (u8*)(tt.data() + j));
+                        yIter[j] = yy[j] ^ tt[j];
+                    }
+                }
+                else
+                {
+                    auto m = n - i;
+                    auto yIter = y.data() + i;
+                    for (u64 j = 0; j < m; ++j)
+                    {
+                        AltModPrf::mBCode.encode((u8*)(tt.data() + j), (u8*)(tt.data() + j));
+                        yIter[j] = yy[j] ^ tt[j];
+                    }
                 }
             }
+
+
         }
         else
         {
@@ -415,7 +424,7 @@ namespace secJoin
         }
     }
 
-    inline void sampleMod3(PRNG& prng, span<block> msb, span<block> lsb, oc::AlignedUnVector<u8>& b)
+    void sampleMod3(PRNG& prng, span<block> msb, span<block> lsb, oc::AlignedUnVector<u8>& b)
     {
         b.resize(msb.size() * 128);
         sampleMod3(prng, b);
@@ -466,11 +475,161 @@ namespace secJoin
                 tt[5] << 4 ^
                 tt[6] << 5 ^
                 tt[7] << 6;
-
-
         }
-
     }
+
+    // generated using buildMod3Tabel. Each of the first 243=3^5 positions
+    // contains 5 mod-3 values. the first byte of each entry contains the 
+    //5 lsb. the second byte contains the 5 msb. The third byte contains a 
+    // zero-one flag indicating if this sample less that 243 ad therefore
+    // valid. The idea of the sample is that it takes as input a random byte 
+    // and returns 5 random mod3 values or bot.
+    static const std::array<u32, 256> mod3Table =
+    { {
+        0x10000, 0x10001, 0x10100, 0x10002, 0x10003, 0x10102, 0x10200, 0x10201,
+        0x10300, 0x10004, 0x10005, 0x10104, 0x10006, 0x10007, 0x10106, 0x10204,
+        0x10205, 0x10304, 0x10400, 0x10401, 0x10500, 0x10402, 0x10403, 0x10502,
+        0x10600, 0x10601, 0x10700, 0x10008, 0x10009, 0x10108, 0x1000a, 0x1000b,
+        0x1010a, 0x10208, 0x10209, 0x10308, 0x1000c, 0x1000d, 0x1010c, 0x1000e,
+        0x1000f, 0x1010e, 0x1020c, 0x1020d, 0x1030c, 0x10408, 0x10409, 0x10508,
+        0x1040a, 0x1040b, 0x1050a, 0x10608, 0x10609, 0x10708, 0x10800, 0x10801,
+        0x10900, 0x10802, 0x10803, 0x10902, 0x10a00, 0x10a01, 0x10b00, 0x10804,
+        0x10805, 0x10904, 0x10806, 0x10807, 0x10906, 0x10a04, 0x10a05, 0x10b04,
+        0x10c00, 0x10c01, 0x10d00, 0x10c02, 0x10c03, 0x10d02, 0x10e00, 0x10e01,
+        0x10f00, 0x10010, 0x10011, 0x10110, 0x10012, 0x10013, 0x10112, 0x10210,
+        0x10211, 0x10310, 0x10014, 0x10015, 0x10114, 0x10016, 0x10017, 0x10116,
+        0x10214, 0x10215, 0x10314, 0x10410, 0x10411, 0x10510, 0x10412, 0x10413,
+        0x10512, 0x10610, 0x10611, 0x10710, 0x10018, 0x10019, 0x10118, 0x1001a,
+        0x1001b, 0x1011a, 0x10218, 0x10219, 0x10318, 0x1001c, 0x1001d, 0x1011c,
+        0x1001e, 0x1001f, 0x1011e, 0x1021c, 0x1021d, 0x1031c, 0x10418, 0x10419,
+        0x10518, 0x1041a, 0x1041b, 0x1051a, 0x10618, 0x10619, 0x10718, 0x10810,
+        0x10811, 0x10910, 0x10812, 0x10813, 0x10912, 0x10a10, 0x10a11, 0x10b10,
+        0x10814, 0x10815, 0x10914, 0x10816, 0x10817, 0x10916, 0x10a14, 0x10a15,
+        0x10b14, 0x10c10, 0x10c11, 0x10d10, 0x10c12, 0x10c13, 0x10d12, 0x10e10,
+        0x10e11, 0x10f10, 0x11000, 0x11001, 0x11100, 0x11002, 0x11003, 0x11102,
+        0x11200, 0x11201, 0x11300, 0x11004, 0x11005, 0x11104, 0x11006, 0x11007,
+        0x11106, 0x11204, 0x11205, 0x11304, 0x11400, 0x11401, 0x11500, 0x11402,
+        0x11403, 0x11502, 0x11600, 0x11601, 0x11700, 0x11008, 0x11009, 0x11108,
+        0x1100a, 0x1100b, 0x1110a, 0x11208, 0x11209, 0x11308, 0x1100c, 0x1100d,
+        0x1110c, 0x1100e, 0x1100f, 0x1110e, 0x1120c, 0x1120d, 0x1130c, 0x11408,
+        0x11409, 0x11508, 0x1140a, 0x1140b, 0x1150a, 0x11608, 0x11609, 0x11708,
+        0x11800, 0x11801, 0x11900, 0x11802, 0x11803, 0x11902, 0x11a00, 0x11a01,
+        0x11b00, 0x11804, 0x11805, 0x11904, 0x11806, 0x11807, 0x11906, 0x11a04,
+        0x11a05, 0x11b04, 0x11c00, 0x11c01, 0x11d00, 0x11c02, 0x11c03, 0x11d02,
+        0x11e00, 0x11e01, 0x11f00, 0x0, 0x0, 0x0, 0x0, 0x0,
+        0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0
+} };
+
+
+    void buildMod3Tabel()
+    {
+        std::array<u32, 256> ret;
+        auto m = 243;
+        auto s = 5;
+        u32 vals[5];
+        for (u64 j = 0; j < s; ++j)
+            vals[j] = 0;
+        for (u64 i = 0; i < 256; ++i)
+        {
+            if (i < m)
+            {
+                u32 lsb = 0;
+                u32 msb = 0;
+
+                for (u64 j = 0; j < s; ++j)
+                {
+                    auto lsbj = vals[j] & 1;
+                    auto msbj = (vals[j] >> 1) & 1;
+                    lsb |= lsbj << j;
+                    msb |= msbj << j;
+                    //std::cout << vals[j] << "(" <<msbj<<"" << lsbj << "), ";
+                }
+                ret[i] = ((1 << 16) + (msb << 8) + lsb);
+
+                ++vals[0];
+                for (u64 j = 0; j < s; ++j)
+                {
+                    if (vals[j] == 3 && j != s - 1)
+                        vals[j + 1]++;
+                    vals[j] = vals[j] % 3;
+                }
+
+            }
+            else
+            {
+                ret[i] = 0;
+                //std::cout << "0," << std::endl;
+            }
+
+            std::cout << "0x" << std::hex << ret[i] << ",";
+            if (i % 8 == 0)
+                std::cout << std::endl;
+        }
+        //return ret;
+    };
+
+
+    void sampleMod3Lookup(PRNG& prng, span<block> msb, span<block> lsb)
+    {
+        u64 n = msb.size() * 128;
+        auto msbIter = (u64*)msb.data();
+        auto lsbIter = (u64*)lsb.data();
+        span<u8> rands = prng.getBufferSpan(256);
+        u64 rIdx = 0;
+        u64 e = rands.size();
+        for (u64 i = 0; i < n; i += 64)
+        {
+            u64 lsb = 0, msb = 0;
+            u64 j = 0;
+            while (j < 64)
+            {
+                if (rIdx == e)
+                {
+                    rands = prng.getBufferSpan(256);
+                    rIdx = 0;
+                    e = rands.size();
+                }
+                auto b = rands.data()[rIdx++];
+                //auto b = prng.get<u8>();
+                auto v = mod3Table[b];
+                auto lsbj = v & 255ull;
+                auto msbj = (v >> 8) & 255ull;
+                auto flag = v >> 16;
+                __assume(flag <= 1);
+                lsb |= lsbj << j;
+                msb |= msbj << j;
+                j += flag * 5;
+            }
+            *lsbIter++ = lsb;
+            *msbIter++ = msb;
+        }
+    }
+    //while (j < 64)
+    //{
+    //    auto r = prng.get<u32>();
+    //    u8 bs[4], flags[4];
+    //    u32 vs[4], lsbjs[4], msbjs[4];
+
+    //    for (u64 k = 0;k < 4; ++k)
+    //    {
+    //        bs[k] = (r >> (8 * k)) & 255ull;
+    //        vs[k] = mod3Table[bs[k]];
+    //        lsbjs[k] = vs[k] & 255ull;
+    //        msbjs[k] = (vs[k] >> 8) & 255ull;
+    //        flags[k] = vs[0] >> 16;
+    //    }
+
+    //    auto lsbj = lsbjs[0] | (lsbjs[1] << 8) | (lsbjs[2] << 16) | (lsbjs[3] << 24);
+    //    auto msbj = msbjs[0] | (msbjs[1] << 8) | (msbjs[2] << 16) | (msbjs[3] << 24);
+
+    //    auto flag = flags[0] + flags[1] + flags[2] + flags[3];
+
+    //    lsb |= lsbj << j;
+    //    msb |= msbj << j;
+    //    j += flag * 5;
+    //}
+
+
     void compare(span<block> m1, span<block> m0, span<u16> u, bool verbose = false)
     {
         for (u64 i = 0; i < u.size(); ++i)
@@ -964,7 +1123,7 @@ namespace secJoin
                 {
                     // ui = (hi1,hi0)         
                     //    = G(OT(i,0))  mod 3 
-                    sampleMod3(mKeyOTs[i], msbShare, lsbShare, buffer);
+                    sampleMod3Lookup(mKeyOTs[i], msbShare, lsbShare);
                 }
             }
         }
@@ -1139,7 +1298,7 @@ namespace secJoin
                 // we store them in swapped order to negate the value.
                 auto msbShare = xkShares[i * 2];
                 auto lsbShare = xkShares[i * 2 + 1];
-                sampleMod3(mKeyOTs[i][0], msbShare, lsbShare, buffer);
+                sampleMod3Lookup(mKeyOTs[i][0], msbShare, lsbShare);
 
                 // # hi = G(OT(i,0)) + x mod 3
                 mod3Add(
@@ -1499,7 +1658,7 @@ namespace secJoin
         triple.reserve(mOleReq.batchCount());
         tIdx = 0;
         tSize = 0;
-        
+
         // the format of u is that it should have AltModPrf::MidSize rows.
         rows = u0.rows();
 

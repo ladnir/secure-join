@@ -50,6 +50,8 @@ namespace secJoin_Tests
 
 
             t.add("AltModPrf_BMult_test                            ", AltModPrf_BMult_test);
+            
+            t.add("AltModPrf_sampleMod3_test                       ", AltModPrf_sampleMod3_test);
             t.add("AltModPrf_mod3_test                             ", AltModPrf_mod3_test);
             t.add("AltModPrf_mod2_test                             ", AltModPrf_mod2_test);
             t.add("AltModPrf_plain_test                            ", AltModPrf_plain_test);

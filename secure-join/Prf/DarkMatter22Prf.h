@@ -361,17 +361,7 @@ namespace secJoin
                 }
             }
         }
-
-        //for (u64 q = 0; q < mBuffer.size(); ++q)
-        //{
-        //    //mBuffer[q] = prng.get<u64>() % 3;
-        //    std::cout << int(mBuffer[q]) << " ";
-        //    assert(mBuffer[q] < 3);
-        //}
-        //std::cout << std::endl;
-
     }
-
 
     inline oc::AlignedUnVector<u16> sampleMod3(PRNG& prng, u64 n)
     {

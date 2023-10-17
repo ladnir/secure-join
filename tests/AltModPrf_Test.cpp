@@ -473,6 +473,27 @@ void AltModPrf_mod3BitDecompostion_test()
     }
 }
 
+void AltModPrf_sampleMod3_test(const oc::CLP& cmd)
+{
+    u64 n = 1ull << cmd.getOr("nn", 16);
+    PRNG prng(oc::ZeroBlock);
+
+    oc::AlignedUnVector<block> lsb(n), msb(n);
+    sampleMod3Lookup(prng, msb, lsb);
+    for (u64 i = 0;i < n;++i)
+    {
+        for (u64 j = 0;j < 128; ++j)
+        {
+            auto lsbj = bit(lsb[i], j);
+            auto msbj = bit(msb[i], j);
+
+            if ((lsbj + 2 * msbj) > 2)
+                throw RTE_LOC;
+        }
+    }
+    //sampleMod3(prng, buff);
+}
+
 void AltModPrf_BMult_test(const oc::CLP& cmd)
 {
     u64 n = 1ull<< cmd.getOr("nn", 16);
