@@ -517,7 +517,9 @@ namespace secJoin
         xorVector(vv, prng);
     }
 
-    inline void xorVector(span<oc::block> v, span<const oc::block> u, PRNG& prng)
+
+    // v = v + u + PRNG()
+    inline void xorVectorAdd(span<oc::block> v, span<const oc::block> u, PRNG& prng)
     {
         oc::block m[8];
         auto vIter = v.data();
@@ -563,11 +565,12 @@ namespace secJoin
         assert(vIter == v.data() + v.size());
     }
 
-    inline void xorVector(span<block256> v, span<const block256> u, PRNG& prng)
+    // v = v + u + PRNG()
+    inline void xorVectorAdd(span<block256> v, span<const block256> u, PRNG& prng)
     {
         auto vv = span<oc::block>(v[0].mData.data(), v.size() * 2);
         auto uu = span<const oc::block>(u[0].mData.data(), u.size() * 2);
-        xorVector(vv, uu, prng);
+        xorVectorAdd(vv, uu, prng);
     }
 
     class DarkMatter22PrfSender : public oc::TimerAdapter
@@ -631,7 +634,7 @@ namespace secJoin
                 if (ki)
                 {
                     // mV = mV ^ vi ^ H(mKeyOTs[i])
-                    xorVector(mV, vi, mKeyOTs[i]);
+                    xorVectorAdd(mV, vi, mKeyOTs[i]);
 
                     // ui = ui ^ H(mKeyOTs[i])
                     xorVector(ui, mKeyOTs[i]);

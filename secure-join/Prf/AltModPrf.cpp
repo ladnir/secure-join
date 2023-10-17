@@ -283,8 +283,8 @@ namespace secJoin
             auto y1i = y1.data()[i];
             auto y0i = y0.data()[i];
             auto x1x0 = x1i ^ x0i;
-            z1[i] = (y0i ^ x0i).andnot_si128(x1x0 ^ y1i);
-            z0[i] = (x1i ^ y1i).andnot_si128(x1x0 ^ y0i);
+            z1.data()[i] = (y0i ^ x0i).andnot_si128(x1x0 ^ y1i);
+            z0.data()[i] = (x1i ^ y1i).andnot_si128(x1x0 ^ y0i);
         }
     }
 
@@ -317,8 +317,8 @@ namespace secJoin
             auto nac = x1.data()[i].andnot_si128(y0.data()[i]);
             auto zz0 = x0.data()[i] ^ nac;
 
-            z1[i] = zz1;
-            z0[i] = zz0;
+            z1.data()[i] = zz1;
+            z0.data()[i] = zz0;
 
         }
     }
@@ -675,8 +675,52 @@ namespace secJoin
             }
         }
     }
+
+
+
+    // v = u + PRNG()
+    inline void xorVectorOne(span<oc::block> v, span<const oc::block> u, PRNG& prng)
+    {
+        oc::block m[8];
+        auto vIter = v.data();
+        auto uIter = u.data();
+        auto n = v.size();
+        assert(u64(v.data()) % 16 == 0);
+
+        auto j = 0ull;
+        auto main = n / 8 * 8;
+        for (; j < main; j += 8)
+        {
+            prng.mAes.ecbEncCounterMode(prng.mBlockIdx, 8, m);
+            prng.mBlockIdx += 8;
+
+            vIter[0] = uIter[0] ^ m[0];
+            vIter[1] = uIter[1] ^ m[1];
+            vIter[2] = uIter[2] ^ m[2];
+            vIter[3] = uIter[3] ^ m[3];
+            vIter[4] = uIter[4] ^ m[4];
+            vIter[5] = uIter[5] ^ m[5];
+            vIter[6] = uIter[6] ^ m[6];
+            vIter[7] = uIter[7] ^ m[7];
+            vIter += 8;
+            uIter += 8;
+        }
+        for (; j < n; ++j)
+        {
+            auto m = prng.mAes.ecbEncBlock(oc::toBlock(prng.mBlockIdx++));
+            //oc::block m = prng.get();
+
+            *vIter = *uIter ^ m;
+            ++vIter;
+            ++uIter;
+        }
+        assert(vIter == v.data() + v.size());
+    }
+
+
+
     // out = (hi0, hi1) ^ prng()
-    inline void xorVector(
+    inline void xorVectorOne(
         span<block> out1,
         span<block> out0,
         span<block> m1,
@@ -684,8 +728,8 @@ namespace secJoin
         PRNG& prng)
     {
 
-        xorVector(out1, m1, prng);
-        xorVector(out0, m0, prng);
+        xorVectorOne(out1, m1, prng);
+        xorVectorOne(out0, m0, prng);
         //assert(out1.size() == hi1.size());
         //assert(out0.size() == hi1.size());
 
@@ -699,14 +743,14 @@ namespace secJoin
     }
 
     // out = (hi0, hi1) ^ prng()
-    inline void xorVector(
+    inline void xorVectorOne(
         span<block> out,
         span<block> m1,
         span<block> m0,
         PRNG& prng)
     {
-        xorVector(out.subspan(m0.size()), m1, prng);
-        xorVector(out.subspan(0, m0.size()), m0, prng);
+        xorVectorOne(out.subspan(m0.size()), m1, prng);
+        xorVectorOne(out.subspan(0, m0.size()), m0, prng);
 
         //assert(out.size() == hi1.size() + hi0.size());
 
@@ -1098,7 +1142,7 @@ namespace secJoin
         // for each bit of the key, perform an OT derandomization where we get a share
         // of the input x times the key mod 3. We store the LSB and MSB of the share separately.
         // Hence we need 2 * AltModPrf::KeySize rows in xkShares
-        xkShares.resize(2 * AltModPrf::KeySize, oc::divCeil(y.size(), 128));
+        xkShares.resize(2 * AltModPrf::KeySize, oc::divCeil(y.size(), 128), oc::AllocType::Uninitialized);
         for (i = 0; i < AltModPrf::KeySize;)
         {
             msg.resize(StepSize, xkShares.cols() * 2); // y.size() * 256 * 2 bits
@@ -1117,7 +1161,7 @@ namespace secJoin
                     // ui = (hi1,hi0)                                   ^ G(OT(i,1))
                     //    = { [ G(OT(i,0))  + x  mod 3 ] ^ G(OT(i,1)) } ^ G(OT(i,1))
                     //    =     G(OT(i,0))  + x  mod 3 
-                    xorVector(shares, msg[k], mKeyOTs[i]);
+                    xorVectorOne(shares, msg[k], mKeyOTs[i]);
                 }
                 else
                 {
@@ -1287,7 +1331,7 @@ namespace secJoin
         // for each bit of the key, perform an OT derandomization where we get a share
         // of the input x times the key mod 3. We store the LSB and MSB of the share separately.
         // Hence we need 2 * AltModPrf::KeySize rows in xkShares
-        xkShares.resize(2 * AltModPrf::KeySize, oc::divCeil(x.size(), 128));
+        xkShares.resize(2 * AltModPrf::KeySize, oc::divCeil(x.size(), 128), oc::AllocType::Uninitialized);
         for (i = 0; i < AltModPrf::KeySize;)
         {
             assert(AltModPrf::KeySize % StepSize == 0);
@@ -1320,8 +1364,8 @@ namespace secJoin
 
         // Compute u = H * xkShare mod 3
         buffer = {};
-        u0.resize(AltModPrf::MidSize, oc::divCeil(x.size(), 128));
-        u1.resize(AltModPrf::MidSize, oc::divCeil(x.size(), 128));
+        u0.resize(AltModPrf::MidSize, oc::divCeil(x.size(), 128), oc::AllocType::Uninitialized);
+        u1.resize(AltModPrf::MidSize, oc::divCeil(x.size(), 128), oc::AllocType::Uninitialized);
         mtxMultA(std::move(xkShares), u1, u0);
 
         if (mDebug)

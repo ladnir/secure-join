@@ -88,9 +88,9 @@ namespace secJoin
     }
     void OleBatch::SendBatch::mock(u64 batchIdx, span<oc::block> add, span<oc::block> mult)
     {
-        memset(add, 0);
-        memset(mult, 0);
-        return;
+        //memset(add, 0);
+        //memset(mult, 0);
+        //return;
 
         auto m = add.size();
         auto m8 = m / 8 * 8;
@@ -102,22 +102,22 @@ namespace secJoin
         u64 i = 0;
         while (i < m8)
         {
-            mult[i + 0] = mm;
-            mult[i + 1] = mm;
-            mult[i + 2] = mm;
-            mult[i + 3] = mm;
-            mult[i + 4] = mm;
-            mult[i + 5] = mm;
-            mult[i + 6] = mm;
-            mult[i + 7] = mm;
-            add[i + 0] = aa;
-            add[i + 1] = aa;
-            add[i + 2] = aa;
-            add[i + 3] = aa;
-            add[i + 4] = aa;
-            add[i + 5] = aa;
-            add[i + 6] = aa;
-            add[i + 7] = aa;
+            mult.data()[i + 0] = mm;
+            mult.data()[i + 1] = mm;
+            mult.data()[i + 2] = mm;
+            mult.data()[i + 3] = mm;
+            mult.data()[i + 4] = mm;
+            mult.data()[i + 5] = mm;
+            mult.data()[i + 6] = mm;
+            mult.data()[i + 7] = mm;
+            add.data()[i + 0] = aa;
+            add.data()[i + 1] = aa;
+            add.data()[i + 2] = aa;
+            add.data()[i + 3] = aa;
+            add.data()[i + 4] = aa;
+            add.data()[i + 5] = aa;
+            add.data()[i + 6] = aa;
+            add.data()[i + 7] = aa;
             mm += mm8;
             aa += aa8;
             i += 8;
@@ -132,9 +132,9 @@ namespace secJoin
     void OleBatch::RecvBatch::mock(u64 batchIdx, span<oc::block> add, span<oc::block> mult)
     {
 
-        memset(add, 0);
-        memset(mult, 0);
-        return;
+        //memset(add, 0);
+        //memset(mult, 0);
+        //return;
 
         auto m = add.size();
         auto m8 = m / 8 * 8;
@@ -146,22 +146,22 @@ namespace secJoin
         u64 i = 0;
         while (i < m8)
         {
-            mult[i + 0] = mm;
-            mult[i + 1] = mm;
-            mult[i + 2] = mm;
-            mult[i + 3] = mm;
-            mult[i + 4] = mm;
-            mult[i + 5] = mm;
-            mult[i + 6] = mm;
-            mult[i + 7] = mm;
-            add[i + 0] = aa;
-            add[i + 1] = aa;
-            add[i + 2] = aa;
-            add[i + 3] = aa;
-            add[i + 4] = aa;
-            add[i + 5] = aa;
-            add[i + 6] = aa;
-            add[i + 7] = aa;
+            mult.data()[i + 0] = mm;
+            mult.data()[i + 1] = mm;
+            mult.data()[i + 2] = mm;
+            mult.data()[i + 3] = mm;
+            mult.data()[i + 4] = mm;
+            mult.data()[i + 5] = mm;
+            mult.data()[i + 6] = mm;
+            mult.data()[i + 7] = mm;
+            add.data()[i + 0] = aa;
+            add.data()[i + 1] = aa;
+            add.data()[i + 2] = aa;
+            add.data()[i + 3] = aa;
+            add.data()[i + 4] = aa;
+            add.data()[i + 5] = aa;
+            add.data()[i + 6] = aa;
+            add.data()[i + 7] = aa;
             mm += mm8;
             aa += aa8;
             i += 8;

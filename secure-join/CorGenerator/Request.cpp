@@ -52,14 +52,14 @@ namespace secJoin
 
         if (mGenState->mMock)
         {
-            for (i = 0; i < mBatches_.size(); ++i)
-            {
-                if (mBatches_[i].mBatch->mStarted.exchange(true) == false)
-                {
-                    mBatches_[i].mBatch->mock(mBatches_[i].mBatch->mIndex);
-                    mBatches_[i].mBatch->mCorReady.set();
-                }
-            }
+            //for (i = 0; i < mBatches_.size(); ++i)
+            //{
+            //    if (mBatches_[i].mBatch->mStarted.exchange(true) == false)
+            //    {
+            //        mBatches_[i].mBatch->mock(mBatches_[i].mBatch->mIndex);
+            //        mBatches_[i].mBatch->mCorReady.set();
+            //    }
+            //}
         }
         else
         {

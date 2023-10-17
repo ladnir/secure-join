@@ -45,6 +45,52 @@ namespace secJoin
         if (!mGenerationInProgress)
             std::terminate();
 
+        if (mMock)
+        {
+            mGenerationInProgress = false;
+            for (i = 0;i < mRequests.size(); ++i)
+            {
+                for (j = 0;j < mRequests[i]->mSize;)
+                {
+                    std::shared_ptr<Batch>& batch = [&]() {
+                        switch (mRequests[i]->mType)
+                        {
+                        case CorType::RecvOt:
+                            return recvOtBatch;
+                        case CorType::SendOt:
+                            return sendOtBatch;
+                        case CorType::Ole:
+                            return oleBatch;
+                        default:
+                            std::terminate();
+                        }
+                    }();
+
+                    if (batch == nullptr)
+                    {
+                        batches.push_back(makeBatch(mRequests[i]->mType, mPartyIdx, oc::Socket{}, PRNG{}));
+                        batches.back()->mIndex = batches.size();
+                        batch = batches.back();
+                        batch->mSize = mBatchSize;
+                        batch->mock(0);
+                        batch->mCorReady.set();
+                    }
+
+                    batch->mSize = mBatchSize;
+
+                    auto remReq = mRequests[i]->mSize - j;
+                    auto size = oc::roundUpTo(128, std::min<u64>(remReq, mBatchSize));
+                    mRequests[i]->addBatch(BatchOffset{ batch, 0, size });
+
+                    j += size;
+                }
+
+                mRequests[i] = nullptr;
+            }
+            mRequests = {};
+            MC_RETURN_VOID();
+        }
+
         // map request to batches
         for (i = 0;i < mRequests.size(); ++i)
         {
@@ -90,12 +136,6 @@ namespace secJoin
         }
 
         mRequests = {};
-
-        if (mMock)
-        {
-            mGenerationInProgress = false;
-            MC_RETURN_VOID();
-        }
 
         // make base OT requests
         reqs.reserve(batches.size());
