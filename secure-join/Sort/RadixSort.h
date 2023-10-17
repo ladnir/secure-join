@@ -108,7 +108,7 @@ namespace secJoin
         // Start the generation of the requested correlated randomness.
         macoro::task<> preprocess(
             coproto::Socket& comm,
-            oc::PRNG& prng);
+            PRNG& prng);
 
         using Matrix32 = oc::Matrix<u32>;
 
@@ -168,7 +168,7 @@ namespace secJoin
             const BinMatrix& k,
             AdditivePerm& dst,
             coproto::Socket& comm,
-            oc::PRNG& prng);
+            PRNG& prng);
 
         //// sort `src` based on the key `k`. The sorted values are written to `dst`
         //// and the sorting (inverse) permutation is written to `dstPerm`.

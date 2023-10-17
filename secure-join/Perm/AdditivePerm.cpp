@@ -127,7 +127,7 @@ namespace secJoin
         PermOp op, 
         BinMatrix& in, 
         BinMatrix& out, 
-        oc::PRNG& prng, 
+        PRNG& prng, 
         coproto::Socket& chl
         )
     {
@@ -141,7 +141,7 @@ namespace secJoin
     macoro::task<> AdditivePerm::compose(
         AdditivePerm& pi,
         AdditivePerm& dst,
-        oc::PRNG& prng,
+        PRNG& prng,
         coproto::Socket& chl)
     {
         if (pi.size() != size())
@@ -168,7 +168,7 @@ namespace secJoin
     //macoro::task<> AdditivePerm::composeSwap(
     //    AdditivePerm& pi,
     //    AdditivePerm& dst,
-    //    oc::PRNG& prng,
+    //    PRNG& prng,
     //    coproto::Socket& chl,
     //    CorGenerator& gen)
     //{

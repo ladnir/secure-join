@@ -53,7 +53,7 @@ namespace secJoin
         coproto::Socket& chl, PRNG& prng_)
     {
         MC_BEGIN(macoro::task<>, this, &chl,
-            prng = oc::PRNG(prng_.get<oc::block>()),
+            prng = PRNG(prng_.get<oc::block>()),
             chl2 = coproto::Socket{ },
             prng2 = prng_.fork(),
             t0 = macoro::task<>{},
@@ -88,7 +88,7 @@ namespace secJoin
         oc::MatrixView<const u8> in,
         oc::MatrixView<u8> out,
         coproto::Socket& chl,
-        oc::PRNG& prng
+        PRNG& prng
         )
     {
 

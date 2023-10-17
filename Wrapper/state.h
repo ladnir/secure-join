@@ -10,7 +10,7 @@ namespace secJoin
         std::vector<ColumnInfo> mLColInfo, mRColInfo;
         std::vector<ColRef> selectCols; // Remove this later
         Table mLTable, mRTable, mShareTable, mOutTable;
-        oc::PRNG mPrng;
+        PRNG mPrng;
         OmJoin mJoin;
         CorGenerator mOle;
         coproto::BufferingSocket mSock;

@@ -26,8 +26,8 @@ namespace secJoin
 
         auto sock = coproto::LocalAsyncSocket::makePair();
 
-        oc::PRNG prng0(oc::ZeroBlock);
-        oc::PRNG prng1(oc::OneBlock);
+        PRNG prng0(oc::ZeroBlock);
+        PRNG prng1(oc::OneBlock);
 
         BinMatrix k[2];
         k[0].resize(n, m);
@@ -58,7 +58,7 @@ namespace secJoin
         }
         auto end = timer.setTimePoint("end");
 
-        std::cout << "radix n:" << n << ", m:" << m <<"  : " <<
+        std::cout << "radix n:" << n << ", m:" << m << "  : " <<
             std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "ms " <<
             sock[0].bytesSent() / double(n) << "+" << sock[0].bytesReceived() / double(n) << "=" <<
             (sock[0].bytesSent() + sock[0].bytesReceived()) / double(n) << " bytes/eval " << std::endl;
@@ -90,8 +90,8 @@ namespace secJoin
 
         auto sock = coproto::LocalAsyncSocket::makePair();
 
-        oc::PRNG prng0(oc::ZeroBlock);
-        oc::PRNG prng1(oc::OneBlock);
+        PRNG prng0(oc::ZeroBlock);
+        PRNG prng1(oc::OneBlock);
 
         AltModPrf dm;
         oc::block kk;
@@ -100,8 +100,8 @@ namespace secJoin
         //sender.setKey(kk);
 
         CorGenerator ole0, ole1;
-        ole0.init(sock[0].fork(), prng0, 0, 1 << 14, cmd.getOr("mock", 1));
-        ole1.init(sock[1].fork(), prng1, 1, 1 << 14, cmd.getOr("mock", 1));
+        ole0.init(sock[0].fork(), prng0, 0, 1 << 18, cmd.getOr("mock", 1));
+        ole1.init(sock[1].fork(), prng1, 1, 1 << 18, cmd.getOr("mock", 1));
 
 
         prng0.get(x.data(), x.size());
@@ -143,19 +143,63 @@ namespace secJoin
     void AltMod_compressB_benchmark(const oc::CLP& cmd)
     {
         u64 n = cmd.getOr("n", 1ull << cmd.getOr("nn", 20));
+
+        if(cmd.isSet("single"))
+        {
+            oc::AlignedUnVector<oc::block> y(n);
+            oc::AlignedUnVector<oc::block> v(n);
+            PRNG prng(oc::ZeroBlock);
+            prng.get(v.data(), v.size());
+            oc::Timer timer;
+            auto b = timer.setTimePoint("begin");
+            for (u64 i = 0; i < n; ++i)
+            {
+                AltModPrf::mBCode.encode(v[i].data(), y[i].data());
+            }
+            //compressB(v, y);
+            auto e = timer.setTimePoint("end");
+            oc::block bb;
+            for (u64 i = 0; i < n; ++i)
+                bb = bb ^ y.data()[i];
+
+            std::cout << "single compressB n:" << n << ", " <<
+                std::chrono::duration_cast<std::chrono::milliseconds>(e - b).count() << "ms " << std::endl;;
+
+            std::cout << bb << std::endl;
+        }
+        {
+            oc::AlignedUnVector<oc::block> y(n);
+            oc::Matrix<oc::block> v(256, n / 128);
+            oc::Timer timer;
+            auto b = timer.setTimePoint("begin");
+            compressB(v, y);
+            auto e = timer.setTimePoint("end");
+            oc::block bb;
+            for (u64 i = 0; i < n; ++i)
+                bb = bb ^ y.data()[i];
+
+            std::cout << "batched compressB n:" << n << ", " <<
+                std::chrono::duration_cast<std::chrono::milliseconds>(e - b).count() << "ms " << std::endl;;
+
+            std::cout << bb << std::endl;
+        }
+    }
+
+    void transpose_benchmark(const oc::CLP& cmd)
+    {
+        u64 n = oc::roundUpTo(cmd.getOr("n", 1ull << cmd.getOr("nn", 20)), 128);
         oc::AlignedUnVector<oc::block> y(n);
-        oc::Matrix<oc::block> v(256, n / 128);
+
         oc::Timer timer;
         auto b = timer.setTimePoint("begin");
-        compressB(v, y);
+        for (u64 i = 0; i < n; i += 128)
+        {
+            oc::transpose128(&y[i]);
+        }
         auto e = timer.setTimePoint("end");
-        oc::block bb;
-        for (u64 i = 0; i < n; ++i)
-            bb = bb ^ y[i];
 
-        std::cout << "compressB n:" << n << ", " <<
+        std::cout << "transpose n:" << n << ", " <<
             std::chrono::duration_cast<std::chrono::milliseconds>(e - b).count() << "ms " << std::endl;;
 
-        std::cout << bb << std::endl;
     }
 }

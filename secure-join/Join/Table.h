@@ -183,7 +183,7 @@ namespace secJoin
     void populateTable(Table& tb, std::string& fileName, oc::u64 rowCount);
     void populateTable(Table& tb, std::istream& in, oc::u64 rowCount);
     void share(Table& table, std::array<Table, 2>& shares,
-        oc::PRNG& prng);
+        PRNG& prng);
     Table join(const ColRef& l, const ColRef& r, std::vector<ColRef> select);
     // class SharedTable
     // {

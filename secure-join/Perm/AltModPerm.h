@@ -102,7 +102,7 @@ namespace secJoin
         macoro::task<> apply(
             PermOp op,
             oc::MatrixView<T> sout,
-            oc::PRNG& prng,
+            PRNG& prng,
             coproto::Socket& chl);
 
         // permute a secret shared input x by our pi and get shares as output
@@ -112,7 +112,7 @@ namespace secJoin
             PermOp op,
             oc::MatrixView<const T> in,
             oc::MatrixView<T> sout,
-            oc::PRNG& prng,
+            PRNG& prng,
             coproto::Socket& chl
         );
 
@@ -144,7 +144,7 @@ namespace secJoin
         // Generate the correlated randomness for the permutation pi. pi will either
         // be mPi if it is already known or it will be mPrePerm.
         macoro::task<> setup(
-            oc::PRNG& prng,
+            PRNG& prng,
             coproto::Socket& chl);
     };
 
@@ -234,7 +234,7 @@ namespace secJoin
             PermOp op,
             oc::MatrixView<const T> in,
             oc::MatrixView<T> sout,
-            oc::PRNG& prng,
+            PRNG& prng,
             coproto::Socket& chl
         );
 
@@ -263,7 +263,7 @@ namespace secJoin
         macoro::task<> validateShares(coproto::Socket& sock);
 
         macoro::task<> setup(
-            oc::PRNG& prng,
+            PRNG& prng,
             coproto::Socket& chl);
 
 
@@ -274,7 +274,7 @@ namespace secJoin
     //    const Perm& pi,
     //    PermOp op,
     //    oc::MatrixView<u8> sout,
-    //    oc::PRNG& prng,
+    //    PRNG& prng,
     //    coproto::Socket& chl,
     //    CorGenerator& ole);
 
@@ -283,7 +283,7 @@ namespace secJoin
     //    const Perm& pi,
     //    PermOp op,
     //    oc::MatrixView<T> sout,
-    //    oc::PRNG& prng,
+    //    PRNG& prng,
     //    coproto::Socket& chl,
     //    CorGenerator& ole)
     //{
@@ -295,14 +295,14 @@ namespace secJoin
     macoro::task<> AltModPermSender::apply<u8>(
         PermOp op,
         oc::MatrixView<u8> sout,
-        oc::PRNG& prng,
+        PRNG& prng,
         coproto::Socket& chl);
 
     template <typename T>
     macoro::task<> AltModPermSender::apply(
         PermOp op,
         oc::MatrixView<T> sout,
-        oc::PRNG& prng,
+        PRNG& prng,
         coproto::Socket& chl)
     {
         return apply<u8>(pi, op, matrixCast<u8>(sout), prng, chl, ole);
@@ -315,7 +315,7 @@ namespace secJoin
     //    PermOp op,
     //    oc::MatrixView<const u8> in,
     //    oc::MatrixView<u8> sout,
-    //    oc::PRNG& prng,
+    //    PRNG& prng,
     //    coproto::Socket& chl,
     //    CorGenerator& ole);
 
@@ -326,7 +326,7 @@ namespace secJoin
     //    PermOp op,
     //    oc::MatrixView<const T> in,
     //    oc::MatrixView<T> sout,
-    //    oc::PRNG& prng,
+    //    PRNG& prng,
     //    coproto::Socket& chl,
     //    CorGenerator& ole)
     //{
@@ -339,7 +339,7 @@ namespace secJoin
         PermOp op,
         oc::MatrixView<const u8> in,
         oc::MatrixView<u8> sout,
-        oc::PRNG& prng,
+        PRNG& prng,
         coproto::Socket& chl);
 
     // Generic version of below method
@@ -348,7 +348,7 @@ namespace secJoin
         PermOp op,
         oc::MatrixView<const T> in,
         oc::MatrixView<T> sout,
-        oc::PRNG& prng,
+        PRNG& prng,
         coproto::Socket& chl)
     {
         return apply<u8>(op, matrixCast<const u8>(in), matrixCast<u8>(out), prng, chl);
@@ -359,7 +359,7 @@ namespace secJoin
         PermOp op,
         oc::MatrixView<const u8> in,
         oc::MatrixView<u8> sout,
-        oc::PRNG& prng,
+        PRNG& prng,
         coproto::Socket& chl
         );
 
@@ -369,7 +369,7 @@ namespace secJoin
         PermOp op,
         oc::MatrixView<const T> in,
         oc::MatrixView<T> sout,
-        oc::PRNG& prng,
+        PRNG& prng,
         coproto::Socket& chl)
     {
         return apply<u8>(op, matrixCast<const u8>(in), matrixCast<u8>(out), prng, chl);

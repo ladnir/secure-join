@@ -3,6 +3,7 @@
 
 set(SRCS
     "Prf/AltModPrf.cpp"
+    "Prf/LinearCode.cpp"
     "Prf/DarkMatter22Prf.cpp"
 
     

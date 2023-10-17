@@ -12,7 +12,7 @@ void PaillierPerm_basic_test()
     PaillierPerm perm0, perm1;
     
     auto chls = coproto::LocalAsyncSocket::makePair();
-    oc::PRNG prng0(oc::block(0,0)), prng1(oc::block(1,1));
+    PRNG prng0(oc::block(0,0)), prng1(oc::block(1,1));
 
     std::vector<u64> pi(n), z(n), y(n), x(n);
 

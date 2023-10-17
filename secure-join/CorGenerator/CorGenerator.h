@@ -22,7 +22,7 @@ namespace secJoin
     struct GenState : std::enable_shared_from_this<GenState>
     {
         GenState() = delete;
-        GenState(u64 partyIdx, oc::PRNG&& prng, oc::Socket s, u64 batchSize, bool mock)
+        GenState(u64 partyIdx, PRNG&& prng, oc::Socket s, u64 batchSize, bool mock)
             : mPartyIdx(partyIdx)
             , mPrng(std::move(prng))
             , mSock(std::move(s))
@@ -45,7 +45,7 @@ namespace secJoin
         std::vector<std::shared_ptr<RequestState>> mRequests;
 
         // randomness source
-        oc::PRNG mPrng;
+        PRNG mPrng;
 
         // the base socket that each subprotocol is forked from.
         coproto::Socket mSock;
@@ -78,7 +78,7 @@ namespace secJoin
 
         void init(
             coproto::Socket&& sock,
-            oc::PRNG& prng,
+            PRNG& prng,
             u64 partyIdx,
             u64 batchSize = 1 << 16,
             bool mock = false)

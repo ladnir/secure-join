@@ -1067,7 +1067,7 @@ namespace secJoin
 
     macoro::task<> RadixSort::preprocess(
         coproto::Socket& comm,
-        oc::PRNG& prng)
+        PRNG& prng)
     {
         mHasPrepro = true;
         MC_BEGIN(macoro::task<>, this, &comm, 
@@ -1102,7 +1102,7 @@ namespace secJoin
         const BinMatrix& k,
         AdditivePerm& dst,
         coproto::Socket& comm,
-        oc::PRNG& prng)
+        PRNG& prng)
     {
 
         MC_BEGIN(macoro::task<>, this, &k, &dst, &comm, &prng,

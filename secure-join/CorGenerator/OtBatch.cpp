@@ -2,7 +2,7 @@
 
 namespace secJoin
 {
-    OtBatch::OtBatch(bool sender, oc::Socket&& s, oc::PRNG&& p)
+    OtBatch::OtBatch(bool sender, oc::Socket&& s, PRNG&& p)
     {
         mSock = std::move(s);
         mPrng = std::move(p);
@@ -16,7 +16,7 @@ namespace secJoin
         }
     }
 
-    macoro::task<> OtBatch::RecvOtBatch::recvTask(oc::PRNG& prng, oc::Socket& sock)
+    macoro::task<> OtBatch::RecvOtBatch::recvTask(PRNG& prng, oc::Socket& sock)
     {
         mMsg.resize(mReceiver.mRequestedNumOts);
         mChoice.resize(mReceiver.mRequestedNumOts);
@@ -39,7 +39,7 @@ namespace secJoin
         }
     }
 
-    macoro::task<> OtBatch::SendOtBatch::sendTask(oc::PRNG& prng, oc::Socket& sock)
+    macoro::task<> OtBatch::SendOtBatch::sendTask(PRNG& prng, oc::Socket& sock)
     {
         mMsg2.resize(mSender.mRequestNumOts);
         return mSender.silentSend(mMsg2, prng, sock);

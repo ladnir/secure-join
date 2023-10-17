@@ -7,7 +7,7 @@ namespace secJoin
     //void validateShares(BinMatrix& shares, CommPkg& comm, oc::BitVector& mask, bool debug);
     //inline void randomize(TBinMatrix& d)
     //{
-    //	static oc::PRNG prng(oc::CCBlock);
+    //	static PRNG prng(oc::CCBlock);
     //	for (u64 j = 0; j < 2; ++j)
     //	{
     //		prng.get(
@@ -313,7 +313,7 @@ namespace secJoin
         Type type,
         coproto::Socket& comm,
         CorGenerator& gen,
-        oc::PRNG& prng,
+        PRNG& prng,
         Level& root,
         span<SplitLevel> levels)
     {
@@ -587,7 +587,7 @@ namespace secJoin
         Type type,
         coproto::Socket& comm,
         CorGenerator& gen,
-        oc::PRNG& prng,
+        PRNG& prng,
         std::vector<SplitLevel>* debugLevels)
     {
         MC_BEGIN(macoro::task<>, this, &src, &op, &root, levels, &newVals, type, &comm, &gen, debugLevels, &prng,

@@ -20,7 +20,7 @@ namespace secJoin
         static macoro::task<> apply(
             oc::MatrixView<const T> x1,
             oc::MatrixView<T> sout,
-            oc::PRNG& prng,
+            PRNG& prng,
             coproto::Socket& chl);
 
         template<typename T>
@@ -29,7 +29,7 @@ namespace secJoin
             PermOp op,
             oc::MatrixView<const T> x2,
             oc::MatrixView<T> sout,
-            oc::PRNG& prng,
+            PRNG& prng,
             coproto::Socket& chl);
 
         template<typename T>
@@ -37,7 +37,7 @@ namespace secJoin
             const Perm& pi,
             PermOp op,
             oc::MatrixView<T> sout,
-            oc::PRNG& prng,
+            PRNG& prng,
             coproto::Socket& chl);
     };
 
@@ -47,7 +47,7 @@ namespace secJoin
     macoro::task<> InsecurePerm::apply(
         oc::MatrixView<const T> x1,
         oc::MatrixView<T> sout,
-        oc::PRNG& prng,
+        PRNG& prng,
         coproto::Socket& chl)
     {
         return apply<u8>(matrixCast<u8>(x1), matrixCast<u8>(sout), prng, chl);
@@ -57,7 +57,7 @@ namespace secJoin
     inline macoro::task<> InsecurePerm::apply<u8>(
         oc::MatrixView<const u8> x1,
         oc::MatrixView<u8> sout,
-        oc::PRNG&,
+        PRNG&,
         coproto::Socket& chl)
     {
         MC_BEGIN(macoro::task<>, x1, &chl, sout
@@ -82,7 +82,7 @@ namespace secJoin
         const Perm& pi,
         PermOp op,
         oc::MatrixView<T> sout,
-        oc::PRNG& prng,
+        PRNG& prng,
         coproto::Socket& chl)
     {
         return apply<u8>(pi, op, matrixCast<u8>(sout), prng, chl);
@@ -93,7 +93,7 @@ namespace secJoin
         const Perm& pi,
         PermOp op,
         oc::MatrixView<u8> sout,
-        oc::PRNG&,
+        PRNG&,
         coproto::Socket& chl)
     {
         MC_BEGIN(macoro::task<>, &pi, &chl, sout,  op,
@@ -124,7 +124,7 @@ namespace secJoin
         PermOp op,
         oc::MatrixView<const T> x2,
         oc::MatrixView<T> sout,
-        oc::PRNG& prng,
+        PRNG& prng,
         coproto::Socket& chl)
     {
         return apply<u8>(pi, op, matrixCast<u8>(x2), matrixCast<u8>(sout), prng, chl, invPerm);
@@ -136,7 +136,7 @@ namespace secJoin
         PermOp op,
         oc::MatrixView<const u8> x2,
         oc::MatrixView<u8> sout,
-        oc::PRNG& prng,
+        PRNG& prng,
         coproto::Socket& chl)
     {
 

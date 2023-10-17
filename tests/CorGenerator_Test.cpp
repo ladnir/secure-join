@@ -10,7 +10,7 @@ void CorGenerator_Ot_Test(const oc::CLP&)
     for (auto mock : { false, true })
     {
 
-        oc::PRNG prng(oc::ZeroBlock);
+        PRNG prng(oc::ZeroBlock);
         //SendBase sBase;sBase.resize(128);
         //RecvBase rBase;rBase.resize(128);
         //rBase.mChoice.randomize(prng);
@@ -84,7 +84,7 @@ void CorGenerator_BinOle_Test(const oc::CLP&)
     {
 
 
-        oc::PRNG prng(oc::ZeroBlock);
+        PRNG prng(oc::ZeroBlock);
         //SendBase sBase;sBase.resize(128);
         //RecvBase rBase;rBase.resize(128);
         //rBase.mChoice.randomize(prng);

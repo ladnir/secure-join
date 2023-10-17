@@ -33,7 +33,7 @@ namespace secJoin
         coproto::Socket mSock;
 
         // randomness source.
-        oc::PRNG mPrng;
+        PRNG mPrng;
 
         // true if the task for this batch has been started.
         // When a task is split between one or more requests,
@@ -55,7 +55,7 @@ namespace secJoin
         virtual void getCor(Cor* c, u64 begin, u64 size) = 0;
     };
 
-    std::shared_ptr<Batch> makeBatch(CorType type, u64 partyIdx, oc::Socket&& sock, oc::PRNG&& p);
+    std::shared_ptr<Batch> makeBatch(CorType type, u64 partyIdx, oc::Socket&& sock, PRNG&& p);
 
     struct BatchOffset {
 

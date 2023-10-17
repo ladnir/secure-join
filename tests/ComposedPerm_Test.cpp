@@ -33,7 +33,7 @@ void ComposedPerm_basic_test(const oc::CLP& cmd)
 
     oc::Matrix<u8> x(n, rowSize);
     
-    oc::PRNG prng(oc::block(0,0));
+    PRNG prng(oc::block(0,0));
 
 
     auto chls = coproto::LocalAsyncSocket::makePair();
@@ -112,8 +112,8 @@ void ComposedPerm_shared_test(const oc::CLP& cmd)
         t(n, rowSize), 
         yAct(n, rowSize);
 
-    oc::PRNG prng0(oc::ZeroBlock);
-    oc::PRNG prng1(oc::OneBlock);
+    PRNG prng0(oc::ZeroBlock);
+    PRNG prng1(oc::OneBlock);
 
     prng0.get(x.data(), x.size());
 
@@ -205,8 +205,8 @@ void ComposedPerm_prepro_test(const oc::CLP& cmd)
         t(n, rowSize),
         yAct(n, rowSize);
 
-    oc::PRNG prng0(oc::ZeroBlock);
-    oc::PRNG prng1(oc::OneBlock);
+    PRNG prng0(oc::ZeroBlock);
+    PRNG prng1(oc::OneBlock);
 
     prng0.get(x.data(), x.size());
 

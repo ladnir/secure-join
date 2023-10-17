@@ -48,7 +48,7 @@ namespace secJoin
         static macoro::task<> apply(
             oc::MatrixView<const T> x1,
             oc::MatrixView<T> sout,
-            oc::PRNG& prng,
+            PRNG& prng,
             coproto::Socket& chl,
             CorGenerator& ole);
 
@@ -58,7 +58,7 @@ namespace secJoin
             PermOp op,
             oc::MatrixView<const T> x2,
             oc::MatrixView<T> sout,
-            oc::PRNG& prng,
+            PRNG& prng,
             coproto::Socket& chl,
             CorGenerator& ole);
 
@@ -67,7 +67,7 @@ namespace secJoin
             const Perm& pi,
             PermOp op,
             oc::MatrixView<T> sout,
-            oc::PRNG& prng,
+            PRNG& prng,
             coproto::Socket& chl,
             CorGenerator& ole);
     };
@@ -78,7 +78,7 @@ namespace secJoin
     macoro::task<> LowMCPerm::apply(
         oc::MatrixView<const T> x1,
         oc::MatrixView<T> sout,
-        oc::PRNG& prng,
+        PRNG& prng,
         coproto::Socket& chl,
         CorGenerator& ole)
     {
@@ -92,7 +92,7 @@ namespace secJoin
     inline macoro::task<> LowMCPerm::apply<u8>(
         oc::MatrixView<const u8> x1,
         oc::MatrixView<u8> sout,
-        oc::PRNG& prng,
+        PRNG& prng,
         coproto::Socket& chl,
         CorGenerator& ole)
     {
@@ -201,7 +201,7 @@ namespace secJoin
         const Perm& pi,
         PermOp op,
         oc::MatrixView<T> sout,
-        oc::PRNG& prng,
+        PRNG& prng,
         coproto::Socket& chl,
         CorGenerator& ole)
     {
@@ -214,7 +214,7 @@ namespace secJoin
         const Perm& pi,
         PermOp op,
         oc::MatrixView<u8> sout,
-        oc::PRNG& prng,
+        PRNG& prng,
         coproto::Socket& chl,
         CorGenerator& ole)
     {
@@ -318,7 +318,7 @@ namespace secJoin
         PermOp op,
         oc::MatrixView<const T> x2,
         oc::MatrixView<T> sout,
-        oc::PRNG& prng,
+        PRNG& prng,
         coproto::Socket& chl,
         CorGenerator& ole)
     {
@@ -334,7 +334,7 @@ namespace secJoin
         PermOp op,
         oc::MatrixView<const u8> x2,
         oc::MatrixView<u8> sout,
-        oc::PRNG& prng,
+        PRNG& prng,
         coproto::Socket& chl,
         CorGenerator& ole)
     {

@@ -78,7 +78,7 @@ namespace secJoin
         bool hasPermutation() const { return mSender.mPi; }
 
         // Samples a random permutation share.
-        void samplePermutation(oc::PRNG& prng) {
+        void samplePermutation(PRNG& prng) {
             if (!size())
                 throw std::runtime_error("init must be called first");
             Perm perm(size(), prng);
@@ -110,7 +110,7 @@ namespace secJoin
             oc::MatrixView<const T> in,
             oc::MatrixView<T> out,
             coproto::Socket& chl,
-            oc::PRNG& prng
+            PRNG& prng
         );
 
 
@@ -128,7 +128,7 @@ namespace secJoin
         oc::MatrixView<const u8> in,
         oc::MatrixView<u8> out,
         coproto::Socket& chl,
-        oc::PRNG& prng);
+        PRNG& prng);
 
     template<typename T>
     macoro::task<> ComposedPerm::apply(
@@ -136,7 +136,7 @@ namespace secJoin
         oc::MatrixView<const T> in,
         oc::MatrixView<T> out,
         coproto::Socket& chl,
-        oc::PRNG& prng)
+        PRNG& prng)
     {
         return apply<u8>(op, matrixCast<const u8>(in), matrixCast<u8>(out), chl, prng);
     }

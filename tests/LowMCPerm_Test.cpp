@@ -25,8 +25,8 @@ void LocMC_eval_test(const oc::CLP& cmd)
         k[i].resize(n, 16);
     }
 
-    oc::PRNG prng0(oc::block(0, 0));
-    oc::PRNG prng1(oc::block(0, 1));
+    PRNG prng0(oc::block(0, 0));
+    PRNG prng1(oc::block(0, 1));
 
     auto chls = coproto::LocalAsyncSocket::makePair();
     CorGenerator ole0, ole1;
@@ -69,7 +69,7 @@ void LowMCPerm_perm_test(const oc::CLP& cmd)
     oc::Matrix<u8> x(n, rowSize), yExp(n,rowSize);
 
     LowMCPerm m1, m2;
-    oc::PRNG prng(oc::block(0, 0));
+    PRNG prng(oc::block(0, 0));
 
     auto chls = coproto::LocalAsyncSocket::makePair();
     CorGenerator ole0, ole1;
@@ -114,7 +114,7 @@ void LowMCPerm_secret_shared_input_perm_test(const oc::CLP& cmd)
     oc::Matrix<u8> x(n, rowSize), yExp(n,rowSize);
 
     LowMCPerm m1, m2;
-    oc::PRNG prng(oc::block(0,0));
+    PRNG prng(oc::block(0,0));
 
     auto chls = coproto::LocalAsyncSocket::makePair();
 

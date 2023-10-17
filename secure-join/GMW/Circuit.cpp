@@ -61,7 +61,7 @@ namespace secJoin
                 throw RTE_LOC;
         }
 
-        oc::PRNG prng(oc::ZeroBlock);
+        PRNG prng(oc::ZeroBlock);
 
         for (u64 i = 0; i < tt; ++i)
         {

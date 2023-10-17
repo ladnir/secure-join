@@ -19,7 +19,7 @@ namespace secJoin
         oc::AlignedUnVector<u16> pi(n);
         std::iota(pi.begin(), pi.end(), 0);
 
-        oc::PRNG prng(s);
+        PRNG prng(s);
         for (u64 i = 0; i < n; ++i)
         {
             auto j = prng.get<u64>() % (n - i) + i;
@@ -68,7 +68,7 @@ namespace secJoin
 
     class DarkMatter32PrfSender : public oc::TimerAdapter
     {
-        std::vector<oc::PRNG> mKeyOTs;
+        std::vector<PRNG> mKeyOTs;
     public:
         bool mCompressed = true;
         block256 mKey;
@@ -99,7 +99,7 @@ namespace secJoin
         }
 
 
-        coproto::task<> evaluate(span<oc::block> y, coproto::Socket& sock, oc::PRNG& prng)
+        coproto::task<> evaluate(span<oc::block> y, coproto::Socket& sock, PRNG& prng)
         {
             static constexpr auto compSize = 256 / 4;
 
@@ -393,7 +393,7 @@ namespace secJoin
 
     class DarkMatter32PrfReceiver : public oc::TimerAdapter
     {
-        std::vector<std::array<oc::PRNG, 2>> mKeyOTs;
+        std::vector<std::array<PRNG, 2>> mKeyOTs;
     public:
         oc::SilentOtExtReceiver mOtReceiver;
         oc::SoftSpokenShOtReceiver<> mSoftReceiver;
@@ -417,7 +417,7 @@ namespace secJoin
         }
 
 
-        coproto::task<> evaluate(span<block256> x, span<oc::block> y, coproto::Socket& sock, oc::PRNG& prng)
+        coproto::task<> evaluate(span<block256> x, span<oc::block> y, coproto::Socket& sock, PRNG& prng)
         {
             MC_BEGIN(coproto::task<>, x, y, this, &sock, &prng,
                 X = oc::AlignedUnVector<std::array<u16, 512>>{},

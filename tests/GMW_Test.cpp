@@ -13,7 +13,7 @@
 using coproto::LocalAsyncSocket;
 using namespace secJoin;
 
-using PRNG = oc::PRNG;
+using PRNG = PRNG;
 namespace secJoin_Tests
 {
     //void generateBase_test()
@@ -26,7 +26,7 @@ namespace secJoin_Tests
     //    b0.mRecvChoiceBits.resize(b1.mNumSend);
     //    b1.mRecvChoiceBits.resize(b0.mNumSend);
 
-    //    oc::PRNG prng(oc::ZeroBlock);
+    //    PRNG prng(oc::ZeroBlock);
     //    b0.mRecvChoiceBits.randomize(prng);
     //    b1.mRecvChoiceBits.randomize(prng);
 
@@ -97,7 +97,7 @@ namespace secJoin_Tests
     //        std::vector<block> m0(b0.mRecvChoiceBits.size()), m1(b1.mRecvChoiceBits.size());
     //        std::vector<std::array<block, 2>> mm0(b0.mNumSend), mm1(b1.mNumSend);
 
-    //        oc::PRNG prng(oc::CCBlock);
+    //        PRNG prng(oc::CCBlock);
     //        prng.get(mm0.data(), mm0.size());
     //        prng.get(mm1.data(), mm1.size());
     //        for (u64 i = 0; i < mm0.size(); ++i)
@@ -139,7 +139,7 @@ namespace secJoin_Tests
     //}
 
 
-    void makeTriple(span<block> a, span<block> b, span<block> c, span<block> d, oc::PRNG& prng)
+    void makeTriple(span<block> a, span<block> b, span<block> c, span<block> d, PRNG& prng)
     {
         prng.get(a.data(), a.size());
         prng.get(b.data(), b.size());
@@ -160,7 +160,7 @@ namespace secJoin_Tests
 
         Gmw cmp0, cmp1;
         block seed = oc::toBlock(cmd.getOr<u64>("s", 0));
-        oc::PRNG prng(seed);
+        PRNG prng(seed);
 
         u64 n = cmd.getOr("n", 100ull);
         u64 bc = cmd.getOr("bc", 16);
@@ -216,7 +216,7 @@ namespace secJoin_Tests
     {
         Gmw cmp0, cmp1;
         block seed = oc::toBlock(cmd.getOr<u64>("s", 0));
-        oc::PRNG prng(seed);
+        PRNG prng(seed);
 
         u64 n = cmd.getOr("n", 100ull);
         u64 bc = cmd.getOr("bc", 16);
@@ -305,7 +305,7 @@ namespace secJoin_Tests
         }
     }
 
-    std::vector<u64> randomSubset(u64 n, u64 m, oc::PRNG& prng)
+    std::vector<u64> randomSubset(u64 n, u64 m, PRNG& prng)
     {
         std::vector<u64> set(n), ret(m);
         std::iota(set.begin(), set.end(), 0);
@@ -878,7 +878,7 @@ namespace secJoin_Tests
 
         Gmw gmw0, gmw1;
         block seed = oc::toBlock(cmd.getOr<u64>("s", 0));
-        oc::PRNG prng(seed);
+        PRNG prng(seed);
 
         u64 n = 77;
 
@@ -949,7 +949,7 @@ namespace secJoin_Tests
 
         Gmw gmw0, gmw1;
         block seed = oc::toBlock(cmd.getOr<u64>("s", 0));
-        oc::PRNG prng(seed);
+        PRNG prng(seed);
 
         u64 n = 100;
 

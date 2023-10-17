@@ -13,7 +13,7 @@ void AdditivePerm_xor_test(const oc::CLP& cmd)
     u64 rowSize = 11;
 
     oc::Matrix<u8> x(n, rowSize), yExp(n, rowSize);
-    oc::PRNG prng(oc::block(0, 0));
+    PRNG prng(oc::block(0, 0));
     auto chls = coproto::LocalAsyncSocket::makePair();
 
     Perm mPi(n, prng);
@@ -106,7 +106,7 @@ void AdditivePerm_prepro_test(const oc::CLP& cmd)
     u64 rowSize = 11;
 
     oc::Matrix<u8> x(n, rowSize), yExp(n, rowSize);
-    oc::PRNG prng(oc::block(0, 0));
+    PRNG prng(oc::block(0, 0));
     auto chls = coproto::LocalAsyncSocket::makePair();
 
     Perm mPi(n, prng);

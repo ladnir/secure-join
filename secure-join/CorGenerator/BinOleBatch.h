@@ -26,7 +26,7 @@ namespace secJoin
 
     struct OleBatch : Batch
     {
-        OleBatch(bool sender, oc::Socket&& s, oc::PRNG&& p);
+        OleBatch(bool sender, oc::Socket&& s, PRNG&& p);
 
         // The "send" specific state
         struct SendBatch
@@ -38,7 +38,7 @@ namespace secJoin
 
             // return the task that generate the Sender correlation.
             macoro::task<> sendTask(
-                oc::PRNG& prng,
+                PRNG& prng,
                 oc::Socket& sock,
                 oc::AlignedUnVector<oc::block>& add,
                 oc::AlignedUnVector<oc::block>& mult,
@@ -69,7 +69,7 @@ namespace secJoin
             oc::AlignedUnVector<oc::block> mMsg;
             // return the task that generate the Sender correlation.
             macoro::task<> recvTask(
-                oc::PRNG& prng,
+                PRNG& prng,
                 oc::Socket& sock,
                 oc::AlignedUnVector<oc::block>& add,
                 oc::AlignedUnVector<oc::block>& mult,

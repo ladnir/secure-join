@@ -387,7 +387,7 @@ namespace secJoin
 
     void share(Table& table,
         std::array<Table, 2>& shares,
-        oc::PRNG& prng)
+        PRNG& prng)
     {
         shares[0].mColumns.resize(table.mColumns.size());
         shares[1].mColumns.resize(table.mColumns.size());

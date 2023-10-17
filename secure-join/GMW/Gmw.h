@@ -212,7 +212,7 @@ namespace secJoin
         macoro::task<> preprocess();
 
         // run the gmw protocol.
-        coproto::task<> run(CorGenerator& gen, coproto::Socket& chl, oc::PRNG& prng);
+        coproto::task<> run(CorGenerator& gen, coproto::Socket& chl, PRNG& prng);
 
         coproto::task<> run(coproto::Socket& chl);
 

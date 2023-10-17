@@ -9,30 +9,54 @@ namespace secJoin
 {
 
 
-    const std::array<block256, 128> AltModPrf::mB = oc::PRNG(oc::block(2134, 5437)).get<std::array<block256, 128>>();
-    const std::array<block256, 128> AltModPrf::mBShuffled = []() {
-
-        std::array<block256, 128> shuffled;
-        for (u64 i = 0; i < shuffled.size(); ++i)
+    const std::array<block, 128> AltModPrf::mB = []() {
+        std::array<block, 128> r;
+        memset(&r, 0, sizeof(r));
+        PRNG prng(block(2134, 5437));
+        for (u64 i = 0; i < r.size(); ++i)
         {
-            auto iter0 = oc::BitIterator((u8*)&mB[i].mData[0]);
-            auto iter1 = oc::BitIterator((u8*)&mB[i].mData[1]);
-            auto dest = oc::BitIterator((u8*)&shuffled[i]);
-            for (u64 j = 0; j < 128; ++j)
-            {
-                *dest++ = *iter0++;
-                *dest++ = *iter1++;
-            }
+            //*oc::BitIterator(r[i].mData[0].data(), i) = 1;
+            r[i] = prng.get();
         }
-        return shuffled;
+        return r;
     }();
 
-    const std::array<std::array<u8, 256>, 128> AltModPrf::mBExpanded = []() {
 
-        std::array<std::array<u8, 256>, 128> r;
+    LinearCode AltModPrf::mBCode = []() { 
+
+        oc::Matrix<u8> g(128, sizeof(block)), gt(128, sizeof(block));
+        g.resize(128, sizeof(block));
+        for (u64 i = 0; i < 128; ++i)
+            memcpy(g[i], span<const block>(&mB[i],1));
+        oc::transpose(g, gt);
+        LinearCode r;
+        r.init(gt);
+        return r;
+    }();
+
+    //const std::array<block256, 128> AltModPrf::mBShuffled = []() {
+
+    //    std::array<block256, 128> shuffled;
+    //    for (u64 i = 0; i < shuffled.size(); ++i)
+    //    {
+    //        auto iter0 = oc::BitIterator((u8*)&mB[i].mData[0]);
+    //        auto iter1 = oc::BitIterator((u8*)&mB[i].mData[1]);
+    //        auto dest = oc::BitIterator((u8*)&shuffled[i]);
+    //        for (u64 j = 0; j < 128; ++j)
+    //        {
+    //            *dest++ = *iter0++;
+    //            *dest++ = *iter1++;
+    //        }
+    //    }
+    //    return shuffled;
+    //}();
+
+    const std::array<std::array<u8, 128>, 128> AltModPrf::mBExpanded = []() {
+
+        std::array<std::array<u8, 128>, 128> r;
         for (u64 i = 0; i < mB.size(); ++i)
         {
-            auto iter0 = oc::BitIterator((u8*)&mB[i].mData[0]);
+            auto iter0 = oc::BitIterator((u8*)&mB[i]);
             for (u64 j = 0; j < r[i].size(); ++j)
                 r[i][j] = *iter0++;
         }
@@ -51,8 +75,8 @@ namespace secJoin
     void compressB(
         u64 begin,
         u64 n,
-        oc::MatrixView<oc::block> v,
-        span<oc::block> y
+        oc::MatrixView<block> v,
+        span<block> y
     )
     {
         //auto n = y.size();
@@ -68,7 +92,7 @@ namespace secJoin
         auto n1024 = n128 / 8 * 8;
 
 
-        oc::Matrix<oc::block> yt(128, n128);
+        oc::Matrix<block> yt(128, n128);
 
         //auto B = AltModPrf::mB;
         assert(begin % 128 == 0);
@@ -80,30 +104,31 @@ namespace secJoin
         auto vStep = v.cols();
         auto ytIter = yt.data();
         auto ytstep = yt.cols();
-        auto vSize = n128 * sizeof(oc::block);
+        auto vSize = n128 * sizeof(block);
 
         for (u64 i = 0; i < 128; ++i)
         {
-            u64 j = 0;
-            while (AltModPrf::mBExpanded[i][j] == 0)
-                ++j;
+            //while (AltModPrf::mBExpanded[i][j] == 0)
+            //    ++j;
 
-            auto vIter = v.data() + begin128 + j * vStep;
+            auto vIter = v.data() + begin128 + i * vStep;
             assert(yt[i].data() == ytIter);
-            assert(v[j].subspan(begin128).data() == vIter);
+            assert(v[i].subspan(begin128).data() == vIter);
             memcpy(ytIter, vIter, vSize);
-            vIter += vStep;
-            ++j;
+            //vIter += vStep;
+            //++j;
 
             //memcpy(yt[i], v[j++].subspan(begin128, n128));
+            u64 j = 128;
+            vIter = v.data() + begin128 + j * vStep;
             while (j < 256)
             {
-                if (AltModPrf::mBExpanded[i][j])
+                if (AltModPrf::mBExpanded[i][j-128])
                 {
                     assert(yt[i].data() == ytIter);
                     assert(vIter == v[j].data() + begin128);
-                    oc::block* __restrict yti = ytIter;
-                    oc::block* __restrict vj = vIter;
+                    block* __restrict yti = ytIter;
+                    block* __restrict vj = vIter;
                     u64 k = 0;
 
                     for (; k < n1024; k += 8)
@@ -128,7 +153,7 @@ namespace secJoin
             ytIter += ytstep;
         }
 
-        oc::AlignedArray<oc::block, 128> tt;
+        oc::AlignedArray<block, 128> tt;
         auto step = yt.cols();
         for (u64 i = 0, ii = 0; i < n; i += 128, ++ii)
         {
@@ -143,7 +168,7 @@ namespace secJoin
             oc::transpose128(tt.data());
             auto m = std::min<u64>(n - i, 128);
 
-            memcpy(y.data() + i + begin, tt.data(), m * sizeof(oc::block));
+            memcpy(y.data() + i + begin, tt.data(), m * sizeof(block));
             //if (m == 128)
             //{
 
@@ -165,24 +190,72 @@ namespace secJoin
 
 
     void compressB(
-        oc::MatrixView<oc::block> v,
-        span<oc::block> y
+        oc::MatrixView<block> v,
+        span<block> y
     )
     {
-        u64 batch = 1ull << 12;
-        auto n = y.size();
-        for (u64 i = 0; i < n; i += batch)
+        if (1)
         {
-            auto m = std::min<u64>(batch, n - i);
-            compressB(i, m, v, y);
+            auto n = y.size();
+            if (n % 128)
+                throw RTE_LOC;
+            if ((u64)y.data() % 16)
+                throw RTE_LOC;
+            oc::AlignedArray<block, 128> tt;
+            //auto v1 = v[1];
+            block* v0Iter = v[0].data();
+            block* v1Iter = v[128].data();
+            auto vStep = v.cols();
+            for (u64 i = 0, ii = 0; i < n; i += 128, ++ii)
+            {
+                auto yIter = y.data() + i;
+                for (u64 j = 0; j < 128; ++j)
+                {
+                    yIter[j] = v0Iter[j * vStep];
+                }
+                ++v0Iter;
+
+                oc::transpose128(yIter);
+
+                //auto m = std::min<u64>(n - i, 128);
+                //memcpy(y.data() + i, tt.data(), m * sizeof(block));
+
+                for (u64 j = 0; j < 128; ++j)
+                {
+                    tt[j] = v1Iter[j * vStep];
+                }
+                ++v1Iter;
+
+                oc::transpose128(tt.data());
+                //for (u64 j = 0;j < 128; j += 1)
+                //{
+                //    AltModPrf::mBCode.encode((u8*)(tt.data()+ j), (u8*)(tt.data() +j));
+                //}
+                for (u64 j = 0; j < 128; ++j)
+                {
+                    AltModPrf::mBCode.encode((u8*)(tt.data() + j), (u8*)(tt.data() + j));
+                    yIter[j] = yIter[j] ^ tt[j];
+                }
+            }
+        }
+        else
+        {
+
+            u64 batch = 1ull << 12;
+            auto n = y.size();
+            for (u64 i = 0; i < n; i += batch)
+            {
+                auto m = std::min<u64>(batch, n - i);
+                compressB(i, m, v, y);
+            }
         }
     }
 
     // z =  x + y mod 3
     void mod3Add(
-        span<oc::block> z1, span<oc::block> z0,
-        span<oc::block> x1, span<oc::block> x0,
-        span<oc::block> y1, span<oc::block> y0)
+        span<block> z1, span<block> z0,
+        span<block> x1, span<block> x0,
+        span<block> y1, span<block> y0)
     {
         assert(z1.size() == z0.size());
         assert(z1.size() == x0.size());
@@ -213,9 +286,9 @@ namespace secJoin
     //   x1 = t / 2
     //   x0 = t % 2
     void mod3Add(
-        span<oc::block> z1, span<oc::block> z0,
-        span<oc::block> x1, span<oc::block> x0,
-        span<oc::block> y0)
+        span<block> z1, span<block> z0,
+        span<block> x1, span<block> x0,
+        span<block> y0)
     {
         //auto z1 = x1 ^ (x1 ^ x0) * y0;
         //auto z0 = x0 ^ (1 ^ x1) * y0;
@@ -243,17 +316,17 @@ namespace secJoin
 
 
 
-    inline void sampleMod3(oc::PRNG& prng, span<u8> mBuffer)
+    inline void sampleMod3(PRNG& prng, span<u8> mBuffer)
     {
         auto n = mBuffer.size();
         auto dst = mBuffer.data();
-        oc::block m[8], t[8], eq[8];
-        oc::block allOne = oc::AllOneBlock;
-        oc::block block1 = oc::block::allSame<u16>(1);
-        oc::block block3 = oc::block::allSame<u16>(3);
+        block m[8], t[8], eq[8];
+        block allOne = oc::AllOneBlock;
+        block block1 = block::allSame<u16>(1);
+        block block3 = block::allSame<u16>(3);
 
         static constexpr int batchSize = 16;
-        std::array<std::array<oc::block, 8>, 64> buffer;
+        std::array<std::array<block, 8>, 64> buffer;
         std::array<u8* __restrict, 64> iters;
 
         for (u64 i = 0; i < n;)
@@ -342,19 +415,19 @@ namespace secJoin
         }
     }
 
-    inline void sampleMod3(oc::PRNG& prng, span<oc::block> msb, span<oc::block> lsb, oc::AlignedUnVector<u8>& b)
+    inline void sampleMod3(PRNG& prng, span<block> msb, span<block> lsb, oc::AlignedUnVector<u8>& b)
     {
         b.resize(msb.size() * 128);
         sampleMod3(prng, b);
-        oc::block block1 = oc::block::allSame<u8>(1);
-        oc::block block2 = oc::block::allSame<u8>(2);
+        block block1 = block::allSame<u8>(1);
+        block block2 = block::allSame<u8>(2);
 
         for (u64 i = 0; i < msb.size(); ++i)
         {
-            auto bb = (oc::block*)&b.data()[i * 128];
+            auto bb = (block*)&b.data()[i * 128];
             assert((u64)bb % 16 == 0);
 
-            oc::block tt[8];
+            block tt[8];
             tt[0] = bb[0] & block1;
             tt[1] = bb[1] & block1;
             tt[2] = bb[2] & block1;
@@ -398,7 +471,7 @@ namespace secJoin
         }
 
     }
-    void compare(span<oc::block> m1, span<oc::block> m0, span<u16> u, bool verbose = false)
+    void compare(span<block> m1, span<block> m0, span<u16> u, bool verbose = false)
     {
         for (u64 i = 0; i < u.size(); ++i)
         {
@@ -420,8 +493,8 @@ namespace secJoin
             }
         }
     }
-    void compare(span<oc::block> m1, span<oc::block> m0,
-        span<oc::block> u1, span<oc::block> u0)
+    void compare(span<block> m1, span<block> m0,
+        span<block> u1, span<block> u0)
     {
         assert(m1.size() == u1.size());
         assert(m0.size() == u1.size());
@@ -445,11 +518,11 @@ namespace secJoin
     }
     // out = (hi0, hi1) ^ prng()
     inline void xorVector(
-        span<oc::block> out1,
-        span<oc::block> out0,
-        span<oc::block> m1,
-        span<oc::block> m0,
-        oc::PRNG& prng)
+        span<block> out1,
+        span<block> out0,
+        span<block> m1,
+        span<block> m0,
+        PRNG& prng)
     {
 
         xorVector(out1, m1, prng);
@@ -468,10 +541,10 @@ namespace secJoin
 
     // out = (hi0, hi1) ^ prng()
     inline void xorVector(
-        span<oc::block> out,
-        span<oc::block> m1,
-        span<oc::block> m0,
-        oc::PRNG& prng)
+        span<block> out,
+        span<block> m1,
+        span<block> m0,
+        PRNG& prng)
     {
         xorVector(out.subspan(m0.size()), m1, prng);
         xorVector(out.subspan(0, m0.size()), m0, prng);
@@ -485,12 +558,12 @@ namespace secJoin
         //    out[i] = out[i] ^ hi1[j];
     }
 
-    void  AltModPrf::setKey(oc::block k)
+    void  AltModPrf::setKey(block k)
     {
         mKey[0] = k;
     }
 
-    void  AltModPrf::compressH(const std::array<u16, KeySize>& hj, block256m3& uj)
+    void  AltModPrf::mtxMultA(const std::array<u16, KeySize>& hj, block256m3& uj)
     {
         //for (u64 k = 0; k < KeySize; ++k)
         //{
@@ -545,15 +618,15 @@ namespace secJoin
         }
     }
 
-    oc::block  AltModPrf::eval(oc::block x)
+    block  AltModPrf::eval(block x)
     {
         std::array<u16, KeySize> h;
-        std::array<oc::block, KeySize / 128> X;
+        std::array<block, KeySize / 128> X;
         if constexpr (AltModPrf::KeySize / 128 > 1)
         {
 
             for (u64 i = 0; i < X.size(); ++i)
-                X[i] = x ^ oc::block(i, i);
+                X[i] = x ^ block(i, i);
             oc::mAesFixedKey.hashBlocks<X.size()>(X.data(), X.data());
         }
         else
@@ -575,7 +648,7 @@ namespace secJoin
         }
 
         block256m3 u;
-        compressH(h, u);
+        mtxMultA(h, u);
 
         block256 w;
         for (u64 i = 0; i < u.mData.size(); ++i)
@@ -588,99 +661,95 @@ namespace secJoin
         return compress(w);
     }
 
-    oc::block  AltModPrf::compress(block256& w)
+    block  AltModPrf::compress(block256& w)
     {
         return compress(w, mB);
     }
 
-    oc::block  AltModPrf::shuffledCompress(block256& w)
-    {
-        return compress(w, mBShuffled);
-    }
 
-    oc::block  AltModPrf::compress(block256& w, const std::array<block256, 128>& B)
+    block  AltModPrf::compress(block256& w, const std::array<block, 128>& B)
     {
-        alignas(32) std::array<std::array<oc::block, 128>, 2> bw;
+        oc::AlignedArray<block, 128> bw;
 
         for (u64 i = 0; i < 128; ++i)
         {
-            bw[0][i] = B[i].mData[0] & w.mData[0];
-            bw[1][i] = B[i].mData[1] & w.mData[1];
+            //bw[0][i] = B[i].mData[0] & w.mData[0];
+            bw[i] = B[i] & w.mData[1];
         }
-        oc::transpose128(bw[0].data());
-        oc::transpose128(bw[1].data());
+        oc::transpose128(bw.data());
+        //oc::transpose128(bw[1].data());
 
-        oc::block r;
-        memset(&r, 0, sizeof(r));
+        block r = w[0];
+        //memset(&r, 0, sizeof(r));
+        //for (u64 i = 0; i < 128; ++i)
+        //    r = r ^ bw[0][i];
         for (u64 i = 0; i < 128; ++i)
-            r = r ^ bw[0][i];
-        for (u64 i = 0; i < 128; ++i)
-            r = r ^ bw[1][i];
+            r = r ^ bw[i];
 
         return r;
     }
 
 
 
-    template<int keySize>
-    inline void compressH(
-        oc::Matrix<u16>&& mH,
-        oc::Matrix<u16>& mU
-    )
-    {
-        if constexpr (keySize == 128)
-        {
+    //template<int keySize>
+    //inline void mtxMultA(
+    //    oc::Matrix<u16>&& mH,
+    //    oc::Matrix<u16>& mU
+    //)
+    //{
+    //    if constexpr (keySize == 128)
+    //    {
 
-            auto n = mH.size() / keySize;
-            auto& h2 = mH;
+    //        auto n = mH.size() / keySize;
+    //        auto& h2 = mH;
 
-            for (u64 i = 1; i < keySize; ++i)
-            {
-                auto h0 = h2.data() + n * (i - 1);
-                auto h1 = h2.data() + n * (i);
-                for (u64 j = 0; j < n; ++j)
-                {
-                    auto h0j = h0[j];
-                    auto h1j = h1[j];
-                    //__assume(h0j < 3);
-                    //__assume(h1j < 3);
-                    // 000 0
-                    // 001 1
-                    // 010 2
-                    // 011 3
-                    // 100 4
+    //        for (u64 i = 1; i < keySize; ++i)
+    //        {
+    //            auto h0 = h2.data() + n * (i - 1);
+    //            auto h1 = h2.data() + n * (i);
+    //            for (u64 j = 0; j < n; ++j)
+    //            {
+    //                auto h0j = h0[j];
+    //                auto h1j = h1[j];
+    //                //__assume(h0j < 3);
+    //                //__assume(h1j < 3);
+    //                // 000 0
+    //                // 001 1
+    //                // 010 2
+    //                // 011 3
+    //                // 100 4
 
-                    auto s = (h0j + h1j);
-                    // __assume(s < 5);
-                    auto q = s == 3 || s == 4;
-                    h1[j] = s - 3 * q;
-                    assert(h1[j] == (h0j + h1j) % 3);
-                }
-            }
+    //                auto s = (h0j + h1j);
+    //                // __assume(s < 5);
+    //                auto q = s == 3 || s == 4;
+    //                h1[j] = s - 3 * q;
+    //                assert(h1[j] == (h0j + h1j) % 3);
+    //            }
+    //        }
 
-            for (u64 i = 0; i < keySize; ++i)
-            {
-                auto hi = mH[i];
-                for (u64 j = 0; j < n; ++j)
-                {
-                    mU[j][i] = hi[j];
-                    mU[j][i + keySize] = hi[j];
-                }
-            }
+    //        for (u64 i = 0; i < keySize; ++i)
+    //        {
+    //            auto hi = mH[i];
+    //            for (u64 j = 0; j < n; ++j)
+    //            {
+    //                mU[j][i] = hi[j];
+    //                mU[j][i + keySize] = hi[j];
+    //            }
+    //        }
 
-        }
-        else
-        {
-            assert(0);
-        }
+    //    }
+    //    else
+    //    {
+    //        assert(0);
+    //    }
 
-        mH = {};
-    }
+    //    mH = {};
+    //}
 
-    void compressH2(
-        oc::Matrix<oc::block>&& mH,
-        oc::Matrix<oc::block>& u1,
-        oc::Matrix<oc::block>& u0
+    void mtxMultA(
+        oc::Matrix<block>&& mH,
+        oc::Matrix<block>& u1,
+        oc::Matrix<block>& u0
     )
     {
         auto keySize = 128;
@@ -719,7 +788,7 @@ namespace secJoin
     }
 
 
-    void AltModPrfSender::setKeyOts(oc::block k, span<oc::block> ots)
+    void AltModPrfSender::setKeyOts(block k, span<block> ots)
     {
         if (ots.size() != AltModPrf::KeySize)
             throw RTE_LOC;
@@ -734,7 +803,7 @@ namespace secJoin
         mDoKeyGen = false;
     }
 
-    void mod3BitDecompostion(oc::MatrixView<u16> u, oc::MatrixView<oc::block> u0, oc::MatrixView<oc::block> u1)
+    void mod3BitDecompostion(oc::MatrixView<u16> u, oc::MatrixView<block> u0, oc::MatrixView<block> u1)
     {
         if (u.rows() != u0.rows())
             throw RTE_LOC;
@@ -787,9 +856,9 @@ namespace secJoin
 
 
     coproto::task<> AltModPrfSender::evaluate(
-        span<oc::block> y,
+        span<block> y,
         coproto::Socket& sock,
-        oc::PRNG& prng,
+        PRNG& prng,
         CorGenerator& gen)
     {
         // init has not been called, call it
@@ -806,25 +875,25 @@ namespace secJoin
 
 
     coproto::task<> AltModPrfSender::evaluate(
-        span<oc::block> y,
+        span<block> y,
         coproto::Socket& sock,
-        oc::PRNG& prng)
+        PRNG& prng)
     {
 
         MC_BEGIN(coproto::task<>, y, this, &sock, &prng,
             buffer = oc::AlignedUnVector<u8>{},
             f = oc::BitVector{},
             diff = oc::BitVector{},
-            ots = oc::AlignedUnVector<std::array<oc::block, 2>>{},
+            ots = oc::AlignedUnVector<std::array<block, 2>>{},
             i = u64{},
             ole = BinOleRequest{},
-            u0 = oc::Matrix<oc::block>{},
-            u1 = oc::Matrix<oc::block>{},
-            uu0 = oc::Matrix<oc::block>{},
-            uu1 = oc::Matrix<oc::block>{},
-            v = oc::Matrix<oc::block>{},
-            xkShares = oc::Matrix<oc::block>{},
-            msg = oc::Matrix<oc::block>{},
+            u0 = oc::Matrix<block>{},
+            u1 = oc::Matrix<block>{},
+            uu0 = oc::Matrix<block>{},
+            uu1 = oc::Matrix<block>{},
+            v = oc::Matrix<block>{},
+            xkShares = oc::Matrix<block>{},
+            msg = oc::Matrix<block>{},
             pre = macoro::eager_task<>{},
             otRecv = OtRecv{}
         );
@@ -840,7 +909,7 @@ namespace secJoin
         if (mKeyReq.size())
         {
             MC_AWAIT(mKeyReq.get(otRecv));
-            auto k = otRecv.mChoice.getSpan<oc::block>()[0];
+            auto k = otRecv.mChoice.getSpan<block>()[0];
             setKeyOts(k, otRecv.mMsg);
         }
 
@@ -883,7 +952,7 @@ namespace secJoin
                 auto lsbShare = xkShares[i * 2 + 0];
                 if (ki)
                 {
-                    auto shares = span<oc::block>(lsbShare.data(), lsbShare.size() * 2);
+                    auto shares = span<block>(lsbShare.data(), lsbShare.size() * 2);
                     assert(shares.data() + shares.size() == msbShare.data() + msbShare.size());
 
                     // ui = (hi1,hi0)                                   ^ G(OT(i,1))
@@ -909,7 +978,7 @@ namespace secJoin
         buffer = {};
         u0.resize(AltModPrf::MidSize, oc::divCeil(y.size(), 128), oc::AllocType::Uninitialized);
         u1.resize(AltModPrf::MidSize, oc::divCeil(y.size(), 128), oc::AllocType::Uninitialized);
-        compressH2(std::move(xkShares), u1, u0);
+        mtxMultA(std::move(xkShares), u1, u0);
 
         if (mDebug)
         {
@@ -940,7 +1009,7 @@ namespace secJoin
         MC_END();
     }
 
-    void AltModPrfReceiver::setKeyOts(span<std::array<oc::block, 2>> ots)
+    void AltModPrfReceiver::setKeyOts(span<std::array<block, 2>> ots)
     {
         if (ots.size() != AltModPrf::KeySize)
             throw RTE_LOC;
@@ -955,10 +1024,10 @@ namespace secJoin
     }
 
     coproto::task<> AltModPrfReceiver::evaluate(
-        span<oc::block> x,
-        span<oc::block> y,
+        span<block> x,
+        span<block> y,
         coproto::Socket& sock,
-        oc::PRNG& prng,
+        PRNG& prng,
         CorGenerator& gen)
     {
         // init has not been called, call it
@@ -974,24 +1043,24 @@ namespace secJoin
     }
 
     coproto::task<> AltModPrfReceiver::evaluate(
-        span<oc::block> x,
-        span<oc::block> y,
+        span<block> x,
+        span<block> y,
         coproto::Socket& sock,
-        oc::PRNG& prng)
+        PRNG& prng)
     {
         MC_BEGIN(coproto::task<>, x, y, this, &sock, &prng,
-            xt = oc::Matrix<oc::block>{},
+            xt = oc::Matrix<block>{},
             buffer = oc::AlignedUnVector<u8>{},
             gx = oc::AlignedUnVector<u16>{},
             i = u64{},
-            baseOts = oc::AlignedUnVector<std::array<oc::block, 2>>{},
-            u0 = oc::Matrix<oc::block>{},
-            u1 = oc::Matrix<oc::block>{},
-            uu0 = oc::Matrix<oc::block>{},
-            uu1 = oc::Matrix<oc::block>{},
-            xkShares = oc::Matrix<oc::block>{},
-            msg = oc::Matrix<oc::block>{},
-            v = oc::Matrix<oc::block>{},
+            baseOts = oc::AlignedUnVector<std::array<block, 2>>{},
+            u0 = oc::Matrix<block>{},
+            u1 = oc::Matrix<block>{},
+            uu0 = oc::Matrix<block>{},
+            uu1 = oc::Matrix<block>{},
+            xkShares = oc::Matrix<block>{},
+            msg = oc::Matrix<block>{},
+            v = oc::Matrix<block>{},
             pre = macoro::eager_task<>{},
             otSend = OtSend{}
         );
@@ -1036,7 +1105,7 @@ namespace secJoin
         for (u64 i = 0, k = 0; i < y.size(); ++k)
         {
             auto m = std::min<u64>(128, y.size() - i);
-            oc::AlignedArray<oc::block, 128> t;
+            oc::AlignedArray<block, 128> t;
             for (u64 j = 0;j < m; ++j, ++i)
             {
                 t[j] = x.data()[i];
@@ -1094,7 +1163,7 @@ namespace secJoin
         buffer = {};
         u0.resize(AltModPrf::MidSize, oc::divCeil(x.size(), 128));
         u1.resize(AltModPrf::MidSize, oc::divCeil(x.size(), 128));
-        compressH2(std::move(xkShares), u1, u0);
+        mtxMultA(std::move(xkShares), u1, u0);
 
         if (mDebug)
         {
@@ -1266,9 +1335,9 @@ namespace secJoin
     // each row will hold packed bits.
     // 
     macoro::task<> AltModPrfSender::mod2(
-        oc::MatrixView<oc::block> u0,
-        oc::MatrixView<oc::block> u1,
-        oc::MatrixView<oc::block> out,
+        oc::MatrixView<block> u0,
+        oc::MatrixView<block> u1,
+        oc::MatrixView<block> out,
         coproto::Socket& sock)
     {
         MC_BEGIN(macoro::task<>, this, u0, u1, out, &sock,
@@ -1282,10 +1351,10 @@ namespace secJoin
             cols = u64{},
             step = u64{},
             end = u64{},
-            buff = oc::AlignedUnVector<oc::block>{},
-            outIter = (oc::block*)nullptr,
-            u0Iter = (oc::block*)nullptr,
-            u1Iter = (oc::block*)nullptr
+            buff = oc::AlignedUnVector<block>{},
+            outIter = (block*)nullptr,
+            u0Iter = (block*)nullptr,
+            u1Iter = (block*)nullptr
         );
 
         if (out.rows() != u0.rows())
@@ -1343,7 +1412,7 @@ namespace secJoin
                         x[k] = x[k] ^ (y[k] & d[k]);
                     }
 
-                    oc::block m0, m1, m2, t0, t1, t2;
+                    block m0, m1, m2, t0, t1, t2;
                     m0 = x[0] ^ x[1];
                     m1 = m0 ^ y[0];
                     m2 = m0 ^ y[1];
@@ -1402,9 +1471,9 @@ namespace secJoin
 
 
     macoro::task<> AltModPrfReceiver::mod2(
-        oc::MatrixView<oc::block> u0,
-        oc::MatrixView<oc::block> u1,
-        oc::MatrixView<oc::block> out,
+        oc::MatrixView<block> u0,
+        oc::MatrixView<block> u1,
+        oc::MatrixView<block> out,
         coproto::Socket& sock)
     {
         MC_BEGIN(macoro::task<>, this, u0, u1, out, &sock,
@@ -1418,13 +1487,13 @@ namespace secJoin
             rows = u64{},
             end = u64{},
             cols = u64{},
-            buff = oc::AlignedUnVector<oc::block>{},
+            buff = oc::AlignedUnVector<block>{},
             ww = oc::AlignedUnVector<block256>{},
-            add = span<oc::block>{},
-            mlt = span<oc::block>{},
-            outIter = (oc::block*)nullptr,
-            u0Iter = (oc::block*)nullptr,
-            u1Iter = (oc::block*)nullptr
+            add = span<block>{},
+            mlt = span<block>{},
+            outIter = (block*)nullptr,
+            u0Iter = (block*)nullptr,
+            u1Iter = (block*)nullptr
         );
 
         triple.reserve(mOleReq.batchCount());
@@ -1523,7 +1592,7 @@ namespace secJoin
                     // if u = 0, w = hi0
                     // if u = 1, w = hi1 + t1
                     // if u = 2, w = m2 + t2
-                    oc::block w =
+                    block w =
                         (*u0Iter++ & buff.data()[tIdx + 0]) ^ // t1
                         (*u1Iter++ & buff.data()[tIdx + 1]) ^ // t2
                         add.data()[tIdx + 0] ^ add.data()[tIdx + 1];// m_u

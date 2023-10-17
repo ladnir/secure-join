@@ -10,7 +10,6 @@ namespace secJoin
 {
 
     using oc::Matrix;
-    using oc::PRNG;
     inline oc::Matrix<oc::block> reveal(oc::MatrixView<oc::block>x0, oc::MatrixView<oc::block>x1)
     {
         oc::Matrix<oc::block>ret(x0.rows(), x0.cols());
@@ -24,7 +23,7 @@ namespace secJoin
     }
 
     template<typename T>
-    inline std::array<oc::Matrix<T>, 2> xorShare(oc::MatrixView<T> d, oc::PRNG& prng)
+    inline std::array<oc::Matrix<T>, 2> xorShare(oc::MatrixView<T> d, PRNG& prng)
     {
         std::array<oc::Matrix<T>, 2> ret;
 
@@ -137,7 +136,7 @@ namespace secJoin
 
     inline std::array<oc::Matrix<oc::u8>, 2> share(
         oc::Matrix<oc::u8> v,
-        oc::PRNG& prng)
+        PRNG& prng)
     {
         auto n = v.rows();
         oc::Matrix<oc::u8>
@@ -154,7 +153,7 @@ namespace secJoin
 
     inline std::array<oc::Matrix<oc::u32>, 2> share(
         oc::Matrix<oc::u32> v,
-        oc::PRNG& prng)
+        PRNG& prng)
     {
         auto n = v.rows();
         oc::Matrix<oc::u32>
@@ -171,7 +170,7 @@ namespace secJoin
 
     inline std::array<std::vector<u32>, 2> xorShare(
         span<const u32> v,
-        oc::PRNG& prng)
+        PRNG& prng)
     {
         auto n = v.size();
         std::vector<u32>

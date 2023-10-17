@@ -27,6 +27,11 @@ int main(int argc, char** argv)
             AltMod_compressB_benchmark(clp);
             return 0;
         }
+        if (clp.isSet("transpose"))
+        {
+            transpose_benchmark(clp);
+            return 0;
+        }
     }
     //clp.set("u");
     secJoin_Tests::Tests.runIf(clp);

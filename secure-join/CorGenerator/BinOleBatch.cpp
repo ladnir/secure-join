@@ -5,7 +5,7 @@ namespace secJoin
 
 
 
-    OleBatch::OleBatch(bool sender, oc::Socket&& s, oc::PRNG&& p)
+    OleBatch::OleBatch(bool sender, oc::Socket&& s, PRNG&& p)
     {
         mSock = std::move(s);
         mPrng = std::move(p);
@@ -175,7 +175,7 @@ namespace secJoin
 
 
     macoro::task<>  OleBatch::RecvBatch::recvTask(
-        oc::PRNG& prng,
+        PRNG& prng,
         oc::Socket& sock,
         oc::AlignedUnVector<oc::block>& add,
         oc::AlignedUnVector<oc::block>& mult,
@@ -194,7 +194,7 @@ namespace secJoin
     }
 
     macoro::task<>  OleBatch::SendBatch::sendTask(
-        oc::PRNG& prng,
+        PRNG& prng,
         oc::Socket& sock,
         oc::AlignedUnVector<oc::block>& add,
         oc::AlignedUnVector<oc::block>& mult,

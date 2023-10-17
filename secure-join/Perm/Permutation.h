@@ -11,7 +11,7 @@
 namespace secJoin
 {
 	
-	using PRNG = oc::PRNG;
+	using PRNG = PRNG;
 
 	struct Xor
 	{

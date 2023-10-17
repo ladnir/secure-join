@@ -6,7 +6,7 @@ namespace secJoin
 {
 
 
-    std::shared_ptr<Batch> makeBatch(CorType type, u64 partyIdx, oc::Socket&& sock, oc::PRNG&& p)
+    std::shared_ptr<Batch> makeBatch(CorType type, u64 partyIdx, oc::Socket&& sock, PRNG&& p)
     {
         switch (type)
         {

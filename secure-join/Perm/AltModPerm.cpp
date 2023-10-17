@@ -142,7 +142,7 @@ namespace secJoin
     // generate random mDelta such that
     // mDelta ^ mB = pi(mA)
     macoro::task<> AltModPermSender::setup(
-        oc::PRNG& prng,
+        PRNG& prng,
         coproto::Socket& chl)
     {
         MC_BEGIN(macoro::task<>, &chl, &prng, this,
@@ -215,7 +215,7 @@ namespace secJoin
     // generate random mA, mB such that
     // mDelta ^ mB = pi(mA)
     macoro::task<> AltModPermReceiver::setup(
-        oc::PRNG& prng,
+        PRNG& prng,
         coproto::Socket& chl)
     {
         MC_BEGIN(macoro::task<>, &chl, &prng, this,
@@ -307,7 +307,7 @@ namespace secJoin
     macoro::task<> AltModPermSender::apply<u8>(
         PermOp op,
         oc::MatrixView<u8> sout,
-        oc::PRNG& prng,
+        PRNG& prng,
         coproto::Socket& chl)
     {
         MC_BEGIN(macoro::task<>, &chl, &prng, this, sout, op,
@@ -385,7 +385,7 @@ namespace secJoin
         PermOp op,
         oc::MatrixView<const u8> in,
         oc::MatrixView<u8> sout,
-        oc::PRNG& prng,
+        PRNG& prng,
         coproto::Socket& chl)
     {
         MC_BEGIN(macoro::task<>, &chl, &prng, this, sout, in, op,
@@ -409,7 +409,7 @@ namespace secJoin
         PermOp op,
         oc::MatrixView<const u8> input,
         oc::MatrixView<u8> sout,
-        oc::PRNG& prng,
+        PRNG& prng,
         coproto::Socket& chl)
     {
         MC_BEGIN(macoro::task<>, &chl, &prng, this, input, sout, op,

@@ -9,7 +9,7 @@
 
 namespace secJoin
 {
-    using PRNG = oc::PRNG;
+    using PRNG = PRNG;
 
     void Gmw::init(
         u64 n,
@@ -204,7 +204,7 @@ namespace secJoin
     // Recver outputs: z2 = x2y2 + z12 + z22 
     //                    = x2y2 + r1 + r2
     //                    = x2y2 + r
-    coproto::task<> Gmw::run(CorGenerator& gen, coproto::Socket& chl, oc::PRNG& prng)
+    coproto::task<> Gmw::run(CorGenerator& gen, coproto::Socket& chl, PRNG& prng)
     {
         if(hasRequest() == false)
             request(gen);

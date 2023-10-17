@@ -13,7 +13,7 @@ using namespace secJoin;
 void DarkMatter22Prf_plain_test()
 {
     throw oc::UnitTestSkipped("known issue");
-    oc::PRNG prng(oc::ZeroBlock);
+    PRNG prng(oc::ZeroBlock);
     block256 k = prng.get();
     block256 x = prng.get();
 
@@ -105,7 +105,7 @@ void DarkMatter32Prf_plain_test()
 {
 
     throw oc::UnitTestSkipped("known issue");
-    oc::PRNG prng(oc::ZeroBlock);
+    PRNG prng(oc::ZeroBlock);
     block256 k = prng.get();
     block256 x = prng.get();
 
@@ -191,7 +191,7 @@ void DarkMatter22Prf_util_test()
 {
     throw oc::UnitTestSkipped("known issue");
     u64 n = 234 * 256;
-    oc::PRNG prng(oc::ZeroBlock);
+    PRNG prng(oc::ZeroBlock);
     auto m3 = sampleMod3(prng, n);
 
     if (m3.size() != n)
@@ -239,8 +239,8 @@ void DarkMatter22Prf_proto_test(const oc::CLP& cmd)
 
     auto sock = coproto::LocalAsyncSocket::makePair();
 
-    oc::PRNG prng0(oc::ZeroBlock);
-    oc::PRNG prng1(oc::OneBlock);
+    PRNG prng0(oc::ZeroBlock);
+    PRNG prng1(oc::OneBlock);
 
     DarkMatter22Prf dm;
     block256 k;
@@ -355,8 +355,8 @@ void DarkMatter32Prf_proto_test(const oc::CLP& cmd)
 
     auto sock = coproto::LocalAsyncSocket::makePair();
 
-    oc::PRNG prng0(oc::ZeroBlock);
-    oc::PRNG prng1(oc::OneBlock);
+    PRNG prng0(oc::ZeroBlock);
+    PRNG prng1(oc::OneBlock);
 
     DarkMatter32Prf dm;
     block256 k;
@@ -492,12 +492,64 @@ void AltModPrf_BMult_test(const oc::CLP& cmd)
     std::vector<oc::block> y(n);
     compressB(v, y);
 
+    //oc::Matrix<u64> B(128, 256);
+    //for (u64 i = 0; i < 128; ++i)
+    //{
+    //    u64 j = 0;
+    //    for (; j < 128; ++j)
+    //        B(i, j) = j == i ? 1 : 0;
+    //    for (; j < B.cols(); ++j)
+    //    {
+    //        B(i, j) = *oc::BitIterator((u8*)&AltModPrf::mB[i], j - 128);
+    //    }
+    //}
+
     for (u64 i = 0; i < n; ++i)
     {
         auto Y = AltModPrf::compress(V[i]);
         if (y[i] != Y)
             throw RTE_LOC;
 
+        Y = oc::ZeroBlock;
+        AltModPrf::mBCode.encode((u8*)&V[i].mData[1], (u8*)&Y);
+
+        {
+            auto w = V[i];
+            oc::AlignedArray<block, 128> bw;
+
+            for (u64 i = 0; i < 128; ++i)
+            {
+                //bw[0][i] = B[i].mData[0] & w.mData[0];
+                bw[i] = AltModPrf::mB[i] & w.mData[1];
+            }
+            oc::transpose128(bw.data());
+            //oc::transpose128(bw[1].data());
+
+            block r = oc::ZeroBlock;//w[0];
+            //memset(&r, 0, sizeof(r));
+            //for (u64 i = 0; i < 128; ++i)
+            //    r = r ^ bw[0][i];
+            for (u64 i = 0; i < 128; ++i)
+                r = r ^ bw[i];
+
+            //oc::block b = oc::ZeroBlock;
+            //for (u64 ii = 0; ii < 128; ++ii)
+            //{
+            //    if (bit(V[i].mData[1], ii))
+            //    {
+            //        b = b ^ AltModPrf::mB[ii];
+            //    }
+            //}
+
+            //if (Y != b)
+            //    throw RTE_LOC;
+            if (r != Y)
+                throw RTE_LOC;
+        }
+        //Y = Y ^ V[i].mData[0];
+        Y = Y ^ V[i].mData[0];
+        if (y[i] != Y)
+            throw RTE_LOC;
     }
 }
 
@@ -513,8 +565,8 @@ void AltModPrf_mod2_test(const oc::CLP& cmd)
     u64 printI = cmd.getOr("i", -1);
     u64 printJ = cmd.getOr("j", -1);
 
-    oc::PRNG prng0(oc::ZeroBlock);
-    oc::PRNG prng1(oc::OneBlock);
+    PRNG prng0(oc::ZeroBlock);
+    PRNG prng1(oc::OneBlock);
     oc::Timer timer;
 
     AltModPrfSender sender;
@@ -703,7 +755,7 @@ void AltModPrf_plain_test()
     u64 n = AltModPrf::KeySize;
     u64 m = 256;
     u64 t = 128;
-    oc::PRNG prng(oc::ZeroBlock);
+    PRNG prng(oc::ZeroBlock);
     oc::block kk = prng.get();
     oc::block xx = prng.get();
 
@@ -738,9 +790,12 @@ void AltModPrf_plain_test()
     }
     for (u64 i = 0; i < t; ++i)
     {
-        for (u64 j = 0; j < m; ++j)
+        u64 j = 0; 
+        for (; j < 128; ++j)
+            B(i, j) = j == i ? 1 : 0;
+        for (; j < m; ++j)
         {
-            B(i, j) = *oc::BitIterator((u8*)&DarkMatter22Prf::mB[i], j);
+            B(i, j) = *oc::BitIterator((u8*)&AltModPrf::mB[i], j - 128);
         }
     }
 
@@ -854,8 +909,8 @@ void AltModPrf_proto_test(const oc::CLP& cmd)
 
     auto sock = coproto::LocalAsyncSocket::makePair();
 
-    oc::PRNG prng0(oc::ZeroBlock);
-    oc::PRNG prng1(oc::OneBlock);
+    PRNG prng0(oc::ZeroBlock);
+    PRNG prng1(oc::OneBlock);
 
     AltModPrf dm;
     oc::block kk;
@@ -947,7 +1002,7 @@ void AltModPrf_proto_test(const oc::CLP& cmd)
             }
 
             block256m3 u;
-            sender.mPrf.compressH(h, u);
+            sender.mPrf.mtxMultA(h, u);
 
             for (u64 i = 0; i < 256; ++i)
             {

@@ -140,7 +140,7 @@ void RadixSort_oneHot_test(const oc::CLP& cmd)
     auto comm = coproto::LocalAsyncSocket::makePair();
     std::array<std::future<void>, 2> f;
     std::array<CorGenerator, 2> g;
-    oc::PRNG prng(oc::ZeroBlock);
+    PRNG prng(oc::ZeroBlock);
     g[0].init(comm[0].fork(), prng, 0, 1 << 14, cmd.getOr("mock", 1));
     g[1].init(comm[1].fork(), prng, 1, 1 << 14, cmd.getOr("mock", 1));
 

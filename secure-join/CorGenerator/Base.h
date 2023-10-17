@@ -19,7 +19,7 @@ namespace secJoin
 {
     struct SendBase
     {
-        std::vector<std::array<oc::PRNG, 2>> mBase;
+        std::vector<std::array<PRNG, 2>> mBase;
 
         std::vector<std::array<oc::block, 2>> get()
         {
@@ -54,7 +54,7 @@ namespace secJoin
 
     struct RecvBase
     {
-        std::vector<oc::PRNG> mBase;
+        std::vector<PRNG> mBase;
         oc::BitVector mChoice;
 
         std::vector<oc::block> get()

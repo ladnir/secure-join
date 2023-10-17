@@ -62,7 +62,7 @@ namespace secJoin
             Type type,
             coproto::Socket& comm,
             CorGenerator& gen,
-            oc::PRNG& prng,
+            PRNG& prng,
             BinMatrix& dst)
         {
             MC_BEGIN(macoro::task<>, this, &src, &controlBits, &op, type, &comm, &gen, &dst, &prng,
@@ -144,7 +144,7 @@ namespace secJoin
             Type type,
             coproto::Socket& comm,
             CorGenerator& gen,
-            oc::PRNG& prng,
+            PRNG& prng,
             Level& root,
             span<SplitLevel> levels);
 
@@ -191,7 +191,7 @@ namespace secJoin
             Type type,
             coproto::Socket& comm,
             CorGenerator& gen,
-            oc::PRNG& prng,
+            PRNG& prng,
             std::vector<SplitLevel>* debugLevels = nullptr);
 
         //	// apply the downstream circuit to each level of the tree.
@@ -201,7 +201,7 @@ namespace secJoin
             const Operator& op,
             BinMatrix& dst,
             Type type,
-            oc::PRNG& prng,
+            PRNG& prng,
             coproto::Socket& comm,
             CorGenerator& gen)
         {

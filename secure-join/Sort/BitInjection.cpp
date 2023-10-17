@@ -74,7 +74,7 @@ namespace secJoin
     //    u64 n,
     //    u64 mInBitCount,
     //    CorGenerator& gen_,
-    //    oc::PRNG& prng_,
+    //    PRNG& prng_,
     //    coproto::Socket& sock_)
     //{
     //    MC_BEGIN(macoro::task<>, this, n, mInBitCount, 
@@ -108,7 +108,7 @@ namespace secJoin
     //    const oc::Matrix<u8>& in,
     //    u64 outBitCount,
     //    oc::Matrix<u32>& out,
-    //    oc::PRNG& prng,
+    //    PRNG& prng,
     //    coproto::Socket& sock)
     //{
     //    MC_BEGIN(macoro::task<>, this, &in, outBitCount, &out, &sock, &prng, 

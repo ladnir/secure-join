@@ -39,11 +39,11 @@ namespace secJoin
 	//	u64 mLogn;
 	//	u64 mLogfn, r, mN0, mN1;
 
-	//	void init(u64 n, u64 bitCount, oc::PRNG& prng,
+	//	void init(u64 n, u64 bitCount, PRNG& prng,
 	//		std::function<oc::BitVector(const oc::BitVector&, const oc::BitVector&)> op);
 
 
-	//	std::array<BinMatrix, 2> shareVals(oc::PRNG& prng)
+	//	std::array<BinMatrix, 2> shareVals(PRNG& prng)
 	//	{
 	//		std::array<BinMatrix, 2> ret;
 	//		ret[0].resize(mInput.size(), mInput.bitsPerEntry());
@@ -65,7 +65,7 @@ namespace secJoin
 	//	}
 
 
-	//	std::array<BinMatrix, 2> shareBits(oc::PRNG& prng)
+	//	std::array<BinMatrix, 2> shareBits(PRNG& prng)
 	//	{
 	//		std::array<BinMatrix, 2> ret;
 	//		ret[0].resize(mInput.size(), 1);
@@ -110,7 +110,7 @@ namespace secJoin
 
 
 
-	inline void share(oc::MatrixView<u8> d, u64 bits, BinMatrix& x0, BinMatrix& x1, oc::PRNG& prng)
+	inline void share(oc::MatrixView<u8> d, u64 bits, BinMatrix& x0, BinMatrix& x1, PRNG& prng)
 	{
 		x0.resize(d.rows(), bits);
 		x1.resize(d.rows(), bits);
@@ -127,7 +127,7 @@ namespace secJoin
 
 
 
-	inline std::array<BinMatrix,2> share(BinMatrix d, oc::PRNG& prng)
+	inline std::array<BinMatrix,2> share(BinMatrix d, PRNG& prng)
 	{
 		std::array<BinMatrix, 2> r;
 		share(d.mData, d.bitsPerEntry(), r[0], r[1], prng);
@@ -164,7 +164,7 @@ namespace secJoin
 			return ss.str();
 		};
 
-		void init(u64 n, u64 bitCount, oc::PRNG& prng,
+		void init(u64 n, u64 bitCount, PRNG& prng,
 			std::function<oc::BitVector(const oc::BitVector&, const oc::BitVector&)> op,
 			std::function<std::string(const oc::BitVector&)> formatter = {}
 			)
@@ -190,7 +190,7 @@ namespace secJoin
 		}
 
 
-		std::array<BinMatrix, 2> shareVals(oc::PRNG& prng)
+		std::array<BinMatrix, 2> shareVals(PRNG& prng)
 		{
 			std::array<BinMatrix, 2> ret;
 			ret[0].resize(mInput.size(), mInput[0].size());
@@ -206,7 +206,7 @@ namespace secJoin
 		}
 
 
-		std::array<BinMatrix, 2> shareBits(oc::PRNG& prng)
+		std::array<BinMatrix, 2> shareBits(PRNG& prng)
 		{
 			std::array<BinMatrix, 2> ret;
 			ret[0].resize(mInput.size(), 1);

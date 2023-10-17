@@ -16,8 +16,8 @@ void AltModPerm_setup_test(const oc::CLP& cmd)
     u64 rowSize = cmd.getOr("m", 63);
     // bool invPerm = false;
 
-    oc::PRNG prng0(oc::ZeroBlock);
-    oc::PRNG prng1(oc::OneBlock);
+    PRNG prng0(oc::ZeroBlock);
+    PRNG prng1(oc::OneBlock);
 
     secJoin::AltModPermSender AltModPerm0;
     secJoin::AltModPermReceiver AltModPerm1;
@@ -92,8 +92,8 @@ void AltModPerm_apply_test(const oc::CLP& cmd)
 
     // bool invPerm = false;
 
-    oc::PRNG prng0(oc::ZeroBlock);
-    oc::PRNG prng1(oc::OneBlock);
+    PRNG prng0(oc::ZeroBlock);
+    PRNG prng1(oc::OneBlock);
 
 
 
@@ -165,8 +165,8 @@ void AltModPerm_sharedApply_test(const oc::CLP& cmd)
 
     // bool invPerm = false;
 
-    oc::PRNG prng0(oc::ZeroBlock);
-    oc::PRNG prng1(oc::OneBlock);
+    PRNG prng0(oc::ZeroBlock);
+    PRNG prng1(oc::OneBlock);
 
 
     secJoin::AltModPermSender AltModPerm0;
@@ -229,8 +229,8 @@ void AltModPerm_prepro_test(const oc::CLP& cmd)
 
     // bool invPerm = false;
 
-    oc::PRNG prng0(oc::ZeroBlock);
-    oc::PRNG prng1(oc::OneBlock);
+    PRNG prng0(oc::ZeroBlock);
+    PRNG prng1(oc::OneBlock);
 
     secJoin::AltModPermSender AltModPerm0;
     secJoin::AltModPermReceiver AltModPerm1;
@@ -271,7 +271,7 @@ void AltModPerm_prepro_test(const oc::CLP& cmd)
         std::get<1>(res0).result();
 
         {
-            oc::PRNG prng(oc::ZeroBlock);
+            PRNG prng(oc::ZeroBlock);
             auto A = AltModPerm1.mA;
             //std::vector<u64> A(n);
             //std::iota(A.begin(), A.end(), 0);

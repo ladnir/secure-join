@@ -6,7 +6,7 @@ namespace secJoin
     //void PTreeNew::init(
     //    u64 n,
     //    u64 bitCount,
-    //    oc::PRNG& prng,
+    //    PRNG& prng,
     //    std::function<
     //    oc::BitVector(
     //        const oc::BitVector&,

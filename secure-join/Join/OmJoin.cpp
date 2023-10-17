@@ -39,7 +39,7 @@ namespace secJoin
         }
         else
         {
-            oc::PRNG prng(oc::ZeroBlock);
+            PRNG prng(oc::ZeroBlock);
             oc::LinearCode code;
             code.random(prng, bits, compressesSize);
 
@@ -122,7 +122,7 @@ namespace secJoin
         coproto::Socket& sock,
         BinMatrix& out,
         CorGenerator& ole,
-        oc::PRNG&prng)
+        PRNG&prng)
     {
         MC_BEGIN(macoro::task<>, &data, &sock, &out, &ole, keyByteOffset, keyBitCount, &prng,
             cir = oc::BetaCircuit{},
@@ -406,7 +406,7 @@ namespace secJoin
         BinMatrix& choice,
         BinMatrix& out,
         CorGenerator& ole,
-        oc::PRNG& prng,
+        PRNG& prng,
         coproto::Socket& sock)
     {
         MC_BEGIN(macoro::task<>, &data, &choice, &out, &ole, &sock, &prng,
@@ -472,7 +472,7 @@ namespace secJoin
         ColRef rightJoinCol,
         std::vector<ColRef> selects,
         SharedTable& out,
-        oc::PRNG& prng,
+        PRNG& prng,
         CorGenerator& ole,
         coproto::Socket& sock)
     {

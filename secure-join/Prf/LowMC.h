@@ -648,7 +648,7 @@ namespace secJoin
             //Fills the matrices and roundconstants with pseudorandom bits 
             void instantiate_LowMC(bool invertable)
             {
-                oc::PRNG prng(oc::ZeroBlock);
+                PRNG prng(oc::ZeroBlock);
 
                 // Create LinMatrices and invLinMatrices
                 LinMatrices.clear();
@@ -757,7 +757,7 @@ namespace secJoin
 
 
             // Random bits functions //
-            block getrandblock(oc::PRNG& prng)
+            block getrandblock(PRNG& prng)
             {
                 block tmp = 0;
                 for (u64 i = 0; i < blocksize; ++i) tmp[i] = prng.get<bool>();
@@ -766,7 +766,7 @@ namespace secJoin
             }
 
 
-            keyblock getrandkeyblock(oc::PRNG& prng)
+            keyblock getrandkeyblock(PRNG& prng)
             {
                 keyblock tmp = 0;
                 for (u64 i = 0; i < keysize; ++i) tmp[i] = prng.get<bool>();

@@ -8,6 +8,7 @@
 #include <bitset>
 #include "libOTe/Tools/Tools.h"
 #include "macoro/optional.h"
+#include "LinearCode.h"
 
 // TODO:
 // * replace sample mod 3 with lookup table. 3^5 = 243. 
@@ -42,7 +43,7 @@ namespace secJoin
     void mod3BitDecompostion(oc::MatrixView<u16> u, oc::MatrixView<oc::block> u0, oc::MatrixView<oc::block> u1);
 
     template<int keySize>
-    void compressH2(
+    void mtxMultA(
         oc::Matrix<u16>&& mH,
         oc::Matrix<u16>& mU
     );
@@ -67,8 +68,10 @@ namespace secJoin
     class AltModPrf
     {
     public:
-        static const std::array<block256, 128> mB, mBShuffled;
-        static const std::array<std::array<u8, 256>, 128> mBExpanded;
+        static const std::array<oc::block, 128> mB;//, mBShuffled;
+        static const std::array<std::array<u8, 128>, 128> mBExpanded;
+
+        static LinearCode mBCode;
 
         // the bit count of the key
         static constexpr auto KeySize = 128;
@@ -96,13 +99,13 @@ namespace secJoin
         oc::block eval(oc::block x);
 
 
-        void compressH(const std::array<u16, KeySize>& hj, block256m3& uj);
+        void mtxMultA(const std::array<u16, KeySize>& hj, block256m3& uj);
         
         static oc::block compress(block256& w);
 
-        static oc::block shuffledCompress(block256& w);
+        //static oc::block shuffledCompress(block256& w);
 
-        static oc::block compress(block256& w, const std::array<block256, 128>& B);
+        static oc::block compress(block256& w, const std::array<oc::block, 128>& B);
     };
 
 
@@ -113,7 +116,7 @@ namespace secJoin
         static constexpr auto StepSize = 32;
 
         // The key OTs, one for each bit of the key mPrf.mKey
-        std::vector<oc::PRNG> mKeyOTs;
+        std::vector<PRNG> mKeyOTs;
 
         // The underlaying PRF
         AltModPrf mPrf;
@@ -244,7 +247,7 @@ namespace secJoin
         coproto::task<> evaluate(
             span<oc::block> y,
             coproto::Socket& sock,
-            oc::PRNG& _,
+            PRNG& _,
             CorGenerator& gen);
 
         // Run the prf protocol and write the result to y. Requires that correlated 
@@ -252,7 +255,7 @@ namespace secJoin
         coproto::task<> evaluate(
             span<oc::block> y,
             coproto::Socket& sock,
-            oc::PRNG& _);
+            PRNG& _);
 
         // re-randomize the OTs seeds with the tweak.
         void tweakKeyOts(oc::block tweak)
@@ -284,7 +287,7 @@ namespace secJoin
         static constexpr auto StepSize = 32;
 
         // base OTs, where the sender has the OT msg based on the bits of their key
-        std::vector<std::array<oc::PRNG, 2>> mKeyOTs;
+        std::vector<std::array<PRNG, 2>> mKeyOTs;
 
         // The number of input we will have.
         u64 mInputSize = 0;
@@ -411,7 +414,7 @@ namespace secJoin
             span<oc::block> x,
             span<oc::block> y,
             coproto::Socket& sock,
-            oc::PRNG&,
+            PRNG&,
             CorGenerator& gen);
 
         // Run the prf protocol and write the result to y. Requires that correlated 
@@ -420,7 +423,7 @@ namespace secJoin
             span<oc::block> x,
             span<oc::block> y,
             coproto::Socket& sock,
-            oc::PRNG&);
+            PRNG&);
 
         // the mod 2 subprotocol.
         macoro::task<> mod2(

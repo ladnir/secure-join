@@ -42,7 +42,7 @@ namespace secJoin
         // prng : Source of randomness
         // out : the output vector, x permuted by pi.
         // chl : the communication socket.
-        macoro::task<> applyVec(std::vector<u64>& x, oc::PRNG& prng, std::vector<u64>& out, coproto::Socket& chl)
+        macoro::task<> applyVec(std::vector<u64>& x, PRNG& prng, std::vector<u64>& out, coproto::Socket& chl)
         {
             MC_BEGIN(macoro::task<>, &x, &out, &chl,
                 secparam = 2048,
@@ -98,7 +98,7 @@ namespace secJoin
 
         macoro::task<> applyPerm(
             std::vector<u64>& pi,
-            oc::PRNG& prng,           
+            PRNG& prng,           
             std::vector<u64>& out, coproto::Socket& chl)
         {
             MC_BEGIN(macoro::task<>, &pi, &out,&chl,

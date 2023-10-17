@@ -26,8 +26,8 @@ namespace secJoin
             rMsg = oc::AlignedUnVector<oc::block>{},
             sProto = macoro::task<>{},
             rProto = macoro::task<>{},
-            sPrng = oc::PRNG{},
-            rPrng = oc::PRNG{},
+            sPrng = PRNG{},
+            rPrng = PRNG{},
             socks = std::array<oc::Socket, 2>{},
 
             sendOtBatch = std::shared_ptr<Batch>{},

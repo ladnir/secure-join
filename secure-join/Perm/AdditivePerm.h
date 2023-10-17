@@ -97,7 +97,7 @@ namespace secJoin
             PermOp op,
             oc::span<const T> in,
             oc::span<T> out,
-            oc::PRNG& prng,
+            PRNG& prng,
             coproto::Socket& chl);
 
         template <typename T>
@@ -105,7 +105,7 @@ namespace secJoin
             PermOp op,
             oc::MatrixView<const T> in,
             oc::MatrixView<T> out,
-            oc::PRNG& prng,
+            PRNG& prng,
             coproto::Socket& chl);
 
 
@@ -113,20 +113,20 @@ namespace secJoin
             PermOp op,
             BinMatrix& in,
             BinMatrix& out,
-            oc::PRNG& prng,
+            PRNG& prng,
             coproto::Socket& chl);
 
         //macoro::task<> composeSwap(
         //    AdditivePerm& pi,
         //    AdditivePerm& dst,
-        //    oc::PRNG& prng,
+        //    PRNG& prng,
         //    coproto::Socket& chl);
 
 
         macoro::task<> compose(
             AdditivePerm& pi,
             AdditivePerm& dst,
-            oc::PRNG& prng,
+            PRNG& prng,
             coproto::Socket& chl);
 
 
@@ -135,7 +135,7 @@ namespace secJoin
             PermOp op,
             oc::MatrixView<const T> in,
             oc::MatrixView<T> out,
-            oc::PRNG& prng,
+            PRNG& prng,
             coproto::Socket& chl);
 
         void request(CorGenerator& ole);
@@ -180,7 +180,7 @@ namespace secJoin
         PermOp op,
         oc::span<const T> in,
         oc::span<T> out,
-        oc::PRNG& prng,
+        PRNG& prng,
         coproto::Socket& chl)
     {
         return apply<T>(
@@ -196,7 +196,7 @@ namespace secJoin
         PermOp op,
         oc::MatrixView<const T> in,
         oc::MatrixView<T> out,
-        oc::PRNG& prng,
+        PRNG& prng,
         coproto::Socket& chl)
     {
         if (out.rows() != in.rows())
@@ -247,7 +247,7 @@ namespace secJoin
         PermOp op,
         oc::MatrixView<const T> in,
         oc::MatrixView<T> out,
-        oc::PRNG& prng,
+        PRNG& prng,
         coproto::Socket& chl)
     {
         if (mInsecureMock == false)

@@ -22,7 +22,7 @@ namespace secJoin
 
     struct OtBatch : Batch
     {
-        OtBatch(bool sender, oc::Socket&& s, oc::PRNG&& p);
+        OtBatch(bool sender, oc::Socket&& s, PRNG&& p);
         OtBatch(OtBatch&&) { throw RTE_LOC; };
 
         struct SendOtBatch
@@ -30,7 +30,7 @@ namespace secJoin
             oc::SilentOtExtSender mSender;
             oc::AlignedUnVector<std::array<oc::block, 2>> mMsg2;
 
-            macoro::task<> sendTask(oc::PRNG& prng, oc::Socket& sock);
+            macoro::task<> sendTask(PRNG& prng, oc::Socket& sock);
             void mock(u64 batchIdx);
         };
 
@@ -40,7 +40,7 @@ namespace secJoin
             oc::AlignedUnVector<oc::block> mMsg;
             oc::BitVector mChoice;
 
-            macoro::task<> recvTask(oc::PRNG& prng, oc::Socket& sock);
+            macoro::task<> recvTask(PRNG& prng, oc::Socket& sock);
             void mock(u64 batchIdx);
         };
 
@@ -88,7 +88,7 @@ namespace secJoin
     //            oc::SilentOtExtSender mSender;
     //            oc::AlignedUnVector<std::array<oc::block, 2>> mMsg2;
 
-    //            macoro::task<> sendTask(oc::PRNG& prng, oc::Socket& sock);
+    //            macoro::task<> sendTask(PRNG& prng, oc::Socket& sock);
     //            void mock(u64 batchIdx);
     //        };
 
@@ -98,7 +98,7 @@ namespace secJoin
     //            oc::AlignedUnVector<oc::block> mMsg;
     //            oc::BitVector mChoice;
 
-    //            macoro::task<> recvTask(oc::PRNG& prng, oc::Socket& sock);
+    //            macoro::task<> recvTask(PRNG& prng, oc::Socket& sock);
     //            void mock(u64 batchIdx);
     //        };
 
@@ -121,7 +121,7 @@ namespace secJoin
     //        coproto::Socket mSock;
 
     //        // randomness source.
-    //        oc::PRNG mPrng;
+    //        PRNG mPrng;
 
     //        // The common state
     //        std::shared_ptr<GenState> mState;
@@ -272,7 +272,7 @@ namespace secJoin
     //        std::vector<std::shared_ptr<Batch>> mBatches;
     //        std::vector<std::shared_ptr<RequestState>> mRequests;
 
-    //        oc::PRNG mPrng;
+    //        PRNG mPrng;
     //        coproto::Socket mSock;
     //        u64 mBatchSize = 0;
     //        std::atomic<bool> mGenerationInProgress = false;
@@ -299,7 +299,7 @@ namespace secJoin
     //        void init(
     //            u64 batchSize,
     //            coproto::Socket& sock,
-    //            oc::PRNG& prng,
+    //            PRNG& prng,
     //            Base& base,
     //            u64 partyIdx,
     //            bool mock)
@@ -363,7 +363,7 @@ namespace secJoin
     //        void init(
     //            u64 batchSize,
     //            coproto::Socket& sock,
-    //            oc::PRNG& prng,
+    //            PRNG& prng,
     //            SendBase& base,
     //            u64 partyIdx,
     //            bool mock)
@@ -409,7 +409,7 @@ namespace secJoin
     //        void init(
     //            u64 batchSize,
     //            coproto::Socket& sock,
-    //            oc::PRNG& prng,
+    //            PRNG& prng,
     //            RecvBase& base,
     //            u64 partyIdx,
     //            bool mock)
