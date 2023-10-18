@@ -49,6 +49,7 @@ namespace secJoin_Tests
             t.add("AltModPrf_mod3BitDecompostion_test              ", AltModPrf_mod3BitDecompostion_test);
 
 
+            t.add("AltModPrf_AMult_test                            ", AltModPrf_AMult_test);
             t.add("AltModPrf_BMult_test                            ", AltModPrf_BMult_test);
             
             t.add("AltModPrf_sampleMod3_test                       ", AltModPrf_sampleMod3_test);

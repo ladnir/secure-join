@@ -11,15 +11,15 @@ namespace secJoin
     // represents a binary matrix G. The encode function on input x
     // returns G * x. This is done by preprocessing subcodes and 
     // implementing G * x as a lookup table for each subcode.
-    class LinearCode
+    class F2LinearCode
     {
     public:
         // the maximum number of subcodes / input bytes that is 
         // currently supported. Can be increases if needed.
         static constexpr u16 sLinearCodePlainTextMaxSize = 64;
 
-        LinearCode() = default;
-        LinearCode(const LinearCode& cp) = default;
+        F2LinearCode() = default;
+        F2LinearCode(const F2LinearCode& cp) = default;
 
         
         void init(oc::Matrix<u8> g);

@@ -22,15 +22,23 @@ namespace secJoin
     }();
 
 
-    LinearCode AltModPrf::mBCode = []() {
+    F2LinearCode AltModPrf::mBCode = []() {
 
         oc::Matrix<u8> g(128, sizeof(block)), gt(128, sizeof(block));
         g.resize(128, sizeof(block));
         for (u64 i = 0; i < 128; ++i)
             memcpy(g[i], span<const block>(&mB[i], 1));
         oc::transpose(g, gt);
-        LinearCode r;
+        F2LinearCode r;
         r.init(gt);
+        return r;
+    }();
+
+
+    F3AccPermCode AltModPrf::mACode = []() {
+
+        F3AccPermCode r;
+        r.init(AltModPrf::KeySize, AltModPrf::MidSize);
         return r;
     }();
 
@@ -730,16 +738,6 @@ namespace secJoin
 
         xorVectorOne(out1, m1, prng);
         xorVectorOne(out0, m0, prng);
-        //assert(out1.size() == hi1.size());
-        //assert(out0.size() == hi1.size());
-
-        //prng.get(out0);
-        //for (u64 i = 0; i < hi0.size(); ++i)
-        //    out0[i] = out0[i] ^ hi0[i];
-
-        //prng.get(out1);
-        //for (u64 i = 0; i < out1.size(); ++i)
-        //    out1[i] = out1[i] ^ hi1[i];
     }
 
     // out = (hi0, hi1) ^ prng()
@@ -751,101 +749,98 @@ namespace secJoin
     {
         xorVectorOne(out.subspan(m0.size()), m1, prng);
         xorVectorOne(out.subspan(0, m0.size()), m0, prng);
-
-        //assert(out.size() == hi1.size() + hi0.size());
-
-        //prng.get(out);
-        //for (u64 i = 0; i < hi0.size(); ++i)
-        //    out[i] = out[i] ^ hi0[i];
-        //for (u64 i = hi0.size(), j = 0; i < out.size(); ++i, ++j)
-        //    out[i] = out[i] ^ hi1[j];
     }
 
     void  AltModPrf::setKey(block k)
     {
-        mKey[0] = k;
+        mExpandedKey[0] = k;
+        mExpandedKey[1] = oc::mAesFixedKey.hashBlock(k);
+        mExpandedKey[2] = oc::mAesFixedKey.hashBlock(k ^ oc::block(4234473534532, 452878778345324));
+        mExpandedKey[3] = oc::mAesFixedKey.hashBlock(k ^ oc::block(35746745624534, 876876787665423));
+
+        static_assert(KeyType{}.size() == 4, "assumed");
     }
 
     void  AltModPrf::mtxMultA(const std::array<u16, KeySize>& hj, block256m3& uj)
     {
-        //for (u64 k = 0; k < KeySize; ++k)
-        //{
-        //    uj.mData[k] = hj[k];
-        //}
+        std::array<u8, KeySize> h;
+        for (u64 i = 0; i < KeySize; ++i)
+            h[i] = hj[i];
+        mACode.encode<u8>(h, uj.mData);
+    }
 
 
-        //assert(mPi.size() != 0);
-        if constexpr (KeySize == 128)
+    void AltModPrf::expandInput(span<block> x, oc::MatrixView<block> xt)
+    {
+        auto n = x.size();
+        for (u64 i = 0, k = 0; i < n; ++k)
         {
-            uj.mData[0] = hj[0];
-            for (u64 k = 1; k < KeySize; ++k)
+            static_assert(AltModPrf::KeySize % 128 == 0);
+            auto m = std::min<u64>(128, n - i);
+            auto xIter = x.data() + k * 128;
+
+            for (u64 q = 0; q < AltModPrf::KeySize / 128; ++q)
             {
-                uj.mData[k] = hj[k] + uj.mData[k - 1];
-                uj.mData[k] = uj.mData[k] % 3;
+                auto tweak = block(q, q);
+                oc::AlignedArray<block, 128> t;
+                if (q == 0)
+                {
+                    for (u64 j = 0;j < m; ++j)
+                    {
+                        t[j] = xIter[j];
+                    }
+                }
+                else
+                {
+                    for (u64 j = 0;j < m; ++j)
+                    {
+                        t[j] = xIter[j] ^ tweak;
+                    }
+                    oc::mAesFixedKey.hashBlocks(t, t);
+                }
+
+                oc::transpose128(t.data());
+
+                auto xtk = &xt(q * 128, k);
+                auto step = xt.cols();
+                for (u64 j = 0;j < 128; ++j)
+                {
+                    assert(xtk == &xt(q * 128 + j, k));
+                    *xtk = t[j];
+                    xtk += step;
+                }
             }
 
-            for (u64 k = 128; k < 256; ++k)
-            {
-                //uj.mData[k] = hj[k-128] + uj.mData[k-128];
-                uj.mData[k] = uj.mData[k - 128];
-            }
 
+            i += 128;
         }
-        else if constexpr (KeySize == 256)
-        {
 
 
-            uj.mData[0] = hj[0];
-            for (u64 k = 1; k < KeySize; ++k)
-            {
-                uj.mData[k] = hj[k] + uj.mData[k - 1];
-                uj.mData[k] = uj.mData[k] % 3;
-            }
-        }
-        else if constexpr (KeySize == 512)
-        {
-            assert(0);
-            //auto pik = mPi.data();
-            //for (u64 k = 0; k < 256; ++k)
-            //{
-            //    uj.mData[k] = (
-            //        hj[pik[0]] +
-            //        hj[pik[1]]
-            //        ) % 3;
-            //    pik += 2;
-            //}
-        }
-        else
-        {
-            assert(0);
-        }
+    }
+
+    void AltModPrf::expandInput(block x, KeyType& X)
+    {
+        X[0] = x;
+        for (u64 i = 1; i < X.size(); ++i)
+            X[i] = x ^ block(i, i);
+
+        constexpr const auto rem = KeyType{}.size() - 1;
+        if (rem)
+            oc::mAesFixedKey.hashBlocks<rem>(X.data() + 1, X.data() + 1);
     }
 
     block  AltModPrf::eval(block x)
     {
         std::array<u16, KeySize> h;
         std::array<block, KeySize / 128> X;
-        if constexpr (AltModPrf::KeySize / 128 > 1)
-        {
 
-            for (u64 i = 0; i < X.size(); ++i)
-                X[i] = x ^ block(i, i);
-            oc::mAesFixedKey.hashBlocks<X.size()>(X.data(), X.data());
-        }
-        else
-            X[0] = x;
+        expandInput(x, X);
 
-        auto kIter = oc::BitIterator((u8*)mKey.data());
+        auto kIter = oc::BitIterator((u8*)mExpandedKey.data());
         auto xIter = oc::BitIterator((u8*)X.data());
         for (u64 i = 0; i < KeySize; ++i)
         {
             h[i] = *kIter & *xIter;
-
-            //if (i < 20)
-            //    std::cout << "h[" << i << "] = " << h[i] 
-            //    << " = " << *kIter 
-            //    <<" & " << *xIter <<std::endl;
-
             ++kIter;
             ++xIter;
         }
@@ -856,13 +851,18 @@ namespace secJoin
         block256 w;
         for (u64 i = 0; i < u.mData.size(); ++i)
         {
-            //if (i < 10)
-            //    std::cout << "u[" << i << "] = " << (int)u.mData[i] << std::endl;
-
             *oc::BitIterator((u8*)&w, i) = u.mData[i] % 2;
         }
         return compress(w);
     }
+
+    void AltModPrf::eval(span<block> x, span<block> y)
+    {
+        for (u64 i = 0; i < x.size(); ++i)
+            y[i] = eval(x[i]);
+    }
+
+
 
     block  AltModPrf::compress(block256& w)
     {
@@ -894,100 +894,16 @@ namespace secJoin
 
 
 
-    //template<int keySize>
-    //inline void mtxMultA(
-    //    oc::Matrix<u16>&& mH,
-    //    oc::Matrix<u16>& mU
-    //)
-    //{
-    //    if constexpr (keySize == 128)
-    //    {
-
-    //        auto n = mH.size() / keySize;
-    //        auto& h2 = mH;
-
-    //        for (u64 i = 1; i < keySize; ++i)
-    //        {
-    //            auto h0 = h2.data() + n * (i - 1);
-    //            auto h1 = h2.data() + n * (i);
-    //            for (u64 j = 0; j < n; ++j)
-    //            {
-    //                auto h0j = h0[j];
-    //                auto h1j = h1[j];
-    //                //__assume(h0j < 3);
-    //                //__assume(h1j < 3);
-    //                // 000 0
-    //                // 001 1
-    //                // 010 2
-    //                // 011 3
-    //                // 100 4
-
-    //                auto s = (h0j + h1j);
-    //                // __assume(s < 5);
-    //                auto q = s == 3 || s == 4;
-    //                h1[j] = s - 3 * q;
-    //                assert(h1[j] == (h0j + h1j) % 3);
-    //            }
-    //        }
-
-    //        for (u64 i = 0; i < keySize; ++i)
-    //        {
-    //            auto hi = mH[i];
-    //            for (u64 j = 0; j < n; ++j)
-    //            {
-    //                mU[j][i] = hi[j];
-    //                mU[j][i + keySize] = hi[j];
-    //            }
-    //        }
-
-    //    }
-    //    else
-    //    {
-    //        assert(0);
-    //    }
-
-    //    mH = {};
-    //}
-
     void mtxMultA(
-        oc::Matrix<block>&& mH,
+        oc::Matrix<block>&& v1,
+        oc::Matrix<block>&& v0,
         oc::Matrix<block>& u1,
         oc::Matrix<block>& u0
     )
     {
-        auto keySize = 128;
-        assert(mH.rows() == 2 * keySize);
-        assert(u1.rows() == 2 * keySize);
-        assert(u0.rows() == 2 * keySize);
-        assert(mH.cols() == u0.cols());
-        assert(mH.cols() == u1.cols());
-
-        // u[0  ] = h[0]
-        // u[128] = h[0]
-        memcpy(u0[0], mH[0]);
-        memcpy(u1[0], mH[1]);
-        memcpy(u0[0 + 128], mH[0]);
-        memcpy(u1[0 + 128], mH[1]);
-
-        for (u64 i = 1; i < keySize; ++i)
-        {
-            auto h0lsb = mH[(i - 1) * 2 + 0];
-            auto h0msb = mH[(i - 1) * 2 + 1];
-            auto h1lsb = mH[i * 2 + 0];
-            auto h1msb = mH[i * 2 + 1];
-
-            // h[i] += h[i-1];
-            mod3Add(h1msb, h1lsb, h0msb, h0lsb, h1msb, h1lsb);
-
-            // u[i      ] = h[i]
-            // u[i + 128] = h[i]
-            memcpy(u0[i], h1lsb);
-            memcpy(u1[i], h1msb);
-            memcpy(u0[i + 128], h1lsb);
-            memcpy(u1[i + 128], h1msb);
-        }
-
-        mH = {};
+        AltModPrf::mACode.encode(v1, v0, u1, u0);
+        v0 = {};
+        v1 = {};
     }
 
 
@@ -1095,7 +1011,8 @@ namespace secJoin
             uu0 = oc::Matrix<block>{},
             uu1 = oc::Matrix<block>{},
             v = oc::Matrix<block>{},
-            xkShares = oc::Matrix<block>{},
+            xk0 = oc::Matrix<block>{},
+            xk1 = oc::Matrix<block>{},
             msg = oc::Matrix<block>{},
             pre = macoro::eager_task<>{},
             otRecv = OtRecv{}
@@ -1127,7 +1044,7 @@ namespace secJoin
             MC_AWAIT(sock.recv(ots));
             for (u64 i = 0; i < ots.size(); ++i)
             {
-                auto ki = *oc::BitIterator((u8*)&mPrf.mKey, i);
+                auto ki = *oc::BitIterator((u8*)&mPrf.mExpandedKey, i);
                 if (ots[i][ki] != mKeyOTs[i].getSeed())
                 {
                     std::cout << "bad key ot " << i << "\nki=" << ki << " " << mKeyOTs[i].getSeed() << " vs \n"
@@ -1142,26 +1059,28 @@ namespace secJoin
         // for each bit of the key, perform an OT derandomization where we get a share
         // of the input x times the key mod 3. We store the LSB and MSB of the share separately.
         // Hence we need 2 * AltModPrf::KeySize rows in xkShares
-        xkShares.resize(2 * AltModPrf::KeySize, oc::divCeil(y.size(), 128), oc::AllocType::Uninitialized);
+        xk0.resize(AltModPrf::KeySize, oc::divCeil(y.size(), 128), oc::AllocType::Uninitialized);
+        xk1.resize(AltModPrf::KeySize, oc::divCeil(y.size(), 128), oc::AllocType::Uninitialized);
         for (i = 0; i < AltModPrf::KeySize;)
         {
-            msg.resize(StepSize, xkShares.cols() * 2); // y.size() * 256 * 2 bits
+            msg.resize(StepSize, xk0.cols() * 2); // y.size() * 256 * 2 bits
             MC_AWAIT(sock.recv(msg));
             for (u64 k = 0; k < StepSize; ++i, ++k)
             {
-                u8 ki = *oc::BitIterator((u8*)&mPrf.mKey, i);
+                u8 ki = *oc::BitIterator((u8*)&mPrf.mExpandedKey, i);
 
-                auto msbShare = xkShares[i * 2 + 1];
-                auto lsbShare = xkShares[i * 2 + 0];
+                auto lsbShare = xk0[i];
+                auto msbShare = xk1[i];
                 if (ki)
                 {
-                    auto shares = span<block>(lsbShare.data(), lsbShare.size() * 2);
-                    assert(shares.data() + shares.size() == msbShare.data() + msbShare.size());
+                    auto msbMsg = msg[k].subspan(0, msbShare.size());
+                    auto lsbMsg = msg[k].subspan(msbShare.size(), lsbShare.size());
 
                     // ui = (hi1,hi0)                                   ^ G(OT(i,1))
                     //    = { [ G(OT(i,0))  + x  mod 3 ] ^ G(OT(i,1)) } ^ G(OT(i,1))
                     //    =     G(OT(i,0))  + x  mod 3 
-                    xorVectorOne(shares, msg[k], mKeyOTs[i]);
+                    xorVectorOne(msbShare, msbMsg, mKeyOTs[i]);
+                    xorVectorOne(lsbShare, lsbMsg, mKeyOTs[i]);
                 }
                 else
                 {
@@ -1174,14 +1093,15 @@ namespace secJoin
 
         if (mDebug)
         {
-            mDebugXkShares = xkShares;
+            mDebugXk0 = xk0;
+            mDebugXk1 = xk1;
         }
 
         // Compute u = H * xkShare mod 3
         buffer = {};
         u0.resize(AltModPrf::MidSize, oc::divCeil(y.size(), 128), oc::AllocType::Uninitialized);
         u1.resize(AltModPrf::MidSize, oc::divCeil(y.size(), 128), oc::AllocType::Uninitialized);
-        mtxMultA(std::move(xkShares), u1, u0);
+        mtxMultA(std::move(xk1), std::move(xk0), u1, u0);
 
         if (mDebug)
         {
@@ -1261,7 +1181,8 @@ namespace secJoin
             u1 = oc::Matrix<block>{},
             uu0 = oc::Matrix<block>{},
             uu1 = oc::Matrix<block>{},
-            xkShares = oc::Matrix<block>{},
+            xk0 = oc::Matrix<block>{},
+            xk1 = oc::Matrix<block>{},
             msg = oc::Matrix<block>{},
             v = oc::Matrix<block>{},
             pre = macoro::eager_task<>{},
@@ -1303,70 +1224,59 @@ namespace secJoin
 
         setTimePoint("DarkMatter.recver.begin");
 
+
+
         // we need x in a transformed format so that we can do SIMD operations.
-        xt.resize(128, oc::divCeil(y.size(), 128));
-        for (u64 i = 0, k = 0; i < y.size(); ++k)
-        {
-            auto m = std::min<u64>(128, y.size() - i);
-            oc::AlignedArray<block, 128> t;
-            for (u64 j = 0;j < m; ++j, ++i)
-            {
-                t[j] = x.data()[i];
-            }
-
-            oc::transpose128(t.data());
-
-            auto xtk = &xt(0, k);
-            auto step = xt.cols();
-            for (u64 j = 0;j < 128; ++j)
-            {
-                assert(xtk == &xt(j, k));
-                *xtk = t[j];
-                xtk += step;
-            }
-        }
+        xt.resize(AltModPrf::KeySize, oc::divCeil(y.size(), 128));
+        AltModPrf::expandInput(x, xt);
 
         static_assert(AltModPrf::KeySize % StepSize == 0, "we dont handle remainders. Should be true.");
 
         // for each bit of the key, perform an OT derandomization where we get a share
         // of the input x times the key mod 3. We store the LSB and MSB of the share separately.
         // Hence we need 2 * AltModPrf::KeySize rows in xkShares
-        xkShares.resize(2 * AltModPrf::KeySize, oc::divCeil(x.size(), 128), oc::AllocType::Uninitialized);
+        xk0.resize(AltModPrf::KeySize, oc::divCeil(x.size(), 128), oc::AllocType::Uninitialized);
+        xk1.resize(AltModPrf::KeySize, oc::divCeil(x.size(), 128), oc::AllocType::Uninitialized);
         for (i = 0; i < AltModPrf::KeySize;)
         {
             assert(AltModPrf::KeySize % StepSize == 0);
-            msg.resize(StepSize, xkShares.cols() * 2);
+            msg.resize(StepSize, xk0.cols() * 2);
 
             for (u64 k = 0; k < StepSize; ++i, ++k)
             {
                 // we store them in swapped order to negate the value.
-                auto msbShare = xkShares[i * 2];
-                auto lsbShare = xkShares[i * 2 + 1];
+                auto msbShare = xk0[i];
+                auto lsbShare = xk1[i];
                 sampleMod3Lookup(mKeyOTs[i][0], msbShare, lsbShare);
+
+                auto msbMsg = msg[k].subspan(0, msbShare.size());
+                auto lsbMsg = msg[k].subspan(msbShare.size(), lsbShare.size());
 
                 // # hi = G(OT(i,0)) + x mod 3
                 mod3Add(
-                    msg[k].subspan(msbShare.size()),
-                    msg[k].subspan(0, msbShare.size()),
+                    msbMsg, lsbMsg,
                     msbShare, lsbShare,
                     xt[i]);
 
                 // ## msg = m ^ G(OT(i,1))
-                xorVector(msg[k], mKeyOTs[i][1]);
+                //xorVector(msg[k], mKeyOTs[i][1]);
+                xorVector(msbMsg, mKeyOTs[i][1]);
+                xorVector(lsbMsg, mKeyOTs[i][1]);
             }
 
             MC_AWAIT(sock.send(std::move(msg)));
         }
         if (mDebug)
         {
-            mDebugXkShares = xkShares;
+            mDebugXk0 = xk0;
+            mDebugXk1 = xk1;
         }
 
         // Compute u = H * xkShare mod 3
         buffer = {};
         u0.resize(AltModPrf::MidSize, oc::divCeil(x.size(), 128), oc::AllocType::Uninitialized);
         u1.resize(AltModPrf::MidSize, oc::divCeil(x.size(), 128), oc::AllocType::Uninitialized);
-        mtxMultA(std::move(xkShares), u1, u0);
+        mtxMultA(std::move(xk1), std::move(xk0), u1, u0);
 
         if (mDebug)
         {

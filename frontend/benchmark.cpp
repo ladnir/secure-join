@@ -111,7 +111,7 @@ namespace secJoin
         {
             sk[i][0] = oc::block(i, 0);
             sk[i][1] = oc::block(i, 1);
-            rk[i] = oc::block(i, *oc::BitIterator((u8*)&sender.mPrf.mKey, i));
+            rk[i] = oc::block(i, *oc::BitIterator((u8*)&sender.mPrf.mExpandedKey, i));
         }
         sender.setKeyOts(kk, rk);
         recver.setKeyOts(sk);
@@ -185,6 +185,40 @@ namespace secJoin
         }
     }
 
+    void AltMod_expandA_benchmark(const oc::CLP& cmd)
+    {
+
+        F3AccPermCode c;
+        auto l = cmd.getOr("n",1<< cmd.getOr("nn", 18));
+        auto k = cmd.getOr("k", 128 * 4);
+        auto p = cmd.getOr("p", 0);
+        auto batch = 1ull<<cmd.getOr("b", 10);
+        auto n = k / 2;
+        c.init(k, n, p);
+
+        {
+            oc::Matrix<block>msb(k, l/128), lsb(k, l / 128);
+            oc::Matrix<block>msbOut(n, l / 128), lsbOut(n, l / 128);
+            PRNG prng(oc::ZeroBlock);
+            sampleMod3Lookup(prng, msb, lsb);
+
+
+            auto msb2 = msb;
+            auto lsb2 = lsb;
+
+
+            oc::Timer timer;
+            auto b = timer.setTimePoint("begin");
+            c.encode(msb2, lsb2, msbOut, lsbOut, batch);
+
+            auto e = timer.setTimePoint("end");
+
+            std::cout << "multA n:" << l << ", " <<
+                std::chrono::duration_cast<std::chrono::milliseconds>(e - b).count() << "ms " << std::endl;;
+        }
+
+    }
+
     void AltMod_sampleMod3_benchmark(const oc::CLP& cmd)
     {
         u64 n = cmd.getOr("n", 1ull << cmd.getOr("nn", 16));
@@ -202,7 +236,7 @@ namespace secJoin
             std::cout << "mod3lookup n:" << n << ", " <<
                 std::chrono::duration_cast<std::chrono::milliseconds>(e - b).count() << "ms " << std::endl;;
         }
-        if(cmd.isSet("old"))
+        if (cmd.isSet("old"))
         {
             oc::AlignedUnVector<u8> bb;
             oc::Timer timer;

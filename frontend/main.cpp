@@ -25,9 +25,14 @@ int main(int argc, char** argv)
             Radix_benchmark(clp);
             return 0;
         }
-        if (clp.isSet("CompressB"))
+        if (clp.isSet("bmult"))
         {
             AltMod_compressB_benchmark(clp);
+            return 0;
+        }
+        if (clp.isSet("amult"))
+        {
+            AltMod_expandA_benchmark(clp);
             return 0;
         }
         if (clp.isSet("transpose"))

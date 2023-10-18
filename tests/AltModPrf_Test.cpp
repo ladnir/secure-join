@@ -7,6 +7,7 @@
 
 #include "cryptoTools/Common/TestCollection.h"
 #include "secure-join/Util/Util.h"
+#include "secure-join/Prf/F3LinearCode.h"
 
 using namespace secJoin;
 
@@ -494,9 +495,85 @@ void AltModPrf_sampleMod3_test(const oc::CLP& cmd)
     //sampleMod3(prng, buff);
 }
 
+void AltModPrf_AMult_test(const oc::CLP& cmd)
+{
+    F3AccPermCode c;
+    auto k = cmd.getOr("k", 128);
+    auto n = cmd.getOr("n", k / 2);
+    auto l = cmd.getOr("l", 1 << 4);
+    auto p = cmd.getOr("p", 0);
+
+    c.init(k, n, p);
+
+    //std::cout << c << std::endl;
+    {
+        auto m = c.getMatrix();
+        std::vector<u8> v(k), y(n);
+        PRNG prng(oc::ZeroBlock);
+        for (u64 j = 0; j < k;++j)
+            v[j] = prng.get<u8>() % 3;
+
+        auto vv = v;
+        auto yy = y;
+        c.encode<u8>(vv, y);
+
+        for (u64 i = 0; i < n; ++i)
+        {
+            for (u64 j = 0; j < k;++j)
+            {
+                yy[i] = (yy[i] + (v[j] * m(i, j))) % 3;
+            }
+        }
+
+        if (yy != y)
+            throw RTE_LOC;
+    }
+
+    {
+        oc::Matrix<block>msb(k, l), lsb(k, l);
+        oc::Matrix<block>msbOut(n, l), lsbOut(n, l);
+        PRNG prng(oc::ZeroBlock);
+        sampleMod3Lookup(prng, msb, lsb);
+
+
+        auto msb2 = msb;
+        auto lsb2 = lsb;
+        c.encode(msb2, lsb2, msbOut, lsbOut);
+
+        for (u64 i = 0; i < l * 128; ++i)
+        {
+            std::vector<u8> v(k), y(n), yy(n);
+            for (u64 j = 0; j < k; ++j)
+                v[j] = bit(lsb[j].data(), i) + bit(msb[j].data(), i) * 2;
+            for (u64 j = 0; j < n; ++j)
+                y[j] = bit(lsbOut[j].data(), i) + bit(msbOut[j].data(), i) * 2;
+
+            c.encode<u8>(v, yy);
+
+            if (y != yy)
+            {
+                std::cout << "v  ";
+                for (u64 j = 0; j < k; ++j)
+                    std::cout << (int)v[j] << " ";
+                std::cout << std::endl;
+                std::cout << "y  ";
+                for (u64 j = 0; j < n; ++j)
+                    std::cout << (int)y[j] << " ";
+                std::cout << std::endl << "yy ";
+                for (u64 j = 0; j < n; ++j)
+                    std::cout << (int)yy[j] << " ";
+                std::cout << std::endl;
+                throw RTE_LOC;
+            }
+        }
+    }
+}
+
+
+
 void AltModPrf_BMult_test(const oc::CLP& cmd)
 {
-    u64 n = 1ull<< cmd.getOr("nn", 16);
+    u64 n = 1ull << cmd.getOr("nn", 16);
     u64 n128 = n / 128;
     oc::Matrix<oc::block> v(256, n128);
     std::vector<block256> V(n);
@@ -657,8 +734,8 @@ void AltModPrf_mod2_test(const oc::CLP& cmd)
 
     sender.init(n);
     recver.init(n);
-//    sender.request(ole0);
-//    recver.request(ole1);
+    //    sender.request(ole0);
+    //    recver.request(ole1);
     sender.mOleReq = ole0.binOleRequest(u0s[0].rows() * u0s[0].cols() * 256);
     recver.mOleReq = ole1.binOleRequest(u0s[0].rows() * u0s[0].cols() * 256);
 
@@ -757,7 +834,7 @@ void AltModPrf_mod3_test(const oc::CLP& cmd)
 
         mod3Add(
             span<oc::block>(&A, 1), span<oc::block>(&B, 1),
-            span<oc::block>(&A, 1), span<oc::block>(&B, 1), 
+            span<oc::block>(&A, 1), span<oc::block>(&B, 1),
             span<oc::block>(&C, 1));
 
         if (Z0 != B)
@@ -785,7 +862,7 @@ void AltModPrf_plain_test()
 
         for (u64 i = 0; i < x.size(); ++i)
             x[i] = xx ^ oc::block(i, i);
-        oc::mAesFixedKey.hashBlocks<AltModPrf::KeySize / 128>(x.data(), x.data());
+        oc::mAesFixedKey.hashBlocks<x.size() - 1>(x.data()+1, x.data()+1);
     }
     else
         x[0] = xx;
@@ -802,7 +879,7 @@ void AltModPrf_plain_test()
     for (u64 i = 0; i < n; ++i)
     {
         X[i] = *oc::BitIterator((u8*)&x, i);
-        K[i] = *oc::BitIterator((u8*)&prf.mKey, i);
+        K[i] = *oc::BitIterator((u8*)&prf.mExpandedKey, i);
         H[i] = X[i] & K[i];
 
         //if (i < 20)
@@ -811,7 +888,7 @@ void AltModPrf_plain_test()
     }
     for (u64 i = 0; i < t; ++i)
     {
-        u64 j = 0; 
+        u64 j = 0;
         for (; j < 128; ++j)
             B(i, j) = j == i ? 1 : 0;
         for (; j < m; ++j)
@@ -820,76 +897,10 @@ void AltModPrf_plain_test()
         }
     }
 
-    //oc::DenseMtx Accumulator(X.size(), X.size());
-    //oc::DenseMtx Expander(X.size() / 2, X.size());
+    AltModPrf::mACode.encode<u64>(H, U);
 
-    //for (u64 i = 0; i < X.size(); ++i)
-    //{
-    //    for (u64 j = 0; j <= i; ++j)
-    //    {
-    //        Accumulator(i, j) = 1;
-    //    }
-
-    //    Expander(i / 2, prf.mPi[i]) = 1;
-    //}
-
-    //auto C = Expander * Accumulator;
-
-    //std::cout << "C\n" << C << std::endl;
-
-    //mult(C, H, U);
-    {
-        //assert(mPi.size() != 0);
-
-        //for (u64 k = 0; k < prf.KeySize; ++k)
-        //{
-        //    U[k] = H[k];
-        //}
-        if (prf.KeySize == 256)
-        {
-
-            U[0] = H[0];
-            for (u64 k = 1; k < prf.KeySize; ++k)
-            {
-                U[k] = H[k] + U[k - 1];
-                U[k] %= 3;
-            }
-        }
-        else if (prf.KeySize == 128)
-        {
-
-            U[0] = H[0];
-            for (u64 k = 1; k < prf.KeySize; ++k)
-            {
-                U[k] = H[k] + U[k - 1];
-                U[k] %= 3;
-            }
-            for (u64 k = 0; k < prf.KeySize; ++k)
-            {
-                U[k + 128] = U[k];
-                //U[k + 128] %= 3;
-            }
-        }
-        else
-        {
-            assert(0);
-        }
-
-        //auto pik = prf.mPi.data();
-        //for (u64 k = 0; k < m; ++k)
-        //{
-        //    U[k] = (
-        //        H[pik[0]] +
-        //        H[pik[1]]
-        //        ) % 3;
-        //    pik += 2;
-        //}
-    }
     for (u64 i = 0; i < m; ++i)
     {
-        //if (i < 20)
-        //    std::cout << "U[" << i << "] = " << (U[i] % 3) << std::endl;
-
         W[i] = (U[i] % 3) % 2;
     }
     for (u64 i = 0; i < t; ++i)
@@ -934,9 +945,7 @@ void AltModPrf_proto_test(const oc::CLP& cmd)
     PRNG prng1(oc::OneBlock);
 
     AltModPrf dm;
-    oc::block kk;
-    kk = prng0.get();
-    dm.setKey(kk);
+    dm.setKey(prng0.get());
     //sender.setKey(kk);
 
     CorGenerator ole0, ole1;
@@ -953,9 +962,9 @@ void AltModPrf_proto_test(const oc::CLP& cmd)
     {
         sk[i][0] = oc::block(i, 0);
         sk[i][1] = oc::block(i, 1);
-        rk[i] = oc::block(i, *oc::BitIterator((u8*)&kk, i));
+        rk[i] = oc::block(i, *oc::BitIterator((u8*)&dm.mExpandedKey, i));
     }
-    sender.setKeyOts(kk,rk);
+    sender.setKeyOts(dm.getKey(), rk);
     recver.setKeyOts(sk);
 
     auto r = coproto::sync_wait(coproto::when_all_ready(
@@ -976,6 +985,9 @@ void AltModPrf_proto_test(const oc::CLP& cmd)
     if (noCheck)
         return;
 
+    oc::Matrix<block> xt(AltModPrf::KeySize, oc::divCeil(n, 128));
+    AltModPrf::expandInput(x, xt);
+
     for (u64 ii = 0; ii < n; ++ii)
     {
         oc::block y;
@@ -984,30 +996,26 @@ void AltModPrf_proto_test(const oc::CLP& cmd)
 
             std::array<u16, sender.mPrf.KeySize> h;
             std::array<oc::block, sender.mPrf.KeySize / 128> X;
-            if (sender.mPrf.KeySize / 128 > 1)
-            {
-                for (u64 i = 0; i < X.size(); ++i)
-                    X[i] = x[ii] ^ oc::block(i, i);
-                oc::mAesFixedKey.hashBlocks<X.size()>(X.data(), X.data());
-            }
-            else
-            {
-                X[0] = x[ii];
-            }
+            AltModPrf::expandInput(x[ii], X);
 
-            auto kIter = oc::BitIterator((u8*)sender.mPrf.mKey.data());
+
+
+            auto kIter = oc::BitIterator((u8*)sender.mPrf.mExpandedKey.data());
             auto xIter = oc::BitIterator((u8*)X.data());
             for (u64 i = 0; i < sender.mPrf.KeySize; ++i)
             {
+                if (bit(X, i) != bit(xt[i].data(), ii))
+                    throw RTE_LOC;
+
                 u8 xi = *xIter;
                 u8 ki = *kIter;
                 h[i] = ki & xi;
 
-                assert(recver.mDebugXkShares.cols() == oc::divCeil(x.size(), 128));
-                auto r0 = bit(recver.mDebugXkShares.data(i * 2 + 0), ii);
-                auto r1 = bit(recver.mDebugXkShares.data(i * 2 + 1), ii);
-                auto s0 = bit(sender.mDebugXkShares.data(i * 2 + 0), ii);
-                auto s1 = bit(sender.mDebugXkShares.data(i * 2 + 1), ii);
+                assert(recver.mDebugXk0.cols() == oc::divCeil(x.size(), 128));
+                auto r0 = bit(recver.mDebugXk0.data(i), ii);
+                auto r1 = bit(recver.mDebugXk1.data(i), ii);
+                auto s0 = bit(sender.mDebugXk0.data(i), ii);
+                auto s1 = bit(sender.mDebugXk1.data(i), ii);
 
 
                 auto s = 2 * s1 + s0;

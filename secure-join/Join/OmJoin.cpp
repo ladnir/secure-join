@@ -40,7 +40,7 @@ namespace secJoin
         else
         {
             PRNG prng(oc::ZeroBlock);
-            oc::LinearCode code;
+            oc::F2LinearCode code;
             code.random(prng, bits, compressesSize);
 
             BinMatrix keys(rows0 + rows1, bits);

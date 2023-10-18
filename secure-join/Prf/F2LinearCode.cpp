@@ -1,4 +1,4 @@
-#include "LinearCode.h"
+#include "F2LinearCode.h"
 #include <fstream>
 #include <cryptoTools/Common/BitVector.h>
 #include <cryptoTools/Common/Log.h>
@@ -13,7 +13,7 @@
 
 namespace secJoin
 {
-    void LinearCode::init(oc::Matrix<u8> g)
+    void F2LinearCode::init(oc::Matrix<u8> g)
     {
         //mCodewordBitSize = g.cols() * 8;
         mInputByteSize = oc::divCeil(g.rows(), 8);
@@ -28,7 +28,7 @@ namespace secJoin
         generateSubcodes();
     }
 
-    //void LinearCode::random(PRNG& prng, u64 inputSize, u64 outputSize)
+    //void F2LinearCode::random(PRNG& prng, u64 inputSize, u64 outputSize)
     //{
     //    mG.resize(inputSize, codewordBlkSize());
 
@@ -43,7 +43,7 @@ namespace secJoin
     // in the table Ti. Ti[x] will be the codeword.
     //
     // The final codeword is then compute as T1[x1] + T2[x2] + ... + Tm[xm]
-    void LinearCode::generateSubcodes()
+    void F2LinearCode::generateSubcodes()
     {
         if (mG.rows() > sLinearCodePlainTextMaxSize * 8)
         {
@@ -85,7 +85,7 @@ namespace secJoin
     }
 
 
-//    void LinearCode::encode(
+//    void F2LinearCode::encode(
 //        const span<block>& plaintxt,
 //        const span<block>& codeword)
 //    {
@@ -98,7 +98,7 @@ namespace secJoin
 //    }
 //
 //
-//    void LinearCode::encode(
+//    void F2LinearCode::encode(
 //        const span<u8>& plaintxt,
 //        const span<u8>& codeword)
 //    {

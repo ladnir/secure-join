@@ -8,14 +8,10 @@
 #include <bitset>
 #include "libOTe/Tools/Tools.h"
 #include "macoro/optional.h"
-#include "LinearCode.h"
+#include "F2LinearCode.h"
+#include "F3LinearCode.h"
 
 // TODO:
-// * replace sample mod 3 with lookup table. 3^5 = 243. 
-//   We can take a byte [0,1,...,255] and use it as a lookup.
-//   If we get less than 243, we produce 5 uniformly random 
-//   mod 3 values. Otherwise we reject that byte.
-// 
 // * Look into using mod 3 vole for the mod conversion.
 // 
 // * implement batching for large number of inputs. Will get 
@@ -69,13 +65,14 @@ namespace secJoin
     class AltModPrf
     {
     public:
-        static const std::array<oc::block, 128> mB;//, mBShuffled;
+        static const std::array<oc::block, 128> mB;
         static const std::array<std::array<u8, 128>, 128> mBExpanded;
 
-        static LinearCode mBCode;
+        static F2LinearCode mBCode;
+        static F3AccPermCode mACode;
 
         // the bit count of the key
-        static constexpr auto KeySize = 128;
+        static constexpr auto KeySize = 128 * 4;
 
         // the bit count of the middle layer
         static constexpr auto MidSize = 256;
@@ -83,19 +80,17 @@ namespace secJoin
         // the bit count of output layer
         static constexpr auto OutSize = 128;
 
-        std::array<oc::block, KeySize / 128> mKey;
+        using KeyType = std::array<oc::block, KeySize / 128>;
+        KeyType mExpandedKey;
 
 
         // set the key
         void setKey(oc::block k);
 
-        // compute y = F(k,x)
-        void eval(span<oc::block> x,span<oc::block> y)
-        {
-            for (u64 i = 0; i < x.size(); ++i)
-                y[i] = eval(x[i]);
-        }
+        block getKey() const { return mExpandedKey[0]; }
 
+        // compute y = F(k,x)
+        void eval(span<oc::block> x, span<oc::block> y);
         // compute y = F(k,x)
         oc::block eval(oc::block x);
 
@@ -104,9 +99,10 @@ namespace secJoin
         
         static oc::block compress(block256& w);
 
-        //static oc::block shuffledCompress(block256& w);
-
         static oc::block compress(block256& w, const std::array<oc::block, 128>& B);
+
+        static void expandInput(block x, KeyType& expanded);
+        static void expandInput(span<block> x, oc::MatrixView<block> expanded);
     };
 
 
@@ -141,7 +137,7 @@ namespace secJoin
         OtRecvRequest mKeyReq;
 
         // variables that are used for debugging.
-        oc::Matrix<oc::block> mDebugXkShares, mDebugU0, mDebugU1,mDebugV;
+        oc::Matrix<oc::block> mDebugXk0, mDebugXk1, mDebugU0, mDebugU1,mDebugV;
 
         AltModPrfSender() = default;
         AltModPrfSender(const AltModPrfSender&) = default;
@@ -168,7 +164,7 @@ namespace secJoin
             mHasKeyOts = false;
             mHasPrepro = false;
             mInputSize = 0;
-            memset(mPrf.mKey.data(), 0, sizeof(mPrf.mKey));
+            memset(mPrf.mExpandedKey.data(), 0, sizeof(mPrf.mExpandedKey));
         }
 
         // return true if correlated randomness has been requested.
@@ -226,7 +222,7 @@ namespace secJoin
         oc::block getKey() const {
             if (mHasKeyOts == false)
                 throw RTE_LOC;
-            return mPrf.mKey;
+            return mPrf.mExpandedKey[0];
         }
 
         // returns a key derivation of the key OTs. This can safely be used by another instance.
@@ -309,7 +305,7 @@ namespace secJoin
         OtSendRequest mKeyReq;
 
         // variables that are used for debugging.
-        oc::Matrix<oc::block> mDebugXkShares,mDebugU0, mDebugU1, mDebugV;
+        oc::Matrix<oc::block> mDebugXk0, mDebugXk1, mDebugU0, mDebugU1, mDebugV;
 
         AltModPrfReceiver() = default;
         AltModPrfReceiver(const AltModPrfReceiver&) = default;
