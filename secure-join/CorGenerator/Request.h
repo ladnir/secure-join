@@ -11,6 +11,15 @@ namespace secJoin
 {
     struct GenState;
 
+    struct Session
+    {
+        // true if the base OTs has been started. This 
+        // will guard starting them to ensure only one 
+        // thread does it.
+        std::atomic<bool> mBaseStarted = false;
+    };
+
+
     struct RequestState : std::enable_shared_from_this<RequestState>
     {
         RequestState(CorType t, u64 size, std::shared_ptr<GenState>&, u64 idx);
@@ -37,6 +46,9 @@ namespace secJoin
 
         // The core state.
         std::shared_ptr<GenState> mGenState;
+
+        // a session is a object that tracts per base OT batch information.
+        std::shared_ptr<Session> mSession;
 
         // set by the batch when it completes.
         //macoro::async_manual_reset_event mDone;

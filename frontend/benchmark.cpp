@@ -94,7 +94,7 @@ namespace secJoin
         PRNG prng1(oc::OneBlock);
 
         AltModPrf dm;
-        oc::block kk;
+        AltModPrf::KeyType kk;
         kk = prng0.get();
         dm.setKey(kk);
         //sender.setKey(kk);

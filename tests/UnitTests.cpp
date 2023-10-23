@@ -29,6 +29,8 @@ namespace secJoin_Tests
 
             t.add("CorGenerator_Ot_Test                          ", CorGenerator_Ot_Test);
             t.add("CorGenerator_BinOle_Test                      ", CorGenerator_BinOle_Test);
+            t.add("CorGenerator_mixed_Test                       ", CorGenerator_mixed_Test);
+            
             //t.add("Generator_BinOle_Test                         ", Generator_BinOle_Test);
             //t.add("Generator_Ot_Test                             ", Generator_Ot_Test);
             //t.add("Generator_ArithTriple_Test                    ", Generator_ArithTriple_Test);

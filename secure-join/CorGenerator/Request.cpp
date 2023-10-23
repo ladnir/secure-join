@@ -11,7 +11,14 @@ namespace secJoin
         , mSize(size)
         , mGenState(state)
         , mReqIndex(idx)
-    { }
+        , mSession(state->mSession)
+    { 
+        if (!mSession)
+        {
+            std::cout << "CorGenerator Session == nullptr. " LOCATION << std::endl;
+            std::terminate();
+        }
+    }
 
 
     void RequestState::addBatch(BatchOffset b)
@@ -44,9 +51,10 @@ namespace secJoin
             tasks = std::vector<macoro::eager_task<>>{}
         );
         // check to see if the base OTs have been started.
-        s = mGenState->mGenerationInProgress.exchange(true);
+        s = mSession->mBaseStarted.exchange(true);
         if (s == false)
         {
+            mGenState->mSession = {};
             MC_AWAIT(mGenState->startBaseOts());
         }
 

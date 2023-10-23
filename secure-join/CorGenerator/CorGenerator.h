@@ -37,9 +37,7 @@ namespace secJoin
         oc::SoftSpokenShOtReceiver<> mRecvBase;
 
 
-
-        // all of the batches. 
-        //std::vector<std::shared_ptr<Batch>> mBatches;
+        std::shared_ptr<Session> mSession;
 
         // all of the requests. These are broken down into batches.
         std::vector<std::shared_ptr<RequestState>> mRequests;
@@ -52,11 +50,6 @@ namespace secJoin
 
         // the size that a batch of OT/OLEs should be generated in.
         u64 mBatchSize = 0;
-
-        // true if the base OTs has been started. This 
-        // will guard starting them to ensure only one 
-        // thread does it.
-        std::atomic<bool> mGenerationInProgress = false;
 
         // true if we should just fake the correlation generation
         bool mMock = false;
@@ -96,10 +89,10 @@ namespace secJoin
             mGenState->set(rb);
         }
 
-        bool started()const
-        {
-            return mGenState && mGenState->mGenerationInProgress;
-        }
+        //bool started()const
+        //{
+        //    return mGenState && mGenState->mGenerationInProgress;
+        //}
 
         bool initialized()const
         {
@@ -112,6 +105,37 @@ namespace secJoin
                 throw RTE_LOC;
             return mGenState->mPartyIdx;
         }
+
+        //std::unordered_map<CorType, std::vector<std::shared_ptr<RequestState>>> getRequestsByType() const
+        //{
+        //    std::unordered_map < CorType, std::vector<std::shared_ptr<RequestState>>> r;
+        //    for (u64 i = 0; i < mGenState->mRequests.size(); ++i)
+        //        r[mGenState->mRequests[i]->mType].push_back(mGenState->mRequests[i]);
+        //    return r;
+        //}
+
+        //bool operator==(const CorGenerator& o) const
+        //{
+        //    auto res0 = getRequestsByType();
+        //    auto res1 = o.getRequestsByType();
+        //    if (res0.size() != res1.size())
+        //        return false;
+
+        //    for (auto& s0 : res0)
+        //    {
+        //        if (res1.find(s0.first) == res1.end())
+        //            return false;
+
+        //        auto& s1 = res1[s0.first];
+
+        //        if (s0.second.size() != s1.size())
+        //            return false;
+
+        //        if()
+        //    }
+
+        //    return true;
+        //}
 
     private:
 

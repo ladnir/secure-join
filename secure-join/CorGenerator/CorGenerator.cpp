@@ -2,14 +2,17 @@
 #include "macoro/macros.h"
 #include "BinOleBatch.h"
 #include "OtBatch.h"
+#include <map>
 
 namespace secJoin
 {
 
     std::shared_ptr<RequestState> CorGenerator::request(CorType t, u64  n)
     {
-        if (mGenState->mGenerationInProgress)
-            throw std::runtime_error("correlations can not be requested while another batch is in progress. " LOCATION);
+        if (mGenState->mSession == nullptr)
+            mGenState->mSession = std::make_shared<Session>();
+//        if (mGenState->mSession->mBaseStarted)
+//            throw std::runtime_error("correlations can not be requested while another batch is in progress. " LOCATION);
         auto r = std::make_shared<RequestState>(t, n, mGenState, mGenState->mRequests.size());
         mGenState->mRequests.push_back(r);
         return r;
@@ -38,18 +41,36 @@ namespace secJoin
             req = BaseRequest{},
             reqs = std::vector<BaseRequest>{},
             temp = std::vector<u8>{},
-            res = macoro::result<void>{}
-
+            res = macoro::result<void>{},
+            reqChecks = std::map<CorType, oc::RandomOracle>{},
+            hash = block{},
+            theirHash = block{}
         );
 
-        if (!mGenerationInProgress)
-            std::terminate();
+        //if (!mGenerationInProgress)
+        //    std::terminate();
 
         if (mMock)
         {
-            mGenerationInProgress = false;
+            //mGenerationInProgress = false;
             for (i = 0;i < mRequests.size(); ++i)
             {
+
+                auto swap = [](CorType t, u64 p)
+                {
+                    if (p)
+                    {
+                        if (t == CorType::RecvOt)
+                            t = CorType::SendOt;
+                        else if (t == CorType::SendOt)
+                            t = CorType::RecvOt;
+                    }
+                    return t;
+                };
+
+                //std::cout << "req r " << mPartyIdx<< " t " << int(mRequests[i]->mType) << " s " << mRequests[i]->mSize << std::endl;
+                reqChecks[swap(mRequests[i]->mType, mPartyIdx)].Update(mRequests[i]->mSize);
+
                 for (j = 0;j < mRequests[i]->mSize;)
                 {
                     std::shared_ptr<Batch>& batch = [&]() {
@@ -87,6 +108,28 @@ namespace secJoin
 
                 mRequests[i] = nullptr;
             }
+
+            hash = oc::ZeroBlock;
+            for (auto& c : reqChecks)
+            {
+                std::array<u8, oc::RandomOracle::HashSize> b;
+                oc::RandomOracle ro(16);
+                ro.Update(c.first);
+                c.second.Final(b);
+                ro.Update(b);
+                ro.Update(hash);
+                ro.Final<block>(hash);
+                //std::cout << " H = " << int(c.first) << " " << hash << " " << *(int*)b.data() << std::endl;
+            }
+
+            MC_AWAIT(mSock.send(std::move(hash)));
+            MC_AWAIT(mSock.recv(theirHash));
+            if (hash != theirHash)
+            {
+                std::cout << "request state mismatch. " LOCATION << std::endl;
+                throw RTE_LOC;
+            }
+
             mRequests = {};
             MC_RETURN_VOID();
         }
@@ -198,7 +241,7 @@ namespace secJoin
             batch.mHaveBase.set();
         }
 
-        mGenerationInProgress = false;
+        //mGenerationInProgress = false;
 
         MC_END();
     }

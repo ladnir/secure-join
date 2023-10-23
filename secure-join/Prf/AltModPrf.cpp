@@ -751,14 +751,14 @@ namespace secJoin
         xorVectorOne(out.subspan(0, m0.size()), m0, prng);
     }
 
-    void  AltModPrf::setKey(block k)
+    void  AltModPrf::setKey(AltModPrf::KeyType k)
     {
-        mExpandedKey[0] = k;
-        mExpandedKey[1] = oc::mAesFixedKey.hashBlock(k);
-        mExpandedKey[2] = oc::mAesFixedKey.hashBlock(k ^ oc::block(4234473534532, 452878778345324));
-        mExpandedKey[3] = oc::mAesFixedKey.hashBlock(k ^ oc::block(35746745624534, 876876787665423));
+        mExpandedKey = k;
+        //mExpandedKey[1] = oc::mAesFixedKey.hashBlock(k);
+        //mExpandedKey[2] = oc::mAesFixedKey.hashBlock(k ^ oc::block(4234473534532, 452878778345324));
+        //mExpandedKey[3] = oc::mAesFixedKey.hashBlock(k ^ oc::block(35746745624534, 876876787665423));
 
-        static_assert(KeyType{}.size() == 4, "assumed");
+        //static_assert(KeyType{}.size() == 4, "assumed");
     }
 
     void  AltModPrf::mtxMultA(const std::array<u16, KeySize>& hj, block256m3& uj)
@@ -858,8 +858,37 @@ namespace secJoin
 
     void AltModPrf::eval(span<block> x, span<block> y)
     {
-        for (u64 i = 0; i < x.size(); ++i)
-            y[i] = eval(x[i]);
+        //for (u64 i = 0; i < x.size(); ++i)
+        //    y[i] = eval(x[i]);
+        //return;
+
+        oc::Matrix<block> xt,xk0,xk1,u0,u1;
+
+        // we need x in a transformed format so that we can do SIMD operations.
+        xt.resize(AltModPrf::KeySize, oc::divCeil(y.size(), 128));
+        AltModPrf::expandInput(x, xt);
+
+        xk0.resize(AltModPrf::KeySize, oc::divCeil(x.size(), 128), oc::AllocType::Uninitialized);
+        xk1.resize(AltModPrf::KeySize, oc::divCeil(x.size(), 128), oc::AllocType::Uninitialized);
+        for (u64 i = 0; i < KeySize; ++i)
+        {
+            if (bit(mExpandedKey, i))
+            {
+                memcpy(xk0[i], xt[i]);
+            }
+            else
+                memset(xk0[i], 0);
+
+            memset(xk1[i], 0);
+        }
+
+        u0.resize(AltModPrf::MidSize, oc::divCeil(x.size(), 128), oc::AllocType::Uninitialized);
+        u1.resize(AltModPrf::MidSize, oc::divCeil(x.size(), 128), oc::AllocType::Uninitialized);
+
+        AltModPrf::mACode.encode(xk1, xk0, u1, u0);
+
+        compressB(u0, y);
+
     }
 
 
@@ -907,7 +936,7 @@ namespace secJoin
     }
 
 
-    void AltModPrfSender::setKeyOts(block k, span<block> ots)
+    void AltModPrfSender::setKeyOts(AltModPrf::KeyType k, span<block> ots)
     {
         if (ots.size() != AltModPrf::KeySize)
             throw RTE_LOC;
@@ -1029,7 +1058,9 @@ namespace secJoin
         if (mKeyReq.size())
         {
             MC_AWAIT(mKeyReq.get(otRecv));
-            auto k = otRecv.mChoice.getSpan<block>()[0];
+            if (oc::divCeil(otRecv.mChoice.size(), 8) != sizeof(AltModPrf::KeyType))
+                throw RTE_LOC;
+            auto k = otRecv.mChoice.getSpan<AltModPrf::KeyType>()[0];
             setKeyOts(k, otRecv.mMsg);
         }
 

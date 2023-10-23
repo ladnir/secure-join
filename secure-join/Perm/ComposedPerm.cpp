@@ -3,7 +3,7 @@
 namespace secJoin
 {
 
-    void ComposedPerm::setKeyOts(oc::block& key, std::vector<oc::block>& rk, std::vector<std::array<oc::block, 2>>& sk)
+    void ComposedPerm::setKeyOts(AltModPrf::KeyType& key, std::vector<oc::block>& rk, std::vector<std::array<oc::block, 2>>& sk)
     {
         mSender.setKeyOts(sk);
         mReceiver.setKeyOts(key, rk);

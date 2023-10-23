@@ -63,7 +63,7 @@ namespace secJoin
 
         // set the AltMod permutation protocol key OTs. These should be AltMod::KeySize OTs in both directions.
         void setKeyOts(
-            oc::block& key,
+            AltModPrf::KeyType& key,
             std::vector<oc::block>& rk,
             std::vector<std::array<oc::block, 2>>& sk)
         {

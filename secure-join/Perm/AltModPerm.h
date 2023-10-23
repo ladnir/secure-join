@@ -183,7 +183,7 @@ namespace secJoin
 
         void init(u64 n, u64 bytesPer = 0, macoro::optional<bool> keyGen = {})
         {
-            clear();
+            clearCorrelatedRandomness();
             mNumElems = n;
             mBytesPerRow = bytesPer;
             mByteOffset = bytesPer;
@@ -200,7 +200,7 @@ namespace secJoin
             mByteOffset = bytesPer;
         }
 
-        void setKeyOts(oc::block& key, std::vector<oc::block>& rk);
+        void setKeyOts(AltModPrf::KeyType& key, std::vector<oc::block>& rk);
 
         bool hasRequest() const { return mSender.hasRequest(); }
 

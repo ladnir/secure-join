@@ -33,10 +33,10 @@ void AdditivePerm_xor_test(const oc::CLP& cmd)
 
 
     // Setuping up the OT Keys
-    oc::block kk = prng.get();
-    std::vector<oc::block> rk(128);
-    std::vector<std::array<oc::block, 2>> sk(128);
-    for (u64 i = 0; i < 128; ++i)
+    AltModPrf::KeyType kk = prng.get();
+    std::vector<oc::block> rk(AltModPrf::KeySize);
+    std::vector<std::array<oc::block, 2>> sk(AltModPrf::KeySize);
+    for (u64 i = 0; i < AltModPrf::KeySize; ++i)
     {
         sk[i][0] = oc::block(i, 0);
         sk[i][1] = oc::block(i, 1);

@@ -3,7 +3,7 @@
 namespace secJoin
 {
 
-    void AltModPermReceiver::setKeyOts(oc::block& key, std::vector<oc::block>& rk)
+    void AltModPermReceiver::setKeyOts(AltModPrf::KeyType& key, std::vector<oc::block>& rk)
     {
         mSender.setKeyOts(key, rk);
     }
@@ -88,11 +88,12 @@ namespace secJoin
     // set if the caller wants to explicitly ask to perform AltMod keygen or not.
     void AltModPermSender::init(u64 n, u64 bytesPerRow, macoro::optional<bool> keyGen)
     {
-        clear();
+        //clear();
         mNumElems = n;
         mBytesPerRow = bytesPerRow;
         mByteOffset = bytesPerRow;
         mKeyGen = keyGen;
+        clearCorrelatedRandomness();
     }
 
     bool AltModPermSender::hasPreprocessing()const
@@ -151,7 +152,10 @@ namespace secJoin
             aes = oc::AES(),
             meta = SetupMeta(),
             pi = (const Perm*)nullptr,
-            eager = macoro::eager_task<>{});
+            eager = macoro::eager_task<>{},
+            debugB = oc::Matrix<oc::block>{},
+            debugInput = oc::Matrix<oc::block>{},
+            debugKey = AltModPrf::KeyType{});
 
         if (mNumElems == 0)
             throw std::runtime_error("AltModPermSender::init() must be called before setup. " LOCATION);
@@ -202,8 +206,27 @@ namespace secJoin
         }
         aes.ecbEncBlocks(mDelta, mDelta);
 
+        if (mDebug)
+            debugInput = mDelta;
+
         MC_AWAIT(mRecver.evaluate(mDelta, mDelta, chl, prng));
 
+        if (mDebug)
+        {
+            debugB.resize(mDelta.rows(), mDelta.cols());
+            MC_AWAIT(chl.recv(debugKey));
+            MC_AWAIT(chl.recv(debugB));
+
+            {
+                AltModPrf prf;
+                prf.setKey(debugKey);
+                for (u64 i = 0; i < debugB.size();++i)
+                {
+                    if ((mDelta(i) ^ debugB(i)) != prf.eval(debugInput(i)))
+                        throw RTE_LOC;
+                }
+            }
+        }
         
         if (eager.handle())
             MC_AWAIT(eager);
@@ -251,6 +274,12 @@ namespace secJoin
         // B = (AltMod(k,AES(k', pi(0))), ..., (AltMod(k,AES(k', pi(n-1)))))
         mB.resize(mNumElems, blocksPerRow);
         MC_AWAIT(mSender.evaluate(mB, chl, prng));
+
+        if (mDebug)
+        {
+            MC_AWAIT(chl.send(std::move(mSender.getKey())));
+            MC_AWAIT(chl.send(coproto::copy(mB)));
+        }
 
         // A = (AltMod(k,AES(k', 0)), ..., (AltMod(k,AES(k', n-1))))
         aes.setKey(meta.mKey);

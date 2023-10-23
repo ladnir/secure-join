@@ -1,6 +1,7 @@
 #include "AltModPerm_Test.h"
 
 using namespace secJoin;
+void AltModProtoCheck(AltModPrfSender& sender, AltModPrfReceiver& recver);
 
 /*
 This is the case where input has not
@@ -14,6 +15,7 @@ void AltModPerm_setup_test(const oc::CLP& cmd)
 {
     u64 n = cmd.getOr("n", 1000);
     u64 rowSize = cmd.getOr("m", 63);
+    bool debug = cmd.isSet("debug");
     // bool invPerm = false;
 
     PRNG prng0(oc::ZeroBlock);
@@ -34,21 +36,39 @@ void AltModPerm_setup_test(const oc::CLP& cmd)
     ole0.init(sock[0].fork(), prng0, 0, 1 << 14, cmd.getOr("mock", 1));
     ole1.init(sock[1].fork(), prng1, 1, 1 << 14, cmd.getOr("mock", 1));
 
-    // AltModPrf dm;
-    oc::block kk = prng0.get();
+    AltModPrf dm; dm.setKey(prng0.get());
+    //oc::block kk = prng0.get();
 
     // Setuping up the OT Keys
-    std::vector<oc::block> rk(128);
-    std::vector<std::array<oc::block, 2>> sk(128);
-    for (u64 i = 0; i < 128; ++i)
+    std::vector<oc::block> rk(AltModPrf::KeySize);
+    std::vector<std::array<oc::block, 2>> sk(AltModPrf::KeySize);
+    for (u64 i = 0; i < AltModPrf::KeySize; ++i)
     {
         sk[i][0] = oc::block(i, 0);
         sk[i][1] = oc::block(i, 1);
-        rk[i] = oc::block(i, *oc::BitIterator((u8*)&kk, i));
+        rk[i] = oc::block(i, *oc::BitIterator((u8*)&dm.mExpandedKey, i));
     }
     AltModPerm0.setKeyOts(sk);
-    AltModPerm1.setKeyOts(kk, rk);
+    AltModPerm1.setKeyOts(dm.getKey(), rk);
+    for (u64 i = 0; i < AltModPrf::KeySize; ++i)
+    {
+        auto ki = *oc::BitIterator((u8*)&AltModPerm1.mSender.mPrf.mExpandedKey, i);
+        if (AltModPerm0.mRecver.mKeyOTs[i][ki].getSeed() != AltModPerm1.mSender.mKeyOTs[i].getSeed())
+        {
+            std::cout << "bad key ot " << i << "\nki=" << ki << " " << AltModPerm1.mSender.mKeyOTs[i].getSeed() << " vs \n"
+                << AltModPerm0.mRecver.mKeyOTs[i][0].getSeed() << " " << AltModPerm0.mRecver.mKeyOTs[i][1].getSeed() << std::endl;
+            throw RTE_LOC;
+        }
+    }
+    if (AltModPerm1.mSender.getKey() != dm.getKey())
+        throw RTE_LOC;
+    if (AltModPerm1.mSender.mPrf.mExpandedKey != dm.mExpandedKey)
+        throw RTE_LOC;
 
+    AltModPerm0.mDebug = debug;
+    AltModPerm1.mDebug = debug;
+    AltModPerm0.mRecver.mDebug = debug;
+    AltModPerm1.mSender.mDebug = debug;
 
     //for (auto invPerm : { PermOp::Regular,PermOp::Inverse })
     {
@@ -73,6 +93,12 @@ void AltModPerm_setup_test(const oc::CLP& cmd)
         if (eq(aExp, permPiA) == false)
         {
             std::cout << "A & permuted A are not the same" << std::endl;
+
+            if (debug)
+            {
+                AltModProtoCheck(AltModPerm1.mSender, AltModPerm0.mRecver);
+            }
+
             throw RTE_LOC;
         }
     }
@@ -116,16 +142,21 @@ void AltModPerm_apply_test(const oc::CLP& cmd)
     ole1.init(sock[1].fork(), prng1, 1, 1 << 14, cmd.getOr("mock", 1));
 
 
+    AltModPerm0.init(n, rowSize);
+    AltModPerm1.init(n, rowSize);
+    AltModPerm0.setPermutation(pi);
+
     for (auto invPerm : { PermOp::Regular,PermOp::Inverse })
     {
-        AltModPerm0.init(n, rowSize);
-        AltModPerm1.init(n, rowSize);
         AltModPerm0.request(ole0);
         AltModPerm1.request(ole1);
 
-        AltModPerm0.setPermutation(pi);
 
-
+        //
+        AltModPerm1.mDebug = true;
+        AltModPerm0.mDebug = true;
+        AltModPerm1.mSender.mDebug = true;
+        AltModPerm0.mRecver.mDebug = true;
 
 
         auto res0 = coproto::sync_wait(coproto::when_all_ready(
@@ -190,14 +221,18 @@ void AltModPerm_sharedApply_test(const oc::CLP& cmd)
 
     std::array<oc::Matrix<u8>, 2> xShares = share(x, prng0);
 
+    AltModPerm0.init(n, rowSize);
+    AltModPerm1.init(n, rowSize);
+    AltModPerm0.setPermutation(pi);
 
     for (auto invPerm : { PermOp::Regular,PermOp::Inverse })
     {
-        AltModPerm0.init(n, rowSize);
-        AltModPerm1.init(n, rowSize);
         AltModPerm0.request(ole0);
         AltModPerm1.request(ole1);
-        AltModPerm0.setPermutation(pi);
+
+        //if (ole0 != ole1)
+        //    throw RTE_LOC;
+
 
         auto res1 = coproto::sync_wait(coproto::when_all_ready(
             AltModPerm0.apply<u8>(invPerm, xShares[0], sout1, prng0, sock[0]),

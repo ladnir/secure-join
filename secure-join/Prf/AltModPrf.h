@@ -16,6 +16,8 @@
 // 
 // * implement batching for large number of inputs. Will get 
 //   better data locality.
+// 
+// * make the expanded x mod 3.
 //
 
 namespace secJoin
@@ -85,9 +87,9 @@ namespace secJoin
 
 
         // set the key
-        void setKey(oc::block k);
+        void setKey(KeyType k);
 
-        block getKey() const { return mExpandedKey[0]; }
+        KeyType getKey() const { return mExpandedKey; }
 
         // compute y = F(k,x)
         void eval(span<oc::block> x, span<oc::block> y);
@@ -122,7 +124,7 @@ namespace secJoin
         u64 mInputSize = 0;
 
         // Generate the key when we run the protocol.
-        bool mDoKeyGen = false;
+        macoro::optional<bool> mDoKeyGen;
 
         // Has the key OTs been set.
         bool mHasKeyOts = false;
@@ -151,7 +153,7 @@ namespace secJoin
         void init(u64 inputSize, macoro::optional<bool> keyGen = {})
         {
             mInputSize = inputSize;
-            mDoKeyGen = keyGen ? *keyGen : mHasKeyOts == false;
+            mDoKeyGen = keyGen;
         }
 
         // clear the state. Removes any key that is set can cancels the prepro (if any).
@@ -160,7 +162,7 @@ namespace secJoin
             mOleReq.clear();
             mKeyReq.clear();
             mKeyOTs.clear();
-            mDoKeyGen = false;
+            mDoKeyGen = {};
             mHasKeyOts = false;
             mHasPrepro = false;
             mInputSize = 0;
@@ -187,7 +189,8 @@ namespace secJoin
 
             auto numOle = oc::roundUpTo(mInputSize, 128) * AltModPrf::MidSize * 2;
             mOleReq = ole.binOleRequest(numOle);
-            if (mDoKeyGen)
+            if ((mDoKeyGen.has_value() == false && mHasKeyOts == false) || 
+                (mDoKeyGen.has_value() == true && *mDoKeyGen == true))
             {
                 mKeyReq = ole.recvOtRequest(AltModPrf::KeySize);
                 mDoKeyGen = false;
@@ -216,13 +219,13 @@ namespace secJoin
         bool hasKeyOts() const {return mHasKeyOts;}
 
         // explicitly set the key and key OTs.
-        void setKeyOts(oc::block k, span<oc::block> ots);
+        void setKeyOts(AltModPrf::KeyType k, span<oc::block> ots);
 
         // return the key that is currently set.
-        oc::block getKey() const {
+        AltModPrf::KeyType getKey() const {
             if (mHasKeyOts == false)
                 throw RTE_LOC;
-            return mPrf.mExpandedKey[0];
+            return mPrf.mExpandedKey;
         }
 
         // returns a key derivation of the key OTs. This can safely be used by another instance.
@@ -290,7 +293,7 @@ namespace secJoin
         u64 mInputSize = 0;
 
         // Generate the key when we run the protocol.
-        bool mDoKeyGen = false;
+        macoro::optional<bool> mDoKeyGen;
 
         // have the OTs been set.
         bool mHasKeyOts = false;
@@ -306,6 +309,7 @@ namespace secJoin
 
         // variables that are used for debugging.
         oc::Matrix<oc::block> mDebugXk0, mDebugXk1, mDebugU0, mDebugU1, mDebugV;
+        std::vector<block> mDebugInput;
 
         AltModPrfReceiver() = default;
         AltModPrfReceiver(const AltModPrfReceiver&) = default;
@@ -327,7 +331,7 @@ namespace secJoin
             mOleReq.clear();
             mKeyReq.clear();
             mKeyOTs.clear();
-            mDoKeyGen = false;
+            mDoKeyGen = {};
             mHasKeyOts = false;
             mHasPrepro = false;
             mInputSize = 0;
@@ -339,7 +343,7 @@ namespace secJoin
         void init(u64 size, macoro::optional<bool> keyGen = {})
         { 
             mInputSize = size;
-            mDoKeyGen = keyGen ? *keyGen : mHasKeyOts == false;
+            mDoKeyGen = keyGen;
         }
 
         // request the required correlated randomness. 
@@ -350,7 +354,8 @@ namespace secJoin
 
             auto numOle = oc::roundUpTo(mInputSize, 128) * AltModPrf::MidSize * 2;
             mOleReq = ole.binOleRequest(numOle);
-            if (mDoKeyGen)
+            if ((mDoKeyGen.has_value() == false && mHasKeyOts == false) || 
+                (mDoKeyGen.has_value() == true && *mDoKeyGen == true))
             {
                 mKeyReq = ole.sendOtRequest(AltModPrf::KeySize);
                 mDoKeyGen = false;

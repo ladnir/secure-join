@@ -573,7 +573,7 @@ void AltModPrf_AMult_test(const oc::CLP& cmd)
 
 void AltModPrf_BMult_test(const oc::CLP& cmd)
 {
-    u64 n = 1ull << cmd.getOr("nn", 16);
+    u64 n = 1ull << cmd.getOr("nn", 12);
     u64 n128 = n / 128;
     oc::Matrix<oc::block> v(256, n128);
     std::vector<block256> V(n);
@@ -849,12 +849,12 @@ void AltModPrf_mod3_test(const oc::CLP& cmd)
 void AltModPrf_plain_test()
 {
 
-
+    u64 len = 1 << 10;
     u64 n = AltModPrf::KeySize;
     u64 m = 256;
     u64 t = 128;
     PRNG prng(oc::ZeroBlock);
-    oc::block kk = prng.get();
+    AltModPrf::KeyType kk = prng.get();
     oc::block xx = prng.get();
 
     std::array<oc::block, AltModPrf::KeySize / 128> x;
@@ -862,7 +862,7 @@ void AltModPrf_plain_test()
 
         for (u64 i = 0; i < x.size(); ++i)
             x[i] = xx ^ oc::block(i, i);
-        oc::mAesFixedKey.hashBlocks<x.size() - 1>(x.data()+1, x.data()+1);
+        oc::mAesFixedKey.hashBlocks<x.size() - 1>(x.data() + 1, x.data() + 1);
     }
     else
         x[0] = xx;
@@ -916,6 +916,117 @@ void AltModPrf_plain_test()
         }
     }
 
+    {
+        std::vector<block> x(len), y(len);
+        prf.eval(x, y);
+        for (u64 i = 0; i < len; ++i)
+        {
+            auto exp = prf.eval(x[i]);
+            if (y[i] != exp)
+                throw RTE_LOC;
+        }
+    }
+}
+
+
+void AltModProtoCheck(AltModPrfSender& sender, AltModPrfReceiver& recver)
+{
+    auto x = recver.mDebugInput;
+    auto n = x.size();
+
+    oc::Matrix<block> xt(AltModPrf::KeySize, oc::divCeil(n, 128));
+    AltModPrf::expandInput(x, xt);
+
+    for (u64 ii = 0; ii < n; ++ii)
+    {
+        oc::block y;
+
+        std::array<u16, sender.mPrf.KeySize> h;
+        std::array<oc::block, sender.mPrf.KeySize / 128> X;
+        AltModPrf::expandInput(x[ii], X);
+
+
+
+        auto kIter = oc::BitIterator((u8*)sender.mPrf.mExpandedKey.data());
+        auto xIter = oc::BitIterator((u8*)X.data());
+        for (u64 i = 0; i < sender.mPrf.KeySize; ++i)
+        {
+            if (bit(X, i) != bit(xt[i].data(), ii))
+                throw RTE_LOC;
+
+            u8 xi = *xIter;
+            u8 ki = *kIter;
+            h[i] = ki & xi;
+
+            assert(recver.mDebugXk0.cols() == oc::divCeil(x.size(), 128));
+            auto r0 = bit(recver.mDebugXk0.data(i), ii);
+            auto r1 = bit(recver.mDebugXk1.data(i), ii);
+            auto s0 = bit(sender.mDebugXk0.data(i), ii);
+            auto s1 = bit(sender.mDebugXk1.data(i), ii);
+
+
+            auto s = 2 * s1 + s0;
+            auto r = 2 * r1 + r0;
+
+            //auto neg = (3 - r) % 3;
+            auto act = (s + r) % 3;
+            if (act != h[i])
+                throw RTE_LOC;
+
+            ++kIter;
+            ++xIter;
+        }
+
+        block256m3 u;
+        sender.mPrf.mtxMultA(h, u);
+
+        for (u64 i = 0; i < 256; ++i)
+        {
+            auto r0 = bit(recver.mDebugU0.data(i), ii);
+            auto r1 = bit(recver.mDebugU1.data(i), ii);
+            auto s0 = bit(sender.mDebugU0.data(i), ii);
+            auto s1 = bit(sender.mDebugU1.data(i), ii);
+
+            auto s = 2 * s1 + s0;
+            auto r = 2 * r1 + r0;
+
+            if ((s + r) % 3 != u.mData[i])
+            {
+                throw RTE_LOC;
+            }
+
+        }
+
+        block256 w;
+        for (u64 i = 0; i < u.mData.size(); ++i)
+        {
+            *oc::BitIterator((u8*)&w, i) = u.mData[i] % 2;
+
+            auto v0 = bit(sender.mDebugV(i, 0), ii);
+            auto v1 = bit(recver.mDebugV(i, 0), ii);
+
+            if ((v0 ^ v1) != u.mData[i] % 2)
+            {
+                throw RTE_LOC;
+            }
+        }
+
+
+        //    auto yy = sender.mPrf.compress(w);
+
+        //    y = sender.mPrf.eval(x[ii]);
+        //else
+        //    y = sender.mPrf.eval(x[ii]);
+
+        //auto yy = (y0[ii] ^ y1[ii]);
+        //if (yy != y)
+        //{
+        //    std::cout << "i   " << ii << std::endl;
+        //    std::cout << "act " << yy << std::endl;
+        //    std::cout << "exp " << y << std::endl;
+        //    throw RTE_LOC;
+        //}
+    }
 }
 
 void AltModPrf_proto_test(const oc::CLP& cmd)
@@ -985,92 +1096,14 @@ void AltModPrf_proto_test(const oc::CLP& cmd)
     if (noCheck)
         return;
 
-    oc::Matrix<block> xt(AltModPrf::KeySize, oc::divCeil(n, 128));
-    AltModPrf::expandInput(x, xt);
-
     for (u64 ii = 0; ii < n; ++ii)
     {
-        oc::block y;
         if (debug)
         {
-
-            std::array<u16, sender.mPrf.KeySize> h;
-            std::array<oc::block, sender.mPrf.KeySize / 128> X;
-            AltModPrf::expandInput(x[ii], X);
-
-
-
-            auto kIter = oc::BitIterator((u8*)sender.mPrf.mExpandedKey.data());
-            auto xIter = oc::BitIterator((u8*)X.data());
-            for (u64 i = 0; i < sender.mPrf.KeySize; ++i)
-            {
-                if (bit(X, i) != bit(xt[i].data(), ii))
-                    throw RTE_LOC;
-
-                u8 xi = *xIter;
-                u8 ki = *kIter;
-                h[i] = ki & xi;
-
-                assert(recver.mDebugXk0.cols() == oc::divCeil(x.size(), 128));
-                auto r0 = bit(recver.mDebugXk0.data(i), ii);
-                auto r1 = bit(recver.mDebugXk1.data(i), ii);
-                auto s0 = bit(sender.mDebugXk0.data(i), ii);
-                auto s1 = bit(sender.mDebugXk1.data(i), ii);
-
-
-                auto s = 2 * s1 + s0;
-                auto r = 2 * r1 + r0;
-
-                //auto neg = (3 - r) % 3;
-                auto act = (s + r) % 3;
-                if (act != h[i])
-                    throw RTE_LOC;
-
-                ++kIter;
-                ++xIter;
-            }
-
-            block256m3 u;
-            sender.mPrf.mtxMultA(h, u);
-
-            for (u64 i = 0; i < 256; ++i)
-            {
-                auto r0 = bit(recver.mDebugU0.data(i), ii);
-                auto r1 = bit(recver.mDebugU1.data(i), ii);
-                auto s0 = bit(sender.mDebugU0.data(i), ii);
-                auto s1 = bit(sender.mDebugU1.data(i), ii);
-
-                auto s = 2 * s1 + s0;
-                auto r = 2 * r1 + r0;
-
-                if ((s + r) % 3 != u.mData[i])
-                {
-                    throw RTE_LOC;
-                }
-
-            }
-
-            block256 w;
-            for (u64 i = 0; i < u.mData.size(); ++i)
-            {
-                *oc::BitIterator((u8*)&w, i) = u.mData[i] % 2;
-
-                auto v0 = bit(sender.mDebugV(i, 0), ii);
-                auto v1 = bit(recver.mDebugV(i, 0), ii);
-
-                if ((v0 ^ v1) != u.mData[i] % 2)
-                {
-                    throw RTE_LOC;
-                }
-            }
-
-
-            auto yy = sender.mPrf.compress(w);
-
-            y = sender.mPrf.eval(x[ii]);
+            AltModProtoCheck(sender, recver);
         }
-        else
-            y = sender.mPrf.eval(x[ii]);
+
+        auto y = sender.mPrf.eval(x[ii]);
 
         auto yy = (y0[ii] ^ y1[ii]);
         if (yy != y)
