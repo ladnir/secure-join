@@ -77,6 +77,9 @@ namespace secJoin
         MC_END();
     }
 
+    auto roundDownTo(u64 v, u64 d) { return v / d * d; }
+
+
     //void RadixSort::hadamardSumRequest(
     //    u64 size,
     //    CorGenerator& gen,
@@ -108,12 +111,12 @@ namespace secJoin
             shares = std::vector<u32>{},
             diff = oc::BitVector{},
             ec = macoro::result<void>{},
-            //A = Matrix32{},
-            //B = Matrix32{},
             i = u64{},
             m = u64{},
             role = u64{},
-            r = u64{},
+            rows = u64{},
+            cols = u64{},
+            end = u64{},
             tt = std::vector<u32>{},
             dd = std::vector<u32>{},
             fIter = (block*)nullptr,
@@ -127,60 +130,74 @@ namespace secJoin
         //A.resize(f.rows(), f.cols());
         //B.resize(f.rows(), f.cols());
 
-        shares.resize(s.rows());
+        rows = s.rows();
+        cols = s.cols();
+        shares.resize(rows);
 
         otRecvReq = std::move(round.mHadamardSumRecvOts);
         otSendReq = std::move(round.mHadamardSumSendOts);
-        //if (gen.mRole == CorGenerator::Role::Sender)
-        //{
-        //    MC_AWAIT_SET(otRecvReq, gen.recvOtRequest(s.size()));
-        //    MC_AWAIT_SET(otSendReq, gen.sendOtRequest(s.size()));
-        //}
-        //else
-        //{
-        //    MC_AWAIT_SET(otSendReq, gen.sendOtRequest(s.size()));
-        //    MC_AWAIT_SET(otRecvReq, gen.recvOtRequest(s.size()));
-        //}
-
-        //initArith2BinCircuit(shares.size());
-        //round.mArithToBinGmw.init(shares.size(), mArith2BinCir);
 
         for (role = 0; role < 2; ++role)
         {
+            TODO("parallel");
             if (role ^ mRole)
             {
                 fIter = (block*)f.data();
                 // recv
-                for (i = 0; i < s.size();)
+                for (i = 0; i < rows;)
                 {
                     MC_AWAIT(otRecvReq.get(otRecv));
-                    m = std::min<u64>(s.size() - i, otRecv.size());
+                    if (otRecv.size() % cols)
+                        throw RTE_LOC;
 
-                    for (u64 j = 0; j < m; ++j, ++i)
+                    m = std::min<u64>(rows - i, otRecv.size() / cols);
+                    end = i + m;
+
+                    //for (u64 j = 0; j < m; ++j, ++i)
+                    //{
+                    //    auto row = i / s.cols();
+                    //    u8 fi = *oc::BitIterator((u8*)fIter, i);
+                    //    otRecv.mChoice[j] = otRecv.mChoice[j] ^ fi;
+                    //    assert(otRecv.mMsg.size() > j);
+                    //    shares[row] += otRecv.mMsg.data()[j].get<u32>(0);
+                    //}
+
+                    for (u64 k = i * cols, otIdx = 0; i < end; ++i)
                     {
-                        auto row = i / s.cols();
-                        u8 fi = *oc::BitIterator((u8*)fIter, i);
-                        otRecv.mChoice[j] = otRecv.mChoice[j] ^ fi;
-                        shares[row] += otRecv.mMsg[j].get<u32>(0);
+                        auto& share = shares.data()[i];
+                        assert(role || (share == 0));
+                        for (u64 j = 0; j < cols; ++j, ++k, ++otIdx)
+                        {
+                            u8 fk = *oc::BitIterator((u8*)fIter, k);
+                            otRecv.mChoice[otIdx] = otRecv.mChoice[otIdx] ^ fk;
+                            assert(otRecv.mMsg.size() > otIdx);
+                            share += otRecv.mMsg.data()[otIdx].get<u32>(0);
+                        }
                     }
 
-                    otRecv.mChoice.resize(m);
+
+                    otRecv.mChoice.resize(m * cols);
                     MC_AWAIT(comm.send(std::move(otRecv.mChoice)));
                 }
 
-                for (i = 0, r = 0; i < s.size();)
+                for (i = 0; i < rows;)
                 {
                     MC_AWAIT_TRY(ec, comm.recvResize(tt));
                     if (ec.has_error())
                         std::cout << "ec: " << whatError(ec) << std::endl;
                     ec.value();
 
-                    m = std::min<u64>(s.size() - i, tt.size());
-                    for (u64 j = 0; j < m; ++j, ++i)
+                    m = std::min<u64>(s.rows() - i, tt.size() / cols);
+                    end = i + m;
+                    for (u64 k = i * cols, otIdx = 0; i < end; ++i)
                     {
-                        auto row = i / s.cols();
-                        u8 fi = *oc::BitIterator((u8*)fIter, i);
-                        shares[row] += tt[j] * fi;
+                        auto& share = shares.data()[i];
+                        for (u64 j = 0; j < cols; ++j, ++k, ++otIdx)
+                        {
+                            u8 fk = *oc::BitIterator((u8*)fIter, k);
+                            assert(otIdx < tt.size());
+                            share += tt.data()[otIdx] * fk;
+                        }
                     }
                 }
             }
@@ -188,31 +205,42 @@ namespace secJoin
             {
                 fIter = (block*)f.data();
                 // send
-                for (i = 0, r = 0; i < s.size();)
+                for (i = 0; i < rows;)
                 {
                     MC_AWAIT(otSendReq.get(otSend));
-                    m = std::min<u64>(s.size() - i, otSend.size());
-                    diff.resize(m);
+                    if (otSend.size() % cols)
+                        throw RTE_LOC;
+                    m = std::min<u64>(rows - i, otSend.size() / cols);
+                    end = i + m;
+
+                    diff.resize(m * cols);
                     MC_AWAIT(comm.recv(diff));
 
-                    tt.resize(m);
-                    for (u64 j = 0; j < m; ++j, ++i)
+                    tt.resize(m * cols);
+
+                    for (u64 k = i * cols, otIdx = 0; i < end; ++i)
                     {
-                        auto row = i / s.cols();
-                        u8 fi = *oc::BitIterator((u8*)fIter, i);
-                        auto d = diff[j];
+                        assert(i < shares.size());
+                        auto& share = shares.data()[i];
+                        assert(role || (share == 0));
 
-                        auto m0 = otSend.mMsg[j][0 ^ d].get<u32>(0);
-                        auto m1 = otSend.mMsg[j][1 ^ d].get<u32>(0);
+                        for (u64 j = 0; j < cols; ++j, ++k, ++otIdx)
+                        {
+                            u8 fk = *oc::BitIterator((u8*)fIter, k);
+                            auto sk = s(k);
+                            auto d = diff[otIdx];
 
-                        auto r = m0 - (fi * s(i));
-                        //auto v0 = m0;
-                        auto v1 = (1 ^ fi) * s(i) + r;
-                        tt[j] = v1 - m1;
+                            assert(otSend.mMsg.size() > otIdx);
+                            auto m0 = otSend.mMsg.data()[otIdx][0 ^ d].get<u32>(0);
+                            auto m1 = otSend.mMsg.data()[otIdx][1 ^ d].get<u32>(0);
 
-                        shares[row] -= r;
+                            auto r = m0 - (fk * sk);
+                            auto v1 = (1 ^ fk) * sk + r;
+                            tt[otIdx] = v1 - m1;
+
+                            share -= r;
+                        }
                     }
-
                     MC_AWAIT(comm.send(std::move(tt)));
                 }
             }
@@ -490,7 +518,7 @@ namespace secJoin
         // for 1 bit keys we will pack 4 rows into 1 row.
         if (bitCount == 1)
         {
-            
+
             auto src = fBin.data();
             auto dst = fBin.data();
             auto main = mSize / 4;
@@ -551,7 +579,7 @@ namespace secJoin
         // here is where we set the zero value.
         memset(fBin.data() + fBin.size(), 0, sizeof(block));
 
-        
+
         TODO("determine min bit count required. currently 32");
         //MC_AWAIT(round.mBitInjects.bitInjection((1ull << bitCount) * k.rows(), fBin.mData, 32, f, comm));
         MC_AWAIT(round.mBitInject.bitInjection(fBin.mData, 32, f, comm));
@@ -1023,7 +1051,7 @@ namespace secJoin
         // the number if radix sort rounds
         u64 ll = oc::divCeil(mBitCount, mL);
         mRounds.resize(ll);
-        
+
         // 2^mL
         u64 pow2L = 1ull << mL;
 
@@ -1070,7 +1098,7 @@ namespace secJoin
         PRNG& prng)
     {
         mHasPrepro = true;
-        MC_BEGIN(macoro::task<>, this, &comm, 
+        MC_BEGIN(macoro::task<>, this, &comm,
             g = prng.fork(),
             i = u64{},
             tasks = std::vector<macoro::eager_task<>>{});
@@ -1173,16 +1201,16 @@ namespace secJoin
 
 
             if (mTimer)
-                mRounds[i-1].mPerm.setTimer(getTimer());
+                mRounds[i - 1].mPerm.setTimer(getTimer());
 
             // consumes 4 cor-rand.
-            MC_AWAIT(mRounds[i-1].mPerm.setup(comm, prng));
+            MC_AWAIT(mRounds[i - 1].mPerm.setup(comm, prng));
 
             // apply the partial sort that we have so far 
             // to the next L bits of the key.
             // consumes 1 cor-rand
-            assert(mRounds[i-1].mPerm.hasSetup(sk.bytesPerEntry()));
-            MC_AWAIT(mRounds[i-1].mPerm.apply<u8>(
+            assert(mRounds[i - 1].mPerm.hasSetup(sk.bytesPerEntry()));
+            MC_AWAIT(mRounds[i - 1].mPerm.apply<u8>(
                 PermOp::Inverse, sk.mData, ssk.mData, prng, comm));
             setTimePoint("apply(sk)");
 
@@ -1195,12 +1223,12 @@ namespace secJoin
             // compose the current partial sort with
             // the permutation that sorts the next L bits
             // consumes 4 cor-rand
-            assert(mRounds[i-1].mPerm.hasSetup(4));
-            MC_AWAIT(mRounds[i-1].mPerm.compose(rho, mRounds[i].mPerm, prng, comm));
+            assert(mRounds[i - 1].mPerm.hasSetup(4));
+            MC_AWAIT(mRounds[i - 1].mPerm.compose(rho, mRounds[i].mPerm, prng, comm));
             setTimePoint("compose");
 
             assert(mRounds[i - 1].mPerm.hasSetup(1) == false);
-            mRounds[i-1].mPerm.clear();
+            mRounds[i - 1].mPerm.clear();
             //std::swap(dst, sigma2);
             //dst.validate(comm);
         }
@@ -1355,7 +1383,7 @@ namespace secJoin
 
             perm = sort(data).inverse();
 
-            dst.init2(mRole,perm.size());
+            dst.init2(mRole, perm.size());
             dst.mShare = perm.mPi;
         }
         else {

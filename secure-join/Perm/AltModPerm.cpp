@@ -20,9 +20,16 @@ namespace secJoin
         oc::MatrixView<oc::u8>& s)
     {
         auto v1 = matrixCast<const u8>(v1_);
-        for (oc::u64 i = 0; i < s.rows(); ++i)
-            for (oc::u64 j = 0; j < s.cols(); ++j)
-                s(i, j) = v1(i, j + byteOffset) ^ v2(i, j);
+        auto r = s.rows();
+        auto c = s.cols();
+        auto d = s.data();
+        auto d2 = v2.data();
+        for (oc::u64 i = 0; i < r; ++i)
+        {
+            auto d1 = v1.data(i) + byteOffset;
+            for (oc::u64 j = 0; j < c; ++j)
+                *d++ = *d1++ ^ *d2++;
+        }
     }
 
     void xorShare(oc::MatrixView<const u8> v1,

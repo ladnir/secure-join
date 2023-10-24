@@ -30,12 +30,12 @@ namespace secJoin
 
         for (u32 i = 0; i < mMsg.size(); ++i)
         {
-            oc::block m0 = std::array<u32, 4>{i, i, i, i};// prng.get();
-            oc::block m1 = std::array<u32, 4>{~i, ~i, ~i, ~i};//prng.get();
+            oc::block m0 = block(i, i);// prng.get();
+            oc::block m1 = block(~i, ~i);//prng.get();
 
             m0 = m0 ^ s;
             m1 = m1 ^ s;
-            mMsg[i] = mChoice[i] ? m1 : m0;
+            mMsg.data()[i] = mChoice[i] ? m1 : m0;
         }
     }
 
@@ -50,12 +50,12 @@ namespace secJoin
         auto s = oc::mAesFixedKey.ecbEncBlock(oc::block(batchIdx, 0));
         for (u32 i = 0; i < mMsg2.size(); ++i)
         {
-            mMsg2[i][0] = std::array<u32, 4>{i, i, i, i};// prng.get();
-            mMsg2[i][1] = std::array<u32, 4>{~i, ~i, ~i, ~i};//prng.get();
+            mMsg2.data()[i][0] = block(i, i);// prng.get();
+            mMsg2.data()[i][1] = block(~i, ~i);//prng.get();
 
 
-            mMsg2[i][0] = mMsg2[i][0] ^ s;
-            mMsg2[i][1] = mMsg2[i][1] ^ s;
+            mMsg2.data()[i][0] = mMsg2.data()[i][0] ^ s;
+            mMsg2.data()[i][1] = mMsg2.data()[i][1] ^ s;
         }
     }
 
