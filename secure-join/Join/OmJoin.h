@@ -12,7 +12,7 @@ namespace secJoin
 
 	struct OmJoin : public oc::TimerAdapter
 	{
-		bool mInsecurePrint = true, mInsecureMockSubroutines = false;
+		bool mInsecurePrint = false, mInsecureMockSubroutines = false;
 
 		// statical security parameter.
 		u64 mStatSecParam = 40;

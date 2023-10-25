@@ -1,6 +1,7 @@
 #include "benchmark.h"
 #include "secure-join/Prf/AltModPrf.h"
 #include "secure-join/Sort/RadixSort.h"
+#include "secure-join/Join/OmJoin.h"
 
 namespace secJoin
 {
@@ -68,6 +69,66 @@ namespace secJoin
             std::cout << timer << std::endl;
             std::cout << sock[0].bytesReceived() / 1000.0 << " " << sock[0].bytesSent() / 1000.0 << " kB " << std::endl;
         }
+    }
+
+    void OmJoin_benchmark(const oc::CLP& cmd)
+    {
+
+        u64 nL = cmd.getOr("Ln", 1ull << cmd.getOr("Lnn", cmd.getOr("nn", 10)));
+        u64 nR = cmd.getOr("Rn", 1ull << cmd.getOr("Rnn", cmd.getOr("nn", 10)));
+        u64 dL = cmd.getOr("Ld", cmd.getOr("d", 10));
+        u64 dR = cmd.getOr("Rd", cmd.getOr("d", 10));
+
+        auto b = cmd.getOr("b", 18);
+        u64 keySize = cmd.getOr("m", 32);
+        bool mock = cmd.getOr("mock", 1);
+
+        Table L, R;
+
+        L.init(nL, { {
+            {"L1", TypeID::IntID, keySize},
+            {"L2", TypeID::IntID, 16}
+        } });
+        R.init(nR, { {
+            {"R1", TypeID::IntID, keySize},
+            {"R2", TypeID::IntID, 7}
+        } });
+
+        PRNG prng(oc::ZeroBlock);
+        std::array<Table, 2> Ls, Rs;
+        share(L, Ls, prng);
+        share(R, Rs, prng);
+
+        OmJoin join0, join1;
+
+        auto sock = coproto::LocalAsyncSocket::makePair();
+        CorGenerator ole0, ole1;
+        ole0.init(sock[0].fork(), prng, 0, 1 << b, mock);
+        ole1.init(sock[1].fork(), prng, 1, 1 << b, mock);
+
+        PRNG prng0(oc::ZeroBlock);
+        PRNG prng1(oc::OneBlock);
+
+        Table out[2];
+
+        auto exp = join(L[0], R[0], { L[0], R[1], L[1] });
+        oc::Timer timer;
+        join0.setTimer(timer);
+
+        auto begin = timer.setTimePoint("begin");
+        auto r = macoro::sync_wait(macoro::when_all_ready(
+            join0.join(Ls[0][0], Rs[0][0], { Ls[0][0], Rs[0][1], Ls[0][1] }, out[0], prng0, ole0, sock[0]),
+            join1.join(Ls[1][0], Rs[1][0], { Ls[1][0], Rs[1][1], Ls[1][1] }, out[1], prng1, ole1, sock[1])
+        ));
+        auto end = timer.setTimePoint("end");
+
+        std::cout << "radix Ln:" << nL << ", Rn:"<<nR<<" m:" << keySize << "  Ld: "<<dL << ", Rd:" <<dR << "  ~ "<<
+            std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "ms " <<
+            sock[0].bytesSent() / double(nL+nR) << "+" << sock[0].bytesReceived() / double(nL + nR) << "=" <<
+            (sock[0].bytesSent() + sock[0].bytesReceived()) / double(nL + nR) << " bytes/elem " << std::endl;
+
+        if (cmd.isSet("timing"))
+            std::cout << timer << std::endl;
     }
     void AltMod_benchmark(const oc::CLP& cmd)
     {

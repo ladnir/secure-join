@@ -486,7 +486,9 @@ namespace secJoin
             sort = RadixSort{},
             keyOffset = u64{},
             dup = AggTree::Operator{},
-            offsets = std::vector<Offset>{});
+            offsets = std::vector<Offset>{},
+            bytesPermuted0 = u64{},
+            bytesPermuted1 = u64{});
 
         setTimePoint("start");
 
@@ -503,16 +505,32 @@ namespace secJoin
         sort.mInsecureMock = mInsecureMockSubroutines;
         sPerm.mInsecureMock = mInsecureMockSubroutines;
 
-        sort.init(ole.partyIdx(), keys.rows(), keys.bitsPerEntry());
+
+        // if the forward direction we will permute the keys, a flag, 
+        // and all of the select columns of the left table. In the 
+        // backwards direction, we will unpermute the left table select
+        // columns. Therefore, in total we will permute:
+        bytesPermuted0 = keys.bytesPerEntry() + 1;
+        bytesPermuted1 = 1;
+        for (u64 i = 0; i < selects.size(); ++i)
+        {
+            auto isLeft = &selects[i].mTable == &leftJoinCol.mTable;
+            //auto notKey = &leftJoinCol.mCol != &selects[i].mCol;
+            if (isLeft)// && notKey)
+            {
+                bytesPermuted0 += selects[i].mCol.getByteCount();
+                bytesPermuted1 += selects[i].mCol.getByteCount();
+            }
+        }
+
+        sort.init(ole.partyIdx(), keys.rows(), keys.bitsPerEntry(), bytesPermuted0 + bytesPermuted1);
         sort.request(ole);
         MC_AWAIT(sort.preprocess(sock, prng));
 
-        //sort.init(ole.partyIdx(), keys.size())
         // get the stable sorting permutation sPerm
         MC_AWAIT(sort.genPerm(keys, sPerm, sock,prng));
         setTimePoint("sort");
 
-        //std::cout << "genPerm done " << LOCATION << std::endl;
         // gather all of the columns from the left table and concatinate them
         // together. Append dummy rows after that. Then add the column of keys
         // to that. So it will look something like:
@@ -530,6 +548,8 @@ namespace secJoin
         temp.resize(data.numEntries(), data.bitsPerEntry() + 8);
         temp.resize(data.numEntries(), data.bitsPerEntry());
         // temp.reshape(data.bitsPerEntry());
+
+        assert(data.bytesPerEntry() == bytesPermuted0);
 
         MC_AWAIT(sPerm.apply(PermOp::Inverse, data, temp, prng, sock));//, ole
         std::swap(data, temp);
@@ -590,6 +610,7 @@ namespace secJoin
         temp.resize(data.numEntries(), data.bitsPerEntry());
         temp.reshape(data.bitsPerEntry());
         temp.setZero();
+        assert(data.bytesPerEntry() == bytesPermuted1);
         MC_AWAIT(sPerm.apply(PermOp::Regular, data, temp, prng, sock));//, ole
         std::swap(data, temp);
         setTimePoint("apply-sort");

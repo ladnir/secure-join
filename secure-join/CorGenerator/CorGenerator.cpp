@@ -100,7 +100,7 @@ namespace secJoin
                     batch->mSize = mBatchSize;
 
                     auto remReq = mRequests[i]->mSize - j;
-                    auto size = oc::roundUpTo(128, std::min<u64>(remReq, mBatchSize));
+                    auto size = oc::roundUpTo(std::min<u64>(remReq, mBatchSize), 128);
                     mRequests[i]->addBatch(BatchOffset{ batch, 0, size });
 
                     j += size;
@@ -163,7 +163,7 @@ namespace secJoin
                 auto begin = batch->mSize;
                 auto remReq = mRequests[i]->mSize - j;
                 auto remAvb = mBatchSize - begin;
-                auto size = oc::roundUpTo(128, std::min<u64>(remReq, remAvb));
+                auto size = oc::roundUpTo(std::min<u64>(remReq, remAvb), 128);
                 assert(size <= remAvb);
 
                 batch->mSize += size;

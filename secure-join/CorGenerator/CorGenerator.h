@@ -28,7 +28,13 @@ namespace secJoin
             , mSock(std::move(s))
             , mBatchSize(batchSize)
             , mMock(mock)
-        { }
+        {
+            if (batchSize < (1ull << 12))
+                throw std::runtime_error("too small of batch size." LOCATION);
+
+            if (batchSize > (1ull << 26))
+                throw std::runtime_error("too large of batch size." LOCATION);
+        }
 
         GenState(const GenState&) = delete;
         GenState(GenState&&) = delete;

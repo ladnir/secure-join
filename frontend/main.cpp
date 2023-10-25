@@ -15,36 +15,35 @@ int main(int argc, char** argv)
 
     if (clp.isSet("bench"))
     {
+        if (clp.isSet("join"))
+        {
+            OmJoin_benchmark(clp);
+        }
         if (clp.isSet("AltMod"))
         {
             AltMod_benchmark(clp);
-            return 0;
         }
         if (clp.isSet("radix"))
         {
             Radix_benchmark(clp);
-            return 0;
         }
         if (clp.isSet("bmult"))
         {
             AltMod_compressB_benchmark(clp);
-            return 0;
         }
         if (clp.isSet("amult"))
         {
             AltMod_expandA_benchmark(clp);
-            return 0;
         }
         if (clp.isSet("transpose"))
         {
             transpose_benchmark(clp);
-            return 0;
         }
         if (clp.isSet("mod3"))
         {
             AltMod_sampleMod3_benchmark(clp);
-            return 0;
         }
+        return 0;
     }
     //clp.set("u");
     secJoin_Tests::Tests.runIf(clp);
