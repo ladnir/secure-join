@@ -58,10 +58,10 @@ namespace secJoin
         // Current assumption are that Visa always provides table with unique keys 
         // Which means Visa always has to be left Table
         if (isUnique)
-            cState->mOle.init(cState->mSock.fork(), cState->mPrng, 0, 1 << 14, mock);
+            cState->mOle.init(cState->mSock.fork(), cState->mPrng, 0, 1<<18, mock);
             //cState->mOle.mock(CorGenerator::Role::Sender);
         else
-            cState->mOle.init(cState->mSock.fork(), cState->mPrng, 1, 1 << 14, mock);
+            cState->mOle.init(cState->mSock.fork(), cState->mPrng, 1, 1<<18, mock);
             //cState->mOle.mock(CorGenerator::Role::Receiver);
 
 

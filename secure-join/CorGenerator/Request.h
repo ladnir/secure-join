@@ -22,10 +22,13 @@ namespace secJoin
 
     struct RequestState : std::enable_shared_from_this<RequestState>
     {
-        RequestState(CorType t, u64 size, std::shared_ptr<GenState>&, u64 idx);
+        RequestState(CorType t, bool sender, u64 size, std::shared_ptr<GenState>&, u64 idx);
 
         // the type of the correlation
         CorType mType;
+
+        // sender or receiver of the correlation
+        bool mSender = 0;
 
         // the total size of the request
         u64 mSize = 0;

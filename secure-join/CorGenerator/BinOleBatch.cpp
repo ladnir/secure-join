@@ -65,14 +65,15 @@ namespace secJoin
             auto& recv = std::get<1>(mSendRecv);
             recv.mReceiver.setSilentBaseOts(rMsg);
         }
+        mHaveBase.set();
     }
 
     macoro::task<> OleBatch::getTask()
     {
         if (mSendRecv.index() == 0)
-            return std::get<0>(mSendRecv).sendTask(mPrng, mSock, mAdd, mMult, mCorReady);
+            return std::get<0>(mSendRecv).sendTask(mPrng, mSock, mAdd, mMult, mCorReady, mHaveBase);
         else
-            return std::get<1>(mSendRecv).recvTask(mPrng, mSock, mAdd, mMult, mCorReady);
+            return std::get<1>(mSendRecv).recvTask(mPrng, mSock, mAdd, mMult, mCorReady, mHaveBase);
     }
 
     void OleBatch::mock(u64 batchIdx)
@@ -179,16 +180,23 @@ namespace secJoin
         oc::Socket& sock,
         oc::AlignedUnVector<oc::block>& add,
         oc::AlignedUnVector<oc::block>& mult,
-        macoro::async_manual_reset_event& corReady)
+        macoro::async_manual_reset_event& corReady,
+        macoro::async_manual_reset_event& haveBase)
     {
-        MC_BEGIN(macoro::task<>, this, &prng, &sock, &add, &mult, &corReady);
+        MC_BEGIN(macoro::task<>, this, &prng, &sock, &add, &mult, &corReady, &haveBase,
+            mChoice = oc::BitVector{},
+            mMsg =oc::AlignedUnVector<oc::block>{});
+
+        MC_AWAIT(haveBase);
         mChoice.resize(mReceiver.mRequestedNumOts);
         mMsg.resize(mReceiver.mRequestedNumOts);
-
+        assert(mReceiver.mGen.hasBaseOts());
         MC_AWAIT(mReceiver.silentReceive(mChoice, mMsg, prng, sock));
         add.resize(oc::divCeil(mMsg.size(), 128));
         mult.resize(oc::divCeil(mMsg.size(), 128));
         compressRecver(mChoice, mMsg, add, mult);
+        mChoice = {};
+        mMsg = {};
         corReady.set();
         MC_END();
     }
@@ -198,16 +206,21 @@ namespace secJoin
         oc::Socket& sock,
         oc::AlignedUnVector<oc::block>& add,
         oc::AlignedUnVector<oc::block>& mult,
-        macoro::async_manual_reset_event& corReady)
+        macoro::async_manual_reset_event& corReady,
+        macoro::async_manual_reset_event& haveBase)
     {
-        MC_BEGIN(macoro::task<>, this, &prng, &sock, &add, &mult, &corReady);
+        MC_BEGIN(macoro::task<>, this, &prng, &sock, &add, &mult, &corReady, &haveBase,
+            mMsg2 = oc::AlignedUnVector<std::array<oc::block, 2>>{});
 
+        MC_AWAIT(haveBase);
         mMsg2.resize(mSender.mRequestNumOts);
+        assert(mSender.mGen.hasBaseOts());
         MC_AWAIT(mSender.silentSend(mMsg2, prng, sock));
         add.resize(oc::divCeil(mMsg2.size(), 128));
         mult.resize(oc::divCeil(mMsg2.size(), 128));
         compressSender(mMsg2, add, mult);
         corReady.set();
+        mMsg2 = {};
         MC_END();
     }
 

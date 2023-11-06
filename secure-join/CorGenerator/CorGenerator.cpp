@@ -7,16 +7,23 @@
 namespace secJoin
 {
 
-    std::shared_ptr<RequestState> CorGenerator::request(CorType t, u64  n)
+    std::shared_ptr<RequestState> CorGenerator::request(CorType t, u64 role, u64  n)
     {
         if (mGenState->mSession == nullptr)
             mGenState->mSession = std::make_shared<Session>();
-//        if (mGenState->mSession->mBaseStarted)
-//            throw std::runtime_error("correlations can not be requested while another batch is in progress. " LOCATION);
-        auto r = std::make_shared<RequestState>(t, n, mGenState, mGenState->mRequests.size());
+        //        if (mGenState->mSession->mBaseStarted)
+        //            throw std::runtime_error("correlations can not be requested while another batch is in progress. " LOCATION);
+        auto r = std::make_shared<RequestState>(t, role, n, mGenState, mGenState->mRequests.size());
         mGenState->mRequests.push_back(r);
         return r;
     }
+
+    struct Config
+    {
+        u32 size;
+        u16 type;
+        u16 role;
+    };
 
     macoro::task<> GenState::startBaseOts()
     {
@@ -33,9 +40,8 @@ namespace secJoin
             rPrng = PRNG{},
             socks = std::array<oc::Socket, 2>{},
 
-            sendOtBatch = std::shared_ptr<Batch>{},
-            recvOtBatch = std::shared_ptr<Batch>{},
-            oleBatch = std::shared_ptr<Batch>{},
+            otBatch = std::array<std::shared_ptr<Batch>, 2>{},
+            oleBatch = std::array<std::shared_ptr<Batch>, 2>{},
             batches = std::vector<std::shared_ptr<Batch>>{},
 
             req = BaseRequest{},
@@ -43,111 +49,33 @@ namespace secJoin
             temp = std::vector<u8>{},
             res = macoro::result<void>{},
             reqChecks = std::map<CorType, oc::RandomOracle>{},
-            hash = block{},
-            theirHash = block{}
+            config = std::vector<Config>{},
+            theirConfig = std::vector<Config>{},
+            requests = std::vector<std::shared_ptr<RequestState>>{}
         );
 
-        //if (!mGenerationInProgress)
-        //    std::terminate();
-
-        if (mMock)
-        {
-            //mGenerationInProgress = false;
-            for (i = 0;i < mRequests.size(); ++i)
-            {
-
-                auto swap = [](CorType t, u64 p)
-                {
-                    if (p)
-                    {
-                        if (t == CorType::RecvOt)
-                            t = CorType::SendOt;
-                        else if (t == CorType::SendOt)
-                            t = CorType::RecvOt;
-                    }
-                    return t;
-                };
-
-                //std::cout << "req r " << mPartyIdx<< " t " << int(mRequests[i]->mType) << " s " << mRequests[i]->mSize << std::endl;
-                reqChecks[swap(mRequests[i]->mType, mPartyIdx)].Update(mRequests[i]->mSize);
-
-                for (j = 0;j < mRequests[i]->mSize;)
-                {
-                    std::shared_ptr<Batch>& batch = [&]() {
-                        switch (mRequests[i]->mType)
-                        {
-                        case CorType::RecvOt:
-                            return recvOtBatch;
-                        case CorType::SendOt:
-                            return sendOtBatch;
-                        case CorType::Ole:
-                            return oleBatch;
-                        default:
-                            std::terminate();
-                        }
-                    }();
-
-                    if (batch == nullptr)
-                    {
-                        batches.push_back(makeBatch(mRequests[i]->mType, mPartyIdx, oc::Socket{}, PRNG{}));
-                        batches.back()->mIndex = batches.size();
-                        batch = batches.back();
-                        batch->mSize = mBatchSize;
-                        batch->mock(0);
-                        batch->mCorReady.set();
-                    }
-
-                    batch->mSize = mBatchSize;
-
-                    auto remReq = mRequests[i]->mSize - j;
-                    auto size = oc::roundUpTo(std::min<u64>(remReq, mBatchSize), 128);
-                    mRequests[i]->addBatch(BatchOffset{ batch, 0, size });
-
-                    j += size;
-                }
-
-                mRequests[i] = nullptr;
-            }
-
-            hash = oc::ZeroBlock;
-            for (auto& c : reqChecks)
-            {
-                std::array<u8, oc::RandomOracle::HashSize> b;
-                oc::RandomOracle ro(16);
-                ro.Update(c.first);
-                c.second.Final(b);
-                ro.Update(b);
-                ro.Update(hash);
-                ro.Final<block>(hash);
-                //std::cout << " H = " << int(c.first) << " " << hash << " " << *(int*)b.data() << std::endl;
-            }
-
-            MC_AWAIT(mSock.send(std::move(hash)));
-            MC_AWAIT(mSock.recv(theirHash));
-            if (hash != theirHash)
-            {
-                std::cout << "request state mismatch. " LOCATION << std::endl;
-                throw RTE_LOC;
-            }
-
-            mRequests = {};
-            MC_RETURN_VOID();
-        }
-
+        requests = std::move(mRequests);
         // map request to batches
-        for (i = 0;i < mRequests.size(); ++i)
+        for (i = 0;i < requests.size(); ++i)
         {
-            for (j = 0;j < mRequests[i]->mSize;)
+            if (mDebug)
             {
-                std::shared_ptr<Batch>& batch = [&]() {
-                    switch (mRequests[i]->mType)
+                Config c;
+                c.size = requests[i]->mSize;
+                c.role = requests[i]->mSender;
+                c.type = (u16)requests[i]->mType;
+                config.push_back(c);
+            }
+
+            for (j = 0;j < requests[i]->mSize;)
+            {
+                std::shared_ptr<Batch>& batch = [&]() -> std::shared_ptr<Batch>&{
+                    switch (requests[i]->mType)
                     {
-                    case CorType::RecvOt:
-                        return recvOtBatch;
-                    case CorType::SendOt:
-                        return sendOtBatch;
+                    case CorType::Ot:
+                        return otBatch[requests[i]->mSender];
                     case CorType::Ole:
-                        return oleBatch;
+                        return oleBatch[requests[i]->mSender];
                     default:
                         std::terminate();
                     }
@@ -155,30 +83,93 @@ namespace secJoin
 
                 if (batch == nullptr)
                 {
-                    batches.push_back(makeBatch(mRequests[i]->mType, mPartyIdx, mSock.fork(), mPrng.fork()));
+                    auto ss = mSock.fork();
+                    for (auto& slot : ss.mImpl->mSlots_)
+                        if (slot.mSessionID == ss.mId)
+                            slot.mName = std::string("gen_") + std::to_string(batches.size());
+                    batches.push_back(makeBatch(requests[i]->mSender, requests[i]->mType, std::move(ss), mPrng.fork()));
                     batches.back()->mIndex = batches.size();
                     batch = batches.back();
                 }
 
                 auto begin = batch->mSize;
-                auto remReq = mRequests[i]->mSize - j;
+                auto remReq = requests[i]->mSize - j;
                 auto remAvb = mBatchSize - begin;
                 auto size = oc::roundUpTo(std::min<u64>(remReq, remAvb), 128);
                 assert(size <= remAvb);
 
                 batch->mSize += size;
 
-                mRequests[i]->addBatch(BatchOffset{ batch, begin, size });
+                requests[i]->addBatch(BatchOffset{ batch, begin, size });
                 j += size;
 
                 if (remAvb == size)
                     batch = nullptr;
             }
 
-            mRequests[i] = nullptr;
+            //requests[i] = nullptr;
         }
 
-        mRequests = {};
+        //requests = {};
+
+        if (mDebug)
+        {
+            MC_AWAIT(mSock.send(coproto::copy(config)));
+            MC_AWAIT(mSock.recvResize(theirConfig));
+            bool misMatch = config.size() != theirConfig.size();
+            if (misMatch)
+            {
+                for (u64 i = 0; i < config.size(); ++i)
+                {
+                    misMatch =
+                        config[i].size != theirConfig[i].size ||
+                        config[i].type != theirConfig[i].type ||
+                        config[i].role == theirConfig[i].role;
+                    if (misMatch)
+                        break;
+                }
+            }
+            if (misMatch)
+            {
+                std::cout << "CorGenerator requires do not match" << std::endl;
+                auto m = std::min(config.size(), theirConfig.size());
+                for (u64 i = 0; i < m; ++i)
+                {
+
+                    auto bad =
+                        config[i].size != theirConfig[i].size ||
+                        config[i].type != theirConfig[i].type ||
+                        config[i].role == theirConfig[i].role;
+                    if (bad)
+                        std::cout << oc::Color::Red;
+
+                    std::cout << "request[" << i << "], P" << mPartyIdx << ": "
+                        << toString((CorType)config[i].type) << " "
+                        << " r " << (config[i].role) << " "
+                        << " size " << (config[i].size) << "\n"
+                        << "\t\tP" << (mPartyIdx ^ 1) << ": "
+                        << toString((CorType)theirConfig[i].type) << " "
+                        << " r " << (theirConfig[i].role) << " "
+                        << " size " << (theirConfig[i].size)
+                        << std::endl;
+
+                    if (bad)
+                        std::cout << oc::Color::Default;
+                }
+                if (config.size() > theirConfig.size())
+                {
+                    std::cout << "P" << mPartyIdx << " has extra requests " << std::endl;
+                }
+                else if (theirConfig.size() > config.size())
+                {
+                    std::cout << "P" << (mPartyIdx^1) << " has extra requests " << std::endl;
+                }
+            }
+        }
+
+        if (mMock)
+            MC_RETURN_VOID();
+
 
         // make base OT requests
         reqs.reserve(batches.size());

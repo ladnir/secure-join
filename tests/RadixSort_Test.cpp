@@ -85,8 +85,8 @@ void RadixSort_hadamardSum_test(const oc::CLP& cmd)
 
     CorGenerator g0, g1;
 
-    g0.init(comm[0].fork(), prng, 0, 1 << 14, cmd.getOr("mock", 1));
-    g1.init(comm[1].fork(), prng, 1, 1 << 14, cmd.getOr("mock", 1));
+    g0.init(comm[0].fork(), prng, 0, 1<<18, cmd.getOr("mock", 1));
+    g1.init(comm[1].fork(), prng, 1, 1<<18, cmd.getOr("mock", 1));
     s0.mDebug = true;
     s1.mDebug = true;
 
@@ -141,8 +141,8 @@ void RadixSort_oneHot_test(const oc::CLP& cmd)
     std::array<std::future<void>, 2> f;
     std::array<CorGenerator, 2> g;
     PRNG prng(oc::ZeroBlock);
-    g[0].init(comm[0].fork(), prng, 0, 1 << 14, cmd.getOr("mock", 1));
-    g[1].init(comm[1].fork(), prng, 1, 1 << 14, cmd.getOr("mock", 1));
+    g[0].init(comm[0].fork(), prng, 0, 1<<18, cmd.getOr("mock", 1));
+    g[1].init(comm[1].fork(), prng, 1, 1<<18, cmd.getOr("mock", 1));
 
     Matrix<u8> kk(n, 1);
     for (u64 i = 0; i < n; ++i)
@@ -213,8 +213,8 @@ void RadixSort_bitInjection_test(const oc::CLP& cmd)
 
     }
     CorGenerator g0, g1;
-    g0.init(comm[0].fork(), prng, 0, 1 << 14, cmd.getOr("mock", 1));
-    g1.init(comm[1].fork(), prng, 1, 1 << 14, cmd.getOr("mock", 1));
+    g0.init(comm[0].fork(), prng, 0, 1<<18, cmd.getOr("mock", 1));
+    g1.init(comm[1].fork(), prng, 1, 1<<18, cmd.getOr("mock", 1));
 
     share(k, L, k0, k1, prng);
 
@@ -287,8 +287,8 @@ void RadixSort_genValMasks2_test(const oc::CLP& cmd)
             }
 
             CorGenerator g0, g1;
-            g0.init(comm[0].fork(), prng, 0, 1 << 14, cmd.getOr("mock", 1));
-            g1.init(comm[1].fork(), prng, 1, 1 << 14, cmd.getOr("mock", 1));
+            g0.init(comm[0].fork(), prng, 0, 1<<18, cmd.getOr("mock", 1));
+            g1.init(comm[1].fork(), prng, 1, 1<<18, cmd.getOr("mock", 1));
 
             share(k, k0, k1, prng);
             s0.mL = L;
@@ -447,8 +447,8 @@ void RadixSort_genBitPerm_test(const oc::CLP& cmd)
                     BinMatrix k(n, m);
                     BinMatrix sk[2];
                     CorGenerator g[2];
-                    g[0].init(comm[0].fork(), prng, 0, 1 << 14, cmd.getOr("mock", 1));
-                    g[1].init(comm[1].fork(), prng, 1, 1 << 14, cmd.getOr("mock", 1));
+                    g[0].init(comm[0].fork(), prng, 0, 1<<18, cmd.getOr("mock", 1));
+                    g[1].init(comm[1].fork(), prng, 1, 1<<18, cmd.getOr("mock", 1));
 
                     //m = L;
                     auto ll = oc::divCeil(m, L);
@@ -531,6 +531,76 @@ void RadixSort_genBitPerm_test(const oc::CLP& cmd)
         }
 
 }
+void printStatus(coproto::LocalAsyncSocket& s0)
+{
+
+    auto name = [](coproto::internal::SockScheduler::Slot& s) -> std::string
+    {
+        if (s.mName.size())
+            return  s.mName;
+
+        std::stringstream ss;
+        ss << s.mSessionID;
+        return ss.str();
+    };
+
+    std::cout << "send buffers: " << std::endl;
+    for (auto& b : s0.mImpl->mSendBuffers_)
+    {
+        std::cout << "name: " << name(*b) << " local: " << b->mLocalId << " remote: " << (i32)b->mRemoteId << " size: " << b->mSendOps2_.begin()->mSendBuff.asSpan().size() << std::endl;
+    }
+
+
+    if (s0.mImpl->mRecvStatus == coproto::internal::SockScheduler::Status::InUse ||
+        s0.mImpl->mRecvStatus == coproto::internal::SockScheduler::Status::RequestedRecvOp)
+    {
+        if (s0.mImpl->mHaveRecvHeader)
+        {
+            std::cout << "recving on remote: " << s0.mImpl->mRecvHeader[1];
+            auto iter = s0.mImpl->mRemoteSlotMapping_.find(s0.mImpl->mRecvHeader[1]);
+            if (iter != s0.mImpl->mRemoteSlotMapping_.end())
+            {
+                std::cout << " name:"<< name(*iter->second);
+            }
+            std::cout << std::endl;
+        }
+        else
+        {
+            std::cout << "recving header " << std::endl;
+        }
+    }
+    else if (s0.mImpl->mRecvStatus == coproto::internal::SockScheduler::Status::Idle)
+    {
+        std::cout << "recv idea " << std::endl;
+    }
+    else
+        std::cout << "recv closed " << std::endl;
+
+
+
+    std::cout << "slots:" << std::endl;
+    for (auto& s : s0.mImpl->mSlots_)
+    {
+        std::cout << "name: " << name(s) << " local: " << s.mLocalId << " remote: " << (i32)s.mRemoteId << std::endl;
+        std::cout << "    " << s.mRecvOps2_.size() << " recvs" << std::endl;
+        std::cout << "    " << s.mSendOps2_.size() << " sends" << std::endl;
+    }
+}
+
+void printStatus(coproto::LocalAsyncSocket& s0, coproto::LocalAsyncSocket& s1)
+{
+
+    std::cout << "S0\n-----------------------" << std::endl;
+    printStatus(s0);
+    std::cout << "S1\n-----------------------" << std::endl;
+    printStatus(s1);
+    //for (auto& b : s0.mImpl->m)
+    //{
+    //    std::cout << "local: " << b->mLocalId << " remote: " << b->mRemoteId << " size: " << b->mSendOps2_.begin()->mSendBuff.asSpan().size() << std::endl;
+    //}
+
+}
+
 
 
 void RadixSort_genPerm_test(const oc::CLP& cmd)
@@ -550,8 +620,11 @@ void RadixSort_genPerm_test(const oc::CLP& cmd)
                     CorGenerator g0, g1;
 
                     PRNG prng(block(0, 0));
-                    g0.init(comm[0].fork(), prng, 0, 1 << 14, cmd.getOr("mock", 1));
-                    g1.init(comm[1].fork(), prng, 1, 1 << 14, cmd.getOr("mock", 1));
+                    g0.init(comm[0].fork(), prng, 0, 1 << 18, cmd.getOr("mock", 1));
+                    g1.init(comm[1].fork(), prng, 1, 1 << 18, cmd.getOr("mock", 1));
+
+                    g0.mGenState->mDebug = cmd.isSet("debug");
+                    g1.mGenState->mDebug = cmd.isSet("debug");
 
                     RadixSort s0, s1;
                     s0.mL = L;
@@ -592,7 +665,10 @@ void RadixSort_genPerm_test(const oc::CLP& cmd)
                     s1.init(1, n, bitCount);
                     s0.request(g0);
                     s1.request(g1);
-
+                    //auto t = std::thread([&]() {
+                    //    std::this_thread::sleep_for(std::chrono::milliseconds(10000));
+                    //    printStatus(comm[0], comm[1]);
+                    //    });
                     macoro::sync_wait(macoro::when_all_ready(
                         s0.preprocess(comm[0], prng),
                         s1.preprocess(comm[1], prng)
@@ -604,7 +680,7 @@ void RadixSort_genPerm_test(const oc::CLP& cmd)
 
                     auto act = reveal(p0, p1);
 
-
+                    //t.join();
                     if (exp != act)
                     {
                         std::cout << "n " << n << " b " << bitCount << " L " << L << std::endl;
@@ -634,8 +710,8 @@ void RadixSort_mock_test(const oc::CLP& cmd)
             {
                 PRNG prng(block(0, 0));
                 CorGenerator g0, g1;
-                g0.init(comm[0].fork(), prng, 0, 1 << 14, cmd.getOr("mock", 1));
-                g1.init(comm[1].fork(), prng, 1, 1 << 14, cmd.getOr("mock", 1));
+                g0.init(comm[0].fork(), prng, 0, 1<<18, cmd.getOr("mock", 1));
+                g1.init(comm[1].fork(), prng, 1, 1<<18, cmd.getOr("mock", 1));
 
                 RadixSort s0, s1;
                 s0.mInsecureMock = true;

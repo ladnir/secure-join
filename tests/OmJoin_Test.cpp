@@ -75,8 +75,8 @@ void OmJoin_getControlBits_Test(const oc::CLP& cmd)
     share(k, kk[0], kk[1], prng);
 
     CorGenerator ole0, ole1;
-    ole0.init(sock[0].fork(), prng, 0, 1 << 14, cmd.getOr("mock", 1));
-    ole1.init(sock[1].fork(), prng, 1, 1 << 14, cmd.getOr("mock", 1));
+    ole0.init(sock[0].fork(), prng, 0, 1<<18, cmd.getOr("mock", 1));
+    ole1.init(sock[1].fork(), prng, 1, 1<<18, cmd.getOr("mock", 1));
 
     auto r = macoro::sync_wait(macoro::when_all_ready(
         OmJoin::getControlBits(kk[0], offset, keyBitCount, sock[0], cc[0], ole0, prng),
@@ -321,8 +321,8 @@ void OmJoin_join_Test(const oc::CLP& cmd)
 
     auto sock = coproto::LocalAsyncSocket::makePair();
     CorGenerator ole0, ole1;
-    ole0.init(sock[0].fork(), prng, 0, 1 << 14, mock);
-    ole1.init(sock[1].fork(), prng, 1, 1 << 14, mock);
+    ole0.init(sock[0].fork(), prng, 0, 1<<18, mock);
+    ole1.init(sock[1].fork(), prng, 1, 1<<18, mock);
 
     PRNG prng0(oc::ZeroBlock);
     PRNG prng1(oc::OneBlock);
@@ -423,8 +423,8 @@ void OmJoin_join_BigKey_Test(const oc::CLP& cmd)
 
     CorGenerator ole0, ole1;
     auto sock = coproto::LocalAsyncSocket::makePair();
-    ole0.init(sock[0].fork(), prng, 0, 1 << 14, mock);
-    ole1.init(sock[1].fork(), prng, 1, 1 << 14, mock);
+    ole0.init(sock[0].fork(), prng, 0, 1<<18, mock);
+    ole1.init(sock[1].fork(), prng, 1, 1<<18, mock);
 
 
     PRNG prng0(oc::ZeroBlock);
@@ -521,8 +521,8 @@ void OmJoin_join_Reveal_Test(const oc::CLP& cmd)
 
     CorGenerator ole0, ole1;
     auto sock = coproto::LocalAsyncSocket::makePair();
-    ole0.init(sock[0].fork(), prng, 0, 1 << 14, mock);
-    ole1.init(sock[1].fork(), prng, 1, 1 << 14, mock);
+    ole0.init(sock[0].fork(), prng, 0, 1<<18, mock);
+    ole1.init(sock[1].fork(), prng, 1, 1<<18, mock);
 
 
     PRNG prng0(oc::ZeroBlock);
@@ -727,8 +727,8 @@ void OmJoin_join_round_Test(const oc::CLP& cmd)
 
     CorGenerator ole0, ole1;
     std::array<coproto::BufferingSocket, 2> sock;
-    ole0.init(sock[0].fork(), prng, 0, 1 << 14, mock);
-    ole1.init(sock[1].fork(), prng, 1, 1 << 14, mock);
+    ole0.init(sock[0].fork(), prng, 0, 1<<18, mock);
+    ole1.init(sock[1].fork(), prng, 1, 1<<18, mock);
 
 
     PRNG prng0(oc::ZeroBlock);

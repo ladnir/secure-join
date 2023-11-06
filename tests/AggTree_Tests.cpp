@@ -41,7 +41,7 @@ void eval(BetaCircuit& cir,
 
         for (u64 i = 0; i < 2; ++i)
         {
-            gen[i].init(comm[i].fork(), prng, i, 1 << 14, mock);
+            gen[i].init(comm[i].fork(), prng, i, 1<<18, mock);
             bin[i].init(numShares, cir);
         }
 
@@ -985,8 +985,8 @@ void AggTree_xor_upstream_Test(const oc::CLP& cmd)
 
         CorGenerator g0, g1;
 
-        g0.init(comm[0].fork(), prng, 0, 1 << 14, cmd.getOr("mock", 1));
-        g1.init(comm[1].fork(), prng, 1, 1 << 14, cmd.getOr("mock", 1));
+        g0.init(comm[0].fork(), prng, 0, 1<<18, cmd.getOr("mock", 1));
+        g1.init(comm[1].fork(), prng, 1, 1<<18, cmd.getOr("mock", 1));
 
 
         macoro::sync_wait(macoro::when_all_ready(
@@ -1159,8 +1159,8 @@ void AggTree_xor_downstream_Test(Op op, OpCir opCir, u64 mN, bool mock)
         std::array<CorGenerator, 2> g;
 
         PRNG prng(ZeroBlock);
-        g[0].init(com[0].fork(), prng, 0, 1 << 14, mock);
-        g[1].init(com[1].fork(), prng, 1, 1 << 14, mock);
+        g[0].init(com[0].fork(), prng, 0, 1<<18, mock);
+        g[1].init(com[1].fork(), prng, 1, 1<<18, mock);
 
         AggTree t[2];
 
@@ -1461,8 +1461,8 @@ void AggTree_full_Test(Op op, OpCir opCir, bool mock)
         std::array<CorGenerator, 2> g;
 
         PRNG prng(oc::ZeroBlock);
-        g[0].init(com[0].fork(), prng, 0, 1 << 14, mock);
-        g[1].init(com[1].fork(), prng, 1, 1 << 14, mock);
+        g[0].init(com[0].fork(), prng, 0, 1<<18, mock);
+        g[1].init(com[1].fork(), prng, 1, 1<<18, mock);
 
         AggTree t[2];
 

@@ -6,8 +6,9 @@
 namespace secJoin
 {
 
-    RequestState::RequestState(CorType t, u64 size, std::shared_ptr<GenState>& state, u64 idx)
+    RequestState::RequestState(CorType t,bool sender, u64 size, std::shared_ptr<GenState>& state, u64 idx)
         : mType(t)
+        , mSender(sender)
         , mSize(size)
         , mGenState(state)
         , mReqIndex(idx)
@@ -25,12 +26,8 @@ namespace secJoin
     {
         switch (mType)
         {
-        case CorType::RecvOt:
-            if (dynamic_cast<OtBatch*>(b.mBatch.get()) == nullptr || dynamic_cast<OtBatch*>(b.mBatch.get())->mSendRecv.index() != 1)
-                std::terminate();
-            break;
-        case CorType::SendOt:
-            if (dynamic_cast<OtBatch*>(b.mBatch.get()) == nullptr || dynamic_cast<OtBatch*>(b.mBatch.get())->mSendRecv.index() != 0)
+        case CorType::Ot:
+            if (dynamic_cast<OtBatch*>(b.mBatch.get()) == nullptr)
                 std::terminate();
             break;
         case CorType::Ole:
@@ -60,14 +57,15 @@ namespace secJoin
 
         if (mGenState->mMock)
         {
-            //for (i = 0; i < mBatches_.size(); ++i)
-            //{
-            //    if (mBatches_[i].mBatch->mStarted.exchange(true) == false)
-            //    {
-            //        mBatches_[i].mBatch->mock(mBatches_[i].mBatch->mIndex);
-            //        mBatches_[i].mBatch->mCorReady.set();
-            //    }
-            //}
+
+            for (i = 0; i < mBatches_.size(); ++i)
+            {
+                if (mBatches_[i].mBatch->mStarted.exchange(true) == false)
+                {
+                    mBatches_[i].mBatch->mock(mBatches_[i].mBatch->mIndex);
+                    mBatches_[i].mBatch->mCorReady.set();
+                }
+            }
         }
         else
         {

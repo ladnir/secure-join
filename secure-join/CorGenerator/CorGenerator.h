@@ -57,6 +57,9 @@ namespace secJoin
         // the size that a batch of OT/OLEs should be generated in.
         u64 mBatchSize = 0;
 
+        // enable additional debugging checks.
+        bool mDebug = false;
+
         // true if we should just fake the correlation generation
         bool mMock = false;
 
@@ -85,9 +88,9 @@ namespace secJoin
             mGenState = std::make_shared<GenState>(partyIdx, prng.fork(), std::move(sock), batchSize, mock);
         }
 
-        Request<OtRecv> recvOtRequest(u64 n) { return Request<OtRecv>{request(CorType::RecvOt, oc::roundUpTo(n, 128))}; }
-        Request<OtSend> sendOtRequest(u64 n) { return Request<OtSend>{request(CorType::SendOt, oc::roundUpTo(n, 128))}; }
-        Request<BinOle> binOleRequest(u64 n) { return Request<BinOle>{request(CorType::Ole, oc::roundUpTo(n, 128))}; }
+        Request<OtRecv> recvOtRequest(u64 n) { return Request<OtRecv>{request(CorType::Ot, 0, oc::roundUpTo(n, 128))}; }
+        Request<OtSend> sendOtRequest(u64 n) { return Request<OtSend>{request(CorType::Ot, 1, oc::roundUpTo(n, 128))}; }
+        Request<BinOle> binOleRequest(u64 n) { return Request<BinOle>{request(CorType::Ole, mGenState->mPartyIdx, oc::roundUpTo(n, 128))}; }
 
         void setBaseOts(SendBase& sb, RecvBase& rb)
         {
@@ -145,7 +148,7 @@ namespace secJoin
 
     private:
 
-        std::shared_ptr<RequestState> request(CorType, u64);
+        std::shared_ptr<RequestState> request(CorType, u64 role, u64 size);
 
     };
 

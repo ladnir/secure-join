@@ -28,8 +28,8 @@ void AdditivePerm_xor_test(const oc::CLP& cmd)
 
     CorGenerator ole0, ole1;
 
-    ole0.init(chls[0].fork(), prng, 0, 1 << 14, cmd.getOr("mock", 1));
-    ole1.init(chls[1].fork(), prng, 1, 1 << 14, cmd.getOr("mock", 1));
+    ole0.init(chls[0].fork(), prng, 0, 1<<18, cmd.getOr("mock", 1));
+    ole1.init(chls[1].fork(), prng, 1, 1<<18, cmd.getOr("mock", 1));
 
 
     // Setuping up the OT Keys
@@ -121,8 +121,8 @@ void AdditivePerm_prepro_test(const oc::CLP& cmd)
 
 
     CorGenerator ole0, ole1;
-    ole0.init(chls[0].fork(), prng, 0, 1 << 14, cmd.getOr("mock", 1));
-    ole1.init(chls[1].fork(), prng, 1, 1 << 14, cmd.getOr("mock", 1));
+    ole0.init(chls[0].fork(), prng, 0, 1<<18, cmd.getOr("mock", 1));
+    ole1.init(chls[1].fork(), prng, 1, 1<<18, cmd.getOr("mock", 1));
 
 
     vecPerm1.request(ole0);

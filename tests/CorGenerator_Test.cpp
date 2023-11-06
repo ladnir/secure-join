@@ -2,7 +2,7 @@
 #include "secure-join/CorGenerator/CorGenerator.h"
 
 using namespace secJoin;
-void CorGenerator_Ot_Test(const oc::CLP&)
+void CorGenerator_Ot_Test(const oc::CLP&cmd)
 {
 
     u64 n = (1ull << 16) + 3234;
@@ -24,8 +24,11 @@ void CorGenerator_Ot_Test(const oc::CLP&)
         auto sock = coproto::LocalAsyncSocket::makePair();
         CorGenerator send;
         CorGenerator recv;
-        send.init(std::move(sock[0]), prng, 0, 1 << 14, mock);
-        recv.init(std::move(sock[1]), prng, 1, 1 << 14, mock);
+        send.init(std::move(sock[0]), prng, 0, 1<<18, mock);
+        recv.init(std::move(sock[1]), prng, 1, 1<<18, mock);
+
+        send.mGenState->mDebug = cmd.isSet("debug");
+        recv.mGenState->mDebug = cmd.isSet("debug");
 
         auto sReq = send.sendOtRequest(n);
         auto rReq = recv.recvOtRequest(n);
@@ -75,7 +78,7 @@ void CorGenerator_Ot_Test(const oc::CLP&)
     //std::get<1>(r).result();
 }
 
-void CorGenerator_BinOle_Test(const oc::CLP&)
+void CorGenerator_BinOle_Test(const oc::CLP&cmd)
 {
 
     u64 n = (1ull << 16) + 3234;
@@ -99,8 +102,11 @@ void CorGenerator_BinOle_Test(const oc::CLP&)
         CorGenerator  send;
         CorGenerator  recv;
 
-        send.init(std::move(sock[0]), prng, 0, 1 << 14, mock);
-        recv.init(std::move(sock[1]), prng, 1, 1 << 14, mock);
+        send.init(std::move(sock[0]), prng, 0, 1<<18, mock);
+        recv.init(std::move(sock[1]), prng, 1, 1<<18, mock);
+        send.mGenState->mDebug = cmd.isSet("debug");
+        recv.mGenState->mDebug = cmd.isSet("debug");
+
 
 
         auto sReq = send.binOleRequest(n);
@@ -141,7 +147,7 @@ void CorGenerator_BinOle_Test(const oc::CLP&)
     }
 }
 
-void CorGenerator_mixed_Test(const oc::CLP&)
+void CorGenerator_mixed_Test(const oc::CLP&cmd)
 {
 
     u64 n = (1ull << 11) + 3234;
@@ -153,8 +159,10 @@ void CorGenerator_mixed_Test(const oc::CLP&)
         CorGenerator  ole[2];
         CorGenerator  recv;
 
-        ole[0].init(std::move(sock[0]), prng, 0, 1 << 14, mock);
-        ole[1].init(std::move(sock[1]), prng, 1, 1 << 14, mock);
+        ole[0].init(std::move(sock[0]), prng, 0, 1<<18, mock);
+        ole[1].init(std::move(sock[1]), prng, 1, 1<<18, mock);
+        ole[0].mGenState->mDebug = cmd.isSet("debug");
+        ole[1].mGenState->mDebug = cmd.isSet("debug");
 
         std::array<std::vector<OtSendRequest>, 2> otSends;
         std::array<std::vector<OtRecvRequest>, 2> otRecvs;

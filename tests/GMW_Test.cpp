@@ -392,7 +392,7 @@ namespace secJoin_Tests
 
         PRNG prng(block(0, 0));
         CorGenerator ole;
-        ole.init(oc::Socket{}, prng, 0, 1 << 14, cmd.getOr("mock", 1));
+        ole.init(oc::Socket{}, prng, 0, 1<<18, cmd.getOr("mock", 1));
 
 
         Gmw gmw;
@@ -456,8 +456,8 @@ namespace secJoin_Tests
         PRNG prng(block(0, 0));
 
         CorGenerator ole0, ole1;
-        ole0.init(chls[0].fork(), prng, 0, 1 << 14, cmd.getOr("mock", 1));
-        ole1.init(chls[1].fork(), prng, 1, 1 << 14, cmd.getOr("mock", 1));
+        ole0.init(chls[0].fork(), prng, 0, 1<<18, cmd.getOr("mock", 1));
+        ole1.init(chls[1].fork(), prng, 1, 1<<18, cmd.getOr("mock", 1));
 
 
         //macoro::thread_pool tp;
@@ -542,8 +542,8 @@ namespace secJoin_Tests
 
         PRNG prng(block(0, 0));
         CorGenerator ole0, ole1;
-        ole0.init(sockets[0].fork(), prng, 0, 1 << 14, cmd.getOr("mock", 1));
-        ole1.init(sockets[1].fork(), prng, 1, 1 << 14, cmd.getOr("mock", 1));
+        ole0.init(sockets[0].fork(), prng, 0, 1<<18, cmd.getOr("mock", 1));
+        ole1.init(sockets[1].fork(), prng, 1, 1<<18, cmd.getOr("mock", 1));
 
         Gmw gmw0, gmw1;
         gmw0.init(n, cir);
@@ -635,8 +635,8 @@ namespace secJoin_Tests
 
         PRNG prng(block(0, 0));
         CorGenerator ole0, ole1;
-        ole0.init(sockets[0].fork(), prng, 0, 1 << 14, cmd.getOr("mock", 1));
-        ole1.init(sockets[1].fork(), prng, 1, 1 << 14, cmd.getOr("mock", 1));
+        ole0.init(sockets[0].fork(), prng, 0, 1<<18, cmd.getOr("mock", 1));
+        ole1.init(sockets[1].fork(), prng, 1, 1<<18, cmd.getOr("mock", 1));
         Gmw gmw0, gmw1;
         gmw0.init(n, cir);
         gmw1.init(n, cir);
@@ -715,8 +715,8 @@ namespace secJoin_Tests
 
         PRNG prng(block(0, 0));
         CorGenerator ole0, ole1;
-        ole0.init(sockets[0].fork(), prng, 0, 1 << 14, cmd.getOr("mock", 1));
-        ole1.init(sockets[1].fork(), prng, 1, 1 << 14, cmd.getOr("mock", 1));
+        ole0.init(sockets[0].fork(), prng, 0, 1<<18, cmd.getOr("mock", 1));
+        ole1.init(sockets[1].fork(), prng, 1, 1<<18, cmd.getOr("mock", 1));
         gmw0.init(n, cir);
         gmw1.init(n, cir);
         gmw0.mO.mDebug = true;
@@ -802,8 +802,8 @@ namespace secJoin_Tests
 
         PRNG prng(block(0, 0));
         CorGenerator ole0, ole1;
-        ole0.init(sockets[0].fork(), prng, 0, 1 << 14, cmd.getOr("mock", 1));
-        ole1.init(sockets[1].fork(), prng, 1, 1 << 14, cmd.getOr("mock", 1));
+        ole0.init(sockets[0].fork(), prng, 0, 1<<18, cmd.getOr("mock", 1));
+        ole1.init(sockets[1].fork(), prng, 1, 1<<18, cmd.getOr("mock", 1));
         gmw0.init(n, cir);
         gmw1.init(n, cir);
         gmw0.mO.mDebug = true;
@@ -901,8 +901,8 @@ namespace secJoin_Tests
         } };
 
         CorGenerator ole0, ole1;
-        ole0.init(sockets[0].fork(), prng, 0, 1 << 14, cmd.getOr("mock", 1));
-        ole1.init(sockets[1].fork(), prng, 1, 1 << 14, cmd.getOr("mock", 1));
+        ole0.init(sockets[0].fork(), prng, 0, 1<<18, cmd.getOr("mock", 1));
+        ole1.init(sockets[1].fork(), prng, 1, 1<<18, cmd.getOr("mock", 1));
 
         gmw0.init(n, cir);
         gmw1.init(n, cir);
@@ -968,8 +968,8 @@ namespace secJoin_Tests
 
 
         CorGenerator ole0, ole1;
-        ole0.init(sockets[0].fork(), prng, 0, 1 << 14, cmd.getOr("mock", 1));
-        ole1.init(sockets[1].fork(), prng, 1, 1 << 14, cmd.getOr("mock", 1));
+        ole0.init(sockets[0].fork(), prng, 0, 1<<18, cmd.getOr("mock", 1));
+        ole1.init(sockets[1].fork(), prng, 1, 1<<18, cmd.getOr("mock", 1));
 
         gmw0.init(n, cir);
         gmw1.init(n, cir);

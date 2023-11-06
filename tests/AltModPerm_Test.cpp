@@ -33,8 +33,8 @@ void AltModPerm_setup_test(const oc::CLP& cmd)
     CorGenerator ole0, ole1;
 
     auto sock = coproto::LocalAsyncSocket::makePair();
-    ole0.init(sock[0].fork(), prng0, 0, 1 << 14, cmd.getOr("mock", 1));
-    ole1.init(sock[1].fork(), prng1, 1, 1 << 14, cmd.getOr("mock", 1));
+    ole0.init(sock[0].fork(), prng0, 0, 1<<18, cmd.getOr("mock", 1));
+    ole1.init(sock[1].fork(), prng1, 1, 1<<18, cmd.getOr("mock", 1));
 
     AltModPrf dm; dm.setKey(prng0.get());
     //oc::block kk = prng0.get();
@@ -138,8 +138,8 @@ void AltModPerm_apply_test(const oc::CLP& cmd)
 
     CorGenerator ole0, ole1;
     auto sock = coproto::LocalAsyncSocket::makePair();
-    ole0.init(sock[0].fork(), prng0, 0, 1 << 14, cmd.getOr("mock", 1));
-    ole1.init(sock[1].fork(), prng1, 1, 1 << 14, cmd.getOr("mock", 1));
+    ole0.init(sock[0].fork(), prng0, 0, 1<<18, cmd.getOr("mock", 1));
+    ole1.init(sock[1].fork(), prng1, 1, 1<<18, cmd.getOr("mock", 1));
 
 
     AltModPerm0.init(n, rowSize);
@@ -216,8 +216,8 @@ void AltModPerm_sharedApply_test(const oc::CLP& cmd)
     // Fake Setup
     CorGenerator ole0, ole1;
     auto sock = coproto::LocalAsyncSocket::makePair();
-    ole0.init(sock[0].fork(), prng0, 0, 1 << 14, cmd.getOr("mock", 1));
-    ole1.init(sock[1].fork(), prng1, 1, 1 << 14, cmd.getOr("mock", 1));
+    ole0.init(sock[0].fork(), prng0, 0, 1<<18, cmd.getOr("mock", 1));
+    ole1.init(sock[1].fork(), prng1, 1, 1<<18, cmd.getOr("mock", 1));
 
     std::array<oc::Matrix<u8>, 2> xShares = share(x, prng0);
 
@@ -283,8 +283,8 @@ void AltModPerm_prepro_test(const oc::CLP& cmd)
     CorGenerator ole0, ole1;
     auto sock = coproto::LocalAsyncSocket::makePair();
 
-    ole0.init(sock[0].fork(), prng0, 0, 1 << 14, cmd.getOr("mock", 1));
-    ole1.init(sock[1].fork(), prng1, 1, 1 << 14, cmd.getOr("mock", 1));
+    ole0.init(sock[0].fork(), prng0, 0, 1<<18, cmd.getOr("mock", 1));
+    ole1.init(sock[1].fork(), prng1, 1, 1<<18, cmd.getOr("mock", 1));
 
     std::array<oc::Matrix<u8>, 2> xShares = share(x, prng0);
 

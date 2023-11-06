@@ -20,6 +20,8 @@ namespace secJoin
     {
         mMsg.resize(mReceiver.mRequestedNumOts);
         mChoice.resize(mReceiver.mRequestedNumOts);
+        assert(mReceiver.mGen.hasBaseOts());
+
         return mReceiver.silentReceive(mChoice, mMsg, prng, sock);
     }
 
@@ -42,6 +44,7 @@ namespace secJoin
     macoro::task<> OtBatch::SendOtBatch::sendTask(PRNG& prng, oc::Socket& sock)
     {
         mMsg2.resize(mSender.mRequestNumOts);
+        assert(mSender.hasSilentBaseOts());
         return mSender.silentSend(mMsg2, prng, sock);
     }
 
@@ -64,7 +67,7 @@ namespace secJoin
     {
         if (mSendRecv.index() == 0)
         {
-            if (c->mType != CorType::SendOt)
+            if (c->mType != CorType::Ot)
                 std::terminate();
 
             auto& d = *static_cast<OtSend*>(c);
@@ -72,7 +75,7 @@ namespace secJoin
         }
         else
         {
-            if (c->mType != CorType::RecvOt)
+            if (c->mType != CorType::Ot )
                 std::terminate();
 
             auto& d = *static_cast<OtRecv*>(c);
@@ -127,10 +130,13 @@ namespace secJoin
             auto& recv = std::get<1>(mSendRecv);
             recv.mReceiver.setSilentBaseOts(rMsg);
         }
+        mHaveBase.set();
     }
 
     macoro::task<> OtBatch::getTask() {
         MC_BEGIN(macoro::task<>, this);
+
+        MC_AWAIT(mHaveBase);
 
         if (mSendRecv.index() == 0)
         {

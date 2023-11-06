@@ -55,7 +55,7 @@ namespace secJoin
         virtual void getCor(Cor* c, u64 begin, u64 size) = 0;
     };
 
-    std::shared_ptr<Batch> makeBatch(CorType type, u64 partyIdx, oc::Socket&& sock, PRNG&& p);
+    std::shared_ptr<Batch> makeBatch(u64 sender, CorType type, oc::Socket&& sock, PRNG&& p);
 
     struct BatchOffset {
 

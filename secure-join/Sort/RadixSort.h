@@ -32,6 +32,9 @@ namespace secJoin
     class RadixSort : public oc::TimerAdapter
     {
     public:
+        // the number of preprocessing's ahead of the main phase
+        u64 mPreProLead = 4;
+
         // run debugging check (insecure).
         bool mDebug = false;
 
@@ -79,13 +82,65 @@ namespace secJoin
             Round&operator=(Round&&) = default;
 
 
+
+            void init(
+                u64 idx,
+                u64 role, u64 size,
+                u64 permutationByteSize,
+                bool AltModKeyGen,
+                u64 expandedBitsSize,
+                oc::BetaCircuit& mIndexToOneHotCircuit,
+                oc::BetaCircuit& mArith2BinCir,
+                bool debug)
+            {
+                mIdx = idx;
+                mRole = role;
+                mPermBytes = permutationByteSize;
+                mExpandedBitSize = expandedBitsSize;
+                mPerm.init2(role, size, permutationByteSize, AltModKeyGen);
+                mBitInject.init(1, expandedBitsSize);
+                mIndexToOneHotGmw.init(size, mIndexToOneHotCircuit);
+                mArithToBinGmw.init(size, mArith2BinCir);
+                mReady = std::make_unique<macoro::async_manual_reset_event>();
+                mDebug = debug;
+            }
+
+            void request(CorGenerator& gen)
+            {
+                if (mPermBytes)
+                    mPerm.request(gen);
+
+                mBitInject.request(gen);
+                mIndexToOneHotGmw.request(gen);
+                mArithToBinGmw.request(gen);
+
+                if (mRole)
+                {
+                    mHadamardSumRecvOts = gen.recvOtRequest(mExpandedBitSize);
+                    mHadamardSumSendOts = gen.sendOtRequest(mExpandedBitSize);
+                }
+                else
+                {
+                    mHadamardSumSendOts = gen.sendOtRequest(mExpandedBitSize);
+                    mHadamardSumRecvOts = gen.recvOtRequest(mExpandedBitSize);
+                }
+            }
+
             macoro::task<> preprocess();
 
+
+            std::unique_ptr<macoro::async_manual_reset_event> mReady;
+            u64 mRole = -1;
+            u64 mIdx = -1;
+            u64 mPermBytes = 0;
+            u64 mExpandedBitSize = 0;
+            bool mPreproDone = false;
             AdditivePerm mPerm;
             BitInject mBitInject;
             Gmw mIndexToOneHotGmw, mArithToBinGmw;
             OtRecvRequest mHadamardSumRecvOts;
             OtSendRequest mHadamardSumSendOts;
+            bool mDebug = false;
         };
 
         // The correlated randomness for each round.
@@ -125,6 +180,20 @@ namespace secJoin
         {
             return mHasPrepro;
         }
+
+        macoro::task<> hadamardSumSend(
+            Matrix32& s,
+            std::vector<u32>& shares,
+            BinMatrix& f,
+            OtRecvRequest& req,
+            coproto::Socket& comm);
+        macoro::task<> hadamardSumRecv(
+            Matrix32& s,
+            std::vector<u32>& shares,
+            BinMatrix& f,
+            OtSendRequest& req,
+            coproto::Socket& comm);
+
 
         // compute dst = sum_i f.col(i) * s.col(i) where * 
         // is the hadamard (component-wise) product. 

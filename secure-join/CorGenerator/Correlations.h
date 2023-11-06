@@ -16,10 +16,22 @@ namespace secJoin
     struct RequestState;
     enum class CorType
     {
-        SendOt,
-        RecvOt,
+        Ot,
         Ole
     };
+
+    inline std::string toString(CorType t)
+    {
+        switch (t)
+        {
+        case secJoin::CorType::Ot:
+            return "CorType::Ot";
+        case secJoin::CorType::Ole:
+            return "CorType::Ole";
+        default:
+            return "CorType::?????";
+        }
+    }
 
     struct Cor {
         Cor(CorType t)
@@ -40,7 +52,7 @@ namespace secJoin
     struct OtRecv : Cor
     {
 
-        OtRecv() : Cor(CorType::RecvOt) {}
+        OtRecv() : Cor(CorType::Ot) {}
         OtRecv(const OtRecv&) = delete;
         OtRecv& operator=(const OtRecv&) = delete;
         OtRecv(OtRecv&&) = default;
@@ -69,7 +81,7 @@ namespace secJoin
     struct OtSend : Cor
     {
 
-        OtSend() : Cor(CorType::SendOt) {}
+        OtSend() : Cor(CorType::Ot) {}
         OtSend(const OtSend&) = delete;
         OtSend& operator=(const OtSend&) = delete;
         OtSend(OtSend&&) = default;

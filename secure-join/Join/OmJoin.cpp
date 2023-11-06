@@ -40,7 +40,7 @@ namespace secJoin
         else
         {
             PRNG prng(oc::ZeroBlock);
-            oc::F2LinearCode code;
+            oc::LinearCode code;
             code.random(prng, bits, compressesSize);
 
             BinMatrix keys(rows0 + rows1, bits);
@@ -221,10 +221,12 @@ namespace secJoin
         offsets.reserve(m + 1);
         for (u64 i = 0; i < m; ++i)
         {
-            auto bytes = oc::divCeil(selects[i].mCol.getBitCount(), 8);
             if (&leftJoinCol.mTable == &selects[i].mTable)
             {
+                auto bytes = oc::divCeil(selects[i].mCol.getBitCount(), 8);
+                assert(bytes == selects[i].mCol.getByteCount());
                 assert(selects[i].mCol.rows() == n0);
+
                 left.emplace_back(&selects[i].mCol.mData);
                 offsets.emplace_back(Offset{ rowSize * 8, selects[i].mCol.mData.bitsPerEntry(), selects[i].mCol.mName });
                 rowSize += bytes;
@@ -488,7 +490,8 @@ namespace secJoin
             dup = AggTree::Operator{},
             offsets = std::vector<Offset>{},
             bytesPermuted0 = u64{},
-            bytesPermuted1 = u64{});
+            bytesPermuted1 = u64{}, 
+            prepro = macoro::eager_task<>{});
 
         setTimePoint("start");
 
@@ -510,7 +513,7 @@ namespace secJoin
         // and all of the select columns of the left table. In the 
         // backwards direction, we will unpermute the left table select
         // columns. Therefore, in total we will permute:
-        bytesPermuted0 = keys.bytesPerEntry() + 1;
+        bytesPermuted0 = oc::divCeil(keys.bitsPerEntry() + 1, 8);
         bytesPermuted1 = 1;
         for (u64 i = 0; i < selects.size(); ++i)
         {
@@ -525,11 +528,14 @@ namespace secJoin
 
         sort.init(ole.partyIdx(), keys.rows(), keys.bitsPerEntry(), bytesPermuted0 + bytesPermuted1);
         sort.request(ole);
-        MC_AWAIT(sort.preprocess(sock, prng));
+        prepro = sort.preprocess(sock, prng) |macoro::make_eager();
 
         // get the stable sorting permutation sPerm
         MC_AWAIT(sort.genPerm(keys, sPerm, sock,prng));
         setTimePoint("sort");
+
+        if (mInsecurePrint)
+            MC_AWAIT(print(data, controlBits, sock, ole.partyIdx(), "preSort", offsets));
 
         // gather all of the columns from the left table and concatinate them
         // together. Append dummy rows after that. Then add the column of keys
@@ -540,14 +546,10 @@ namespace secJoin
         setTimePoint("concat");
         keys.mData = {};
 
-        if (mInsecurePrint)
-            MC_AWAIT(print(data, controlBits, sock, ole.partyIdx(), "preSort", offsets));
-
         // Apply the sortin permutation. What you end up with are the keys
         // in sorted order and the rows of L also in sorted order.
         temp.resize(data.numEntries(), data.bitsPerEntry() + 8);
         temp.resize(data.numEntries(), data.bitsPerEntry());
-        // temp.reshape(data.bitsPerEntry());
 
         assert(data.bytesPerEntry() == bytesPermuted0);
 

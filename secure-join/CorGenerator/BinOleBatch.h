@@ -34,7 +34,7 @@ namespace secJoin
             // The OT Sender
             oc::SilentOtExtSender mSender;
             // The OT send messages
-            oc::AlignedUnVector<std::array<oc::block, 2>> mMsg2;
+            ;
 
             // return the task that generate the Sender correlation.
             macoro::task<> sendTask(
@@ -42,7 +42,8 @@ namespace secJoin
                 oc::Socket& sock,
                 oc::AlignedUnVector<oc::block>& add,
                 oc::AlignedUnVector<oc::block>& mult,
-                macoro::async_manual_reset_event& corReady);
+                macoro::async_manual_reset_event& corReady,
+                macoro::async_manual_reset_event& haveBase);
 
             // The routine that compresses the sender's OT messages
             // into OLEs. Basically, it just tasks the LSB of the OTs.
@@ -63,17 +64,15 @@ namespace secJoin
         {
             // The OT receiver
             oc::SilentOtExtReceiver mReceiver;
-            // The OT recv choice bit
-            oc::BitVector mChoice;
-            // The OT recv messages
-            oc::AlignedUnVector<oc::block> mMsg;
+
             // return the task that generate the Sender correlation.
             macoro::task<> recvTask(
                 PRNG& prng,
                 oc::Socket& sock,
                 oc::AlignedUnVector<oc::block>& add,
                 oc::AlignedUnVector<oc::block>& mult,
-                macoro::async_manual_reset_event& corReady);
+                macoro::async_manual_reset_event& corReady,
+                macoro::async_manual_reset_event& haveBase);
 
             // The routine that compresses the sender's OT messages
             // into OLEs. Basically, it just tasks the LSB of the OTs.
