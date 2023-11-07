@@ -118,17 +118,17 @@ namespace secJoin
 
 
 
-    template<typename T>
-    macoro::task<> InsecurePerm::apply(
-        const Perm& pi,
-        PermOp op,
-        oc::MatrixView<const T> x2,
-        oc::MatrixView<T> sout,
-        PRNG& prng,
-        coproto::Socket& chl)
-    {
-        return apply<u8>(pi, op, matrixCast<u8>(x2), matrixCast<u8>(sout), prng, chl, invPerm);
-    }
+    //template<typename T>
+    //macoro::task<> InsecurePerm::apply(
+    //    const Perm& pi,
+    //    PermOp op,
+    //    oc::MatrixView<const T> x2,
+    //    oc::MatrixView<T> sout,
+    //    PRNG& prng,
+    //    coproto::Socket& chl)
+    //{
+    //    return apply<u8>(pi, op, matrixCast<u8>(x2), matrixCast<u8>(sout), prng, chl, invPerm);
+    //}
 
     template<>
     inline macoro::task<> InsecurePerm::apply<u8>(

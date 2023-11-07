@@ -13,6 +13,7 @@
         "SECUREJOIN_ENABLE_FAKE_GEN": true,
         "SECUREJOIN_ENABLE_BOOST": false,
         "FETCH_AUTO": "ON",
+        "SECUREJOIN_DEV": true,
         "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}"
       },
       "vendor": {

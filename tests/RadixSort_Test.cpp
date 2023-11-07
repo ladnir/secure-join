@@ -87,8 +87,8 @@ void RadixSort_hadamardSum_test(const oc::CLP& cmd)
 
     g0.init(comm[0].fork(), prng, 0, 1<<18, cmd.getOr("mock", 1));
     g1.init(comm[1].fork(), prng, 1, 1<<18, cmd.getOr("mock", 1));
-    s0.mDebug = true;
-    s1.mDebug = true;
+    s0.mDebug = cmd.isSet("debug");
+    s1.mDebug = cmd.isSet("debug");
 
     //s0.request(
     s0.init(0, rows, s0.mL); s0.request(g0);

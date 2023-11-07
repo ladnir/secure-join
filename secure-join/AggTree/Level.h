@@ -57,7 +57,7 @@ namespace secJoin
             mN = n_;
 
             // the number of entries rounded up to a multiple of 16 or power of 2
-            mN16 = std::min(1ull << oc::log2ceil(mN), oc::roundUpTo(mN, 16));
+            mN16 = std::min<u64>(1ull << oc::log2ceil(mN), oc::roundUpTo(mN, 16));
 
             // log 2 floor
             mLogfn = oc::log2floor(mN16);

@@ -603,7 +603,7 @@ namespace secJoin
                 auto lsbj = v & 255ull;
                 auto msbj = (v >> 8) & 255ull;
                 auto flag = v >> 16;
-                __assume(flag <= 1);
+                //__assume(flag <= 1);
                 lsb |= lsbj << j;
                 msb |= msbj << j;
                 j += flag * 5;

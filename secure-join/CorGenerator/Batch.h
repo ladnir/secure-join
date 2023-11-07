@@ -39,7 +39,7 @@ namespace secJoin
         // When a task is split between one or more requests,
         // multiple requests might try to start it. This flag 
         // decides who is first.
-        std::atomic_bool mStarted;
+        std::atomic_bool mStarted = false;
 
         virtual BaseRequest getBaseRequest() = 0;
 

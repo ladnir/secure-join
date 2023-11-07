@@ -498,10 +498,10 @@ void AltModPrf_sampleMod3_test(const oc::CLP& cmd)
 void AltModPrf_AMult_test(const oc::CLP& cmd)
 {
     F3AccPermCode c;
-    auto k = cmd.getOr("k", 128);
-    auto n = cmd.getOr("n", k / 2);
-    auto l = cmd.getOr("l", 1 << 4);
-    auto p = cmd.getOr("p", 0);
+    u64 k = cmd.getOr("k", 128);
+    u64 n = cmd.getOr("n", k / 2);
+    u64 l = cmd.getOr("l", 1 << 4);
+    u64 p = cmd.getOr("p", 0);
 
     c.init(k, n, p);
 

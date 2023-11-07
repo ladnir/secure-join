@@ -2,7 +2,7 @@
 #include "cryptoTools/Common/CLP.h"
 #include "benchmark.h"
 #include "secure-join/Defines.h"
-
+#include "coproto/Proto/SessionID.h"
 using namespace secJoin;
 
 
@@ -45,7 +45,8 @@ int main(int argc, char** argv)
         }
         return 0;
     }
-    //clp.set("u");
+
+
     secJoin_Tests::Tests.runIf(clp);
     // secJoin_Tests::Tests.runAll();
     return 0;

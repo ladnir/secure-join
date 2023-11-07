@@ -71,12 +71,12 @@ if(SECUREJOIN_DEV)
     add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/../out/libOTe")
 else()
 
-    #if(FETCH_LIBOTE_AUTO)
-    #    FIND_LIBOTE(QUIET)
-    #    include(${CMAKE_CURRENT_LIST_DIR}/../thirdparty/getLibOTe.cmake)
-    #endif()
-    #
-    #FIND_LIBOTE(REQUIRED)
+    if(FETCH_LIBOTE_AUTO)
+        FIND_LIBOTE(QUIET)
+        include(${CMAKE_CURRENT_LIST_DIR}/../thirdparty/getLibOTe.cmake)
+    endif()
+    
+    FIND_LIBOTE(REQUIRED)
 endif()
 
 

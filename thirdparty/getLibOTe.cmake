@@ -2,7 +2,7 @@
 set(USER_NAME           )      
 set(TOKEN               )      
 set(GIT_REPOSITORY      "https://github.com/osu-crypto/libOTe.git")
-set(GIT_TAG             "6bb3a23a91c7c98a2ef8c5ac64a2cf42769cc2ec")
+set(GIT_TAG             "1ca6463bc6a4c2028cc8ea1649aaa71ca6835161")
 
 set(DEP_NAME            libOTe)          
 set(CLONE_DIR "${SECUREJOIN_THIRDPARTY_CLONE_DIR}/${DEP_NAME}")

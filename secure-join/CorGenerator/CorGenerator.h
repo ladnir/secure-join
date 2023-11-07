@@ -23,11 +23,11 @@ namespace secJoin
     {
         GenState() = delete;
         GenState(u64 partyIdx, PRNG&& prng, oc::Socket s, u64 batchSize, bool mock)
-            : mPartyIdx(partyIdx)
-            , mPrng(std::move(prng))
+            : mPrng(std::move(prng))
             , mSock(std::move(s))
             , mBatchSize(batchSize)
             , mMock(mock)
+            , mPartyIdx(partyIdx)
         {
             if (batchSize < (1ull << 12))
                 throw std::runtime_error("too small of batch size." LOCATION);

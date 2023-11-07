@@ -1276,7 +1276,8 @@ namespace secJoin
             // release the next batch of preprocessing
             if (lead < mRounds.size())
             {
-                std::cout << "main ready " << lead << std::endl;
+                if(mDebug)
+                    std::cout << "main ready " << lead << std::endl;
                 mRounds[lead++].mReady->set();
             }
 

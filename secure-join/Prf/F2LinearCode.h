@@ -328,6 +328,7 @@ namespace secJoin
         void encodeN(block* inout)
         {
 #ifndef NDEBUG
+            const u64 codeSize = mSubcodes.cols();
             if (codeSize != 1)
                 throw RTE_LOC;// not impl.
             if (mInputByteSize != sizeof(block))

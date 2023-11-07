@@ -237,7 +237,7 @@ namespace secJoin
         MC_END();
     }
 
-    void GenState::set(SendBase& b) { mRecvBase.setBaseOts(b.get()); }
-    void GenState::set(RecvBase& b) { mSendBase.setBaseOts(b.get(), b.mChoice); }
+    void GenState::set(SendBase& b) { auto v = b.get(); mRecvBase.setBaseOts(v); }
+    void GenState::set(RecvBase& b) { auto v = b.get(); mSendBase.setBaseOts(v, b.mChoice); }
 
 }

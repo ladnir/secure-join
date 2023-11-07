@@ -609,8 +609,8 @@ namespace secJoin
 
 
         // this will hold the downstream intermediate levels.
-        temp[0].resize(std::max(mN0, 1ull << mLogfn), bitsPerEntry, type);
-        temp[1].resize(std::max(mN0, 1ull << mLogfn), bitsPerEntry, type);
+        temp[0].resize(std::max<u64>(mN0, 1ull << mLogfn), bitsPerEntry, type);
+        temp[1].resize(std::max<u64>(mN0, 1ull << mLogfn), bitsPerEntry, type);
 
 
         // we start at the root and move down. We store intermidate 

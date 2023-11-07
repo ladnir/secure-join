@@ -298,15 +298,15 @@ namespace secJoin
         PRNG& prng,
         coproto::Socket& chl);
 
-    template <typename T>
-    macoro::task<> AltModPermSender::apply(
-        PermOp op,
-        oc::MatrixView<T> sout,
-        PRNG& prng,
-        coproto::Socket& chl)
-    {
-        return apply<u8>(pi, op, matrixCast<u8>(sout), prng, chl, ole);
-    }
+    //template <typename T>
+    //macoro::task<> AltModPermSender::apply(
+    //    PermOp op,
+    //    oc::MatrixView<T> sout,
+    //    PRNG& prng,
+    //    coproto::Socket& chl)
+    //{
+    //    return apply<u8>(op, matrixCast<u8>(sout), prng, chl, ole);
+    //}
 
     // Generic version of below method
     //template <>
@@ -342,17 +342,17 @@ namespace secJoin
         PRNG& prng,
         coproto::Socket& chl);
 
-    // Generic version of below method
-    template <typename T>
-    macoro::task<> AltModPermSender::apply(
-        PermOp op,
-        oc::MatrixView<const T> in,
-        oc::MatrixView<T> sout,
-        PRNG& prng,
-        coproto::Socket& chl)
-    {
-        return apply<u8>(op, matrixCast<const u8>(in), matrixCast<u8>(out), prng, chl);
-    }
+    //// Generic version of below method
+    //template <typename T>
+    //macoro::task<> AltModPermSender::apply(
+    //    PermOp op,
+    //    oc::MatrixView<const T> in,
+    //    oc::MatrixView<T> sout,
+    //    PRNG& prng,
+    //    coproto::Socket& chl)
+    //{
+    //    return apply<u8>(op, matrixCast<const u8>(in), matrixCast<u8>(out), prng, chl);
+    //}
 
     template <>
     macoro::task<> AltModPermReceiver::apply<u8>(
@@ -364,16 +364,16 @@ namespace secJoin
         );
 
     // Generic version of below method
-    template <typename T>
-    macoro::task<> AltModPermReceiver::apply(
-        PermOp op,
-        oc::MatrixView<const T> in,
-        oc::MatrixView<T> sout,
-        PRNG& prng,
-        coproto::Socket& chl)
-    {
-        return apply<u8>(op, matrixCast<const u8>(in), matrixCast<u8>(out), prng, chl);
-    }
+    //template <typename T>
+    //macoro::task<> AltModPermReceiver::apply(
+    //    PermOp op,
+    //    oc::MatrixView<const T> in,
+    //    oc::MatrixView<T> sout,
+    //    PRNG& prng,
+    //    coproto::Socket& chl)
+    //{
+    //    return apply<u8>(op, matrixCast<const u8>(in), matrixCast<u8>(out), prng, chl);
+    //}
 
 
 

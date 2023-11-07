@@ -49,7 +49,8 @@ void AltModPerm_setup_test(const oc::CLP& cmd)
         rk[i] = oc::block(i, *oc::BitIterator((u8*)&dm.mExpandedKey, i));
     }
     AltModPerm0.setKeyOts(sk);
-    AltModPerm1.setKeyOts(dm.getKey(), rk);
+    auto kkk = dm.getKey();
+    AltModPerm1.setKeyOts(kkk, rk);
     for (u64 i = 0; i < AltModPrf::KeySize; ++i)
     {
         auto ki = *oc::BitIterator((u8*)&AltModPerm1.mSender.mPrf.mExpandedKey, i);

@@ -7,7 +7,7 @@
 
 #include <iostream>
 #include "secure-join/Defines.h"
-
+#include "secure-join/Util/Matrix.h"
 namespace secJoin
 {
 	
