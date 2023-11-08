@@ -10,3 +10,4 @@ void OmJoin_join_Test(const oc::CLP&);
 void OmJoin_join_BigKey_Test(const oc::CLP&);
 void OmJoin_join_Reveal_Test(const oc::CLP&);
 void OmJoin_join_round_Test(const oc::CLP&);
+void OmJoin_join_csv_Test(const oc::CLP&);

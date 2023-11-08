@@ -3,23 +3,23 @@
 namespace secJoin
 {
     // Reading files starts here
-    u64 getRows(std::string line)
+    u64 getCount(std::string& line, const std::string& type)
     {
         std::stringstream str(line);
         std::string word;
 
-        u64 rowCount = 0;
+        u64 count = 0;
         u8 colInfoCount = 0;
         while (getline(str, word, CSV_COL_DELIM))
         {
             if (colInfoCount == 0)
             {
-                if (word.compare(ROWS_META_TYPE) != 0)
+                if (word.compare(type) != 0)
                     throw RTE_LOC;
             }
             else if (colInfoCount == 1)
             {
-                rowCount = std::stol(word);
+                count = std::stol(word);
             }
 
             colInfoCount++;
@@ -30,10 +30,10 @@ namespace secJoin
             std::string temp = line + " -> Not enough Information in the Meta File\n" + LOCATION;
             throw std::runtime_error(temp);
         }
-        return rowCount;
+        return count;
     }
 
-    ColumnInfo getColumnInfo(std::string line)
+    ColumnInfo getColumnInfo(std::string& line)
     {
         std::stringstream str(line);
         std::string word;
@@ -74,19 +74,34 @@ namespace secJoin
     void getFileInfo(std::string &fileName,
                      std::istream &in,
                      std::vector<ColumnInfo> &columnInfo,
-                     u64 &rowCount)
+                     u64 &rowCount,
+                     u64 &colCount)
     {
         std::string line, word;
         bool readRowCount = false;
+        bool readColCount = false;
 
         while (getline(in, line))
         {
             if (!readRowCount)
-                rowCount = getRows(line);
+            {
+                rowCount = getCount(line, ROWS_META_TYPE);
+                readRowCount = true;
+            }
+            else if (!readColCount)
+            {
+                colCount = getCount(line, COLS_META_TYPE);
+                readColCount = true;
+            }
             else
                 columnInfo.push_back(getColumnInfo(line));
 
-            readRowCount = true;
+        }
+
+        if(columnInfo.size() != colCount)
+        {
+            throw std::runtime_error("Col Count doesn't match the total \
+                number of column info " + fileName + "\n" LOCATION);
         }
 
         if (SECJOIN_ENABLE_LOGGING)
@@ -114,7 +129,8 @@ namespace secJoin
         }
     }
 
-    void getFileInfo(std::string &fileName, std::vector<ColumnInfo> &columnInfo, u64 &rowCount)
+    void getFileInfo(std::string &fileName, std::vector<ColumnInfo> &columnInfo, 
+        u64 &rowCount, u64& colCount)
     {
 
         std::fstream file(fileName, std::ios::in);
@@ -123,7 +139,7 @@ namespace secJoin
         if (!file.is_open())
             throw std::runtime_error("Could not open the file " + fileName + "\n" LOCATION);
 
-        getFileInfo(fileName, in, columnInfo, rowCount);
+        getFileInfo(fileName, in, columnInfo, rowCount, colCount);
         file.close();
     }
 

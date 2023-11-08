@@ -141,4 +141,7 @@ namespace secJoin
         return apply<u8>(op, matrixCast<const u8>(in), matrixCast<u8>(out), chl, prng);
     }
 
+    static_assert(std::is_move_constructible<ComposedPerm>::value, "ComposedPerm is missing its move ctor");
+    static_assert(std::is_move_assignable<ComposedPerm>::value, "ComposedPerm is missing its move ctor");
+
 }

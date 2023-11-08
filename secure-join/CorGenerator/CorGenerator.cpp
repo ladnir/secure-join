@@ -84,9 +84,9 @@ namespace secJoin
                 if (batch == nullptr)
                 {
                     auto ss = mSock.fork();
-                    for (auto& slot : ss.mImpl->mSlots_)
-                        if (slot.mSessionID == ss.mId)
-                            slot.mName = std::string("gen_") + std::to_string(batches.size());
+                    //for (auto& slot : ss.mImpl->mSlots_)
+                    //    if (slot.mSessionID == ss.mId)
+                    //        slot.mName = std::string("gen_") + std::to_string(batches.size());
                     batches.push_back(makeBatch(requests[i]->mSender, requests[i]->mType, std::move(ss), mPrng.fork()));
                     batches.back()->mIndex = batches.size();
                     batch = batches.back();

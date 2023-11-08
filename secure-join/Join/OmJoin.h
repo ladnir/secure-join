@@ -117,6 +117,14 @@ namespace secJoin
 
 		static AggTree::Operator getDupCircuit();
 
+		static macoro::task<> print(
+			const BinMatrix& data,
+			const BinMatrix& control,
+			coproto::Socket& sock,
+			int role,
+			std::string name,
+			std::vector<OmJoin::Offset>& offsets);
+
 		// leftJoinCol should be unique
 		macoro::task<> join(
 			ColRef leftJoinCol,

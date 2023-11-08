@@ -344,7 +344,7 @@ namespace secJoin
         };
     }
 
-    macoro::task<> print(
+    macoro::task<> OmJoin::print(
         const BinMatrix& data,
         const BinMatrix& control,
         coproto::Socket& sock,
@@ -402,7 +402,7 @@ namespace secJoin
         MC_END();
     }
 
-
+    // Active Flag = LFlag & Controlbits
     macoro::task<> OmJoin::updateActiveFlag(
         BinMatrix& data,
         BinMatrix& choice,

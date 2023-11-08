@@ -17,6 +17,7 @@ namespace secJoin
     const char CSV_COL_DELIM = ';';
     const std::string STRING_META_TYPE = "STRING";
     const std::string ROWS_META_TYPE = "Rows";
+    const std::string COLS_META_TYPE = "Cols";
     using block = oc::block;
     using PRNG = oc::PRNG;
 
@@ -45,7 +46,8 @@ namespace secJoin
     inline std::string hex(oc::span<const u8> d)
     {
         std::stringstream ss;
-        for (u64 i = d.size() - 1; i < d.size(); --i)
+        // for (u64 i = d.size() - 1; i < d.size(); --i)
+        for (u64 i = 0; i < d.size(); i++)
             ss << std::hex << std::setw(2) << std::setfill('0') << int(d[i]);
         return ss.str();
     }

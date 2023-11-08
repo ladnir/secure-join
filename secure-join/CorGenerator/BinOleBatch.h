@@ -12,6 +12,7 @@
 #include "macoro/channel.h"
 #include "macoro/macros.h"
 #include "macoro/manual_reset_event.h"
+#include "macoro/variant.h"
 
 #include "libOTe/TwoChooseOne/Silent/SilentOtExtSender.h"
 #include "libOTe/TwoChooseOne/Silent/SilentOtExtReceiver.h"

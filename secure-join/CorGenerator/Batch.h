@@ -69,4 +69,19 @@ namespace secJoin
         u64 mSize = 0;
     };
 
+
+
+
+    template <typename... Fs>
+    struct match : Fs... {
+        using Fs::operator()...;
+        // constexpr match(Fs &&... fs) : Fs{fs}... {}
+    };
+    template<class... Ts> match(Ts...)->match<Ts...>;
+
+    template <typename Var, typename... Fs>
+    constexpr decltype(auto) operator| (Var&& v, match<Fs...> const& match) {
+        return std::visit(match, v);
+    }
+
 }

@@ -32,11 +32,12 @@ set(SRCS
     "AggTree/AggTree.cpp"
     "AggTree/Level.cpp"
     "AggTree/PlainAggTree.cpp"
+    "Aggregate/Average.cpp"
     
     "Util/Trim.cpp"
     "Util/CSVParser.cpp"
     
-    "join/Table.cpp"
+    "Join/Table.cpp"
     "Join/OmJoin.cpp"
     )
 

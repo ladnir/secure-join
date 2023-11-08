@@ -44,6 +44,7 @@ if(NOT ${DEP_NAME}_FOUND OR LIBOTE_DEV)
                        -DENABLE_ASAN=${SECUREJOIN_ENABLE_ASAN}
                        -DENABLE_BOOST=${SECUREJOIN_ENABLE_BOOST}
                        -DOC_THIRDPARTY_INSTALL_PREFIX=${SECUREJOIN_THIRDPARTY_DIR}
+                       -DENABLE_PIC=${SECUREJOIN_ENABLE_PIC}
                        )
     set(BUILD_CMD     ${CMAKE_COMMAND} --build ${BUILD_DIR} --config ${CMAKE_BUILD_TYPE})
     set(INSTALL_CMD   ${CMAKE_COMMAND} --install ${BUILD_DIR} --config ${CMAKE_BUILD_TYPE} --prefix ${SECUREJOIN_THIRDPARTY_DIR})

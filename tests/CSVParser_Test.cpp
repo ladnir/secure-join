@@ -8,10 +8,11 @@ void secret_share_table_test()
     using oc::block;
     std::vector<ColumnInfo> columnInfo;
     u64 rowCount = 0;
+    u64 colCount = 0;
 
     std::string filename = "Visa Meta File";
     std::istream in(visa_meta_text.rdbuf());
-    getFileInfo(filename, in, columnInfo, rowCount);
+    getFileInfo(filename, in, columnInfo, rowCount, colCount);
 
     Table table(rowCount, columnInfo);
     std::array<Table, 2> shareTables;
@@ -43,9 +44,9 @@ void secret_share_csv_test()
     std::string csvFileNm = "INSERT PATH TO THE CSV DATA";
 
     std::vector<ColumnInfo> columnInfo;
-    u64 rowCount = 0;
+    u64 rowCount = 0, colCount = 0;
 
-    getFileInfo(csvMetaFileNm, columnInfo, rowCount);
+    getFileInfo(csvMetaFileNm, columnInfo, rowCount, colCount);
 
     Table table(rowCount, columnInfo);
     std::array<Table, 2> shareTables;
@@ -73,11 +74,11 @@ void table_write_csv_test()
 
     using oc::block;
     std::vector<ColumnInfo> columnInfo;
-    u64 rowCount = 0;
+    u64 rowCount = 0, colCount = 0;
     
     std::string filename = "Visa Meta File";
     std::istream in(visa_meta_text.rdbuf());
-    getFileInfo(filename, in, columnInfo, rowCount);
+    getFileInfo(filename, in, columnInfo, rowCount, colCount);
 
     Table table(rowCount, columnInfo);
     std::istream in1(visa_csv.rdbuf());

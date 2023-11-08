@@ -1,5 +1,5 @@
-Rows;70
+Rows;1500000
 Date;STRING;10
 PAN;INT;8
 Balance;INT;4
-Risk_Score;STRING;10
+Risk_Score;INT;4

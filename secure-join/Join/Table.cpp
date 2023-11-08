@@ -3,6 +3,7 @@
 #include "secure-join/Sort/RadixSort.h"
 
 
+
 namespace secJoin
 {
     // SelectBundle SelectQuery::addInput(SharedTable::ColRef column)
@@ -284,7 +285,6 @@ namespace secJoin
         {
             MC_AWAIT(sock.recv(remoteShare.mColumns[i].mData.mData));
         }
-
         if (share.mIsActive.size() > 0)
         {
             remoteShare.mIsActive.resize(share.mIsActive.size());
@@ -304,7 +304,6 @@ namespace secJoin
         {
             MC_AWAIT(sock.send(coproto::copy(share.mColumns[i].mData.mData)));
         }
-
 
         // std::move() will the delete the local share
         if (share.mIsActive.size() > 0)
@@ -439,6 +438,241 @@ namespace secJoin
         //         // return false;
         //     });
         // return res;
+    }
+
+    Table average(ColRef groupByCol,
+                std::vector<ColRef> avgCol)
+    {
+        u64 m = avgCol.size();
+        u64 n0 = groupByCol.mCol.rows();
+
+        // Generating the permutation
+        auto groupByPerm = sort(groupByCol);
+
+
+        auto invPerm = PermOp::Regular;
+        BinMatrix temp; 
+        temp.resize(groupByCol.mCol.mData.numEntries(), groupByCol.mCol.mData.bytesPerEntry() * 8);
+        groupByPerm.apply<u8>(groupByCol.mCol.mData, temp, invPerm);
+        std::swap(groupByCol.mCol.mData, temp);
+
+
+        // Applying permutation to all the average cols
+        for(u64 i=0; i<m; i++)
+        {
+            temp.resize(avgCol[i].mCol.mData.numEntries(), 
+                avgCol[i].mCol.mData.bytesPerEntry() * 8);
+            groupByPerm.apply<u8>(avgCol[i].mCol.mData, temp, invPerm);
+            std::swap(avgCol[i].mCol.mData, temp);
+        }
+
+
+        // Adding a Columns of 1's for calculating average
+        BinMatrix ones(n0, sizeof(oc::u64) * 8);
+        for(oc::u64 i = 0; i < n0; i++)
+            ones(i,0) = 1;
+
+        Table out;
+
+        u64 nOutRows=0;
+
+        // Maybe implement a ControlBits logic
+        if(n0 > 0)
+        {
+            nOutRows=1; // First region 
+            for(u64 row=1; row<n0; row++)
+            {
+                if( !eq(groupByCol.mCol.mData[row], groupByCol.mCol.mData[row-1]))
+                    nOutRows++;
+            }
+        }
+
+        populateOutTable(out, avgCol, groupByCol, nOutRows);
+
+        // Base case where there are no rows
+        if(n0 == 0)
+            return out;
+        
+
+    
+        // Creating a vector of inputs for Beta Curcuit evaluation
+        std::vector<oc::BetaCircuit*> cir;
+        cir.resize(m + 1);
+        std::vector<oc::BitVector> inputs(2 * cir.size()), outputs(cir.size());
+
+        oc::BetaLibrary lib;
+        for(u64 i=0; i<m; i++)
+        {
+            u64 size = avgCol[i].mCol.getByteCount() * 8;
+            cir[i] = lib.int_int_add(size, size, size, oc::BetaLibrary::Optimized::Depth);
+            
+            // Placing the first entry of the table for each column
+            u64 rem = size - avgCol[i].mCol.getBitCount();
+            inputs[2*i].reset(rem);
+            inputs[2*i].append(avgCol[i].mCol.mData.data(0) , avgCol[i].mCol.getBitCount());
+
+            // Placing 0s as the first entry
+            inputs[2*i+1].reset(size);
+            outputs[i].reset(size);
+        }
+
+        // Adding the ciruit for the BinMatrix of ones
+        u64 size = ones.bytesPerEntry() * 8;
+        cir[m] = lib.int_int_add(size, size, size, oc::BetaLibrary::Optimized::Depth);
+        inputs[2*m].append(ones.mData.data(0) , size);
+        inputs[2*m+1].reset(size);
+        outputs[m].reset(size);
+
+
+        u64 curOutRow = 0;
+        // We don't have to check the first entry
+        for(u64 row=1; row<n0; row++)
+        {
+            // Checking groupby row with the previous entry
+            if( eq(groupByCol.mCol.mData[row], groupByCol.mCol.mData[row-1]))
+            {
+
+                for(u64 col=0; col<m; col++)
+                {
+                    std::vector<oc::BitVector> tempInputs = 
+                                    {inputs[2*col], inputs[2*col+1]};
+
+                    inputs[2*col] = cirEval(cir[col], tempInputs,
+                        outputs[col], avgCol[col].mCol.mData.data(row), 
+                        avgCol[col].mCol.getBitCount(),
+                        avgCol[col].mCol.getByteCount()
+                    );
+                }
+
+                // Run the circuit of ones:
+                std::vector<oc::BitVector> tempInputs = {inputs[2*m], inputs[2*m+1]};
+                inputs[2*m] = cirEval(cir[m], tempInputs,
+                        outputs[m], ones.mData.data(row), 
+                        ones.bitsPerEntry(),
+                        ones.bytesPerEntry()
+                    );
+            }
+            else
+            {
+                copyTableEntry(out, groupByCol, avgCol, inputs, ones,
+                    curOutRow, nOutRows, row);
+
+                // Putting the current row value in the first input
+                for(u64 i=0; i<m; i++)
+                {
+                    auto size = avgCol[i].mCol.getByteCount() * 8;
+                    auto bits = avgCol[i].mCol.getBitCount();
+                    // Filling extra bits with zero
+                    u64 rem = size - bits;
+                    inputs[2*i].reset(rem);
+                    inputs[2*i].append(avgCol[i].mCol.mData.data(row) , bits);
+                }
+                inputs[2*m].reset(0);
+                inputs[2*m].append(ones.mData.data(row) , ones.bitsPerEntry());
+
+                curOutRow++;
+            }
+
+            if( row == n0 - 1)
+            {
+                copyTableEntry(out, groupByCol, avgCol, inputs, ones,
+                    curOutRow, nOutRows, row);
+            }
+
+        }
+
+
+        return out;
+    }
+
+    void copyTableEntry(Table& out, ColRef groupByCol, std::vector<ColRef> avgCol,
+                std::vector<oc::BitVector>& inputs, BinMatrix& ones,
+                u64 curOutRow, u64 nOutRows, u64 row)
+    {
+        u64 m = avgCol.size();
+        assert(curOutRow <= nOutRows);
+        // Copying the groupby column
+        assert(out.mColumns[0].mData.cols() == groupByCol.mCol.mData.cols());
+        memcpy(out.mColumns[0].mData.data(curOutRow),  
+                groupByCol.mCol.mData.data(row-1), 
+                groupByCol.mCol.mData.cols());
+
+        // Copying the average column
+        for(u64 col=0; col<m; col++)
+        {
+            assert(out.mColumns[col+1].mData.bytesPerEntry() == inputs[2*col].sizeBytes());
+            memcpy(out.mColumns[col+1].mData.data(curOutRow),
+                    inputs[2*col].data(), inputs[2*col].sizeBytes());
+        }
+
+        // Copying the ones column 
+        memcpy(out.mColumns[m+1].mData.data(curOutRow),
+                    inputs[2*m].data(), inputs[2*m].sizeBytes());
+
+        // Making the first input zero
+        for(u64 i=0; i<m; i++)
+        {
+            u64 size = avgCol[i].mCol.getByteCount() * 8;
+            inputs[2*i+1].reset(size);
+        }
+        u64 size = ones.bytesPerEntry() * 8;
+        inputs[2*m].reset(size);
+    }
+
+    void populateOutTable(
+        Table& out,
+        std::vector<ColRef> avgCol,
+        ColRef groupByCol,
+        u64 nOutRows)
+    {
+        u64 m = avgCol.size();
+        // u64 n0 = groupByCol.mCol.rows();
+
+        out.mColumns.resize(m + 2); // Average Cols + Group By Cols + Count Col
+
+        // Adding the group by column info
+        out.mColumns[0].mName = groupByCol.mCol.mName;
+        auto bits = groupByCol.mCol.getByteCount() * 8;
+        out.mColumns[0].mBitCount = bits;
+        out.mColumns[0].mType = groupByCol.mCol.mType;
+        out.mColumns[0].mData.resize(nOutRows, bits);
+
+        // Adding the average cols
+        for(u64 i=0; i < m; i++)
+        {
+            out.mColumns[i+1].mName = avgCol[i].mCol.mName;
+            auto bits = avgCol[i].mCol.getByteCount() * 8;
+            out.mColumns[i+1].mBitCount = bits;
+            out.mColumns[i+1].mType = avgCol[i].mCol.mType;
+            out.mColumns[i+1].mData.resize(nOutRows, bits);
+        }
+
+        // Adding the count col
+        out.mColumns[m+1].mName = "Count";
+        out.mColumns[m+1].mBitCount = sizeof(oc::u64) * 8;
+        out.mColumns[m+1].mType = TypeID::IntID;
+        out.mColumns[m+1].mData.resize(nOutRows, sizeof(oc::u64) * 8);
+
+    }
+
+    oc::BitVector cirEval(oc::BetaCircuit* cir, std::vector<oc::BitVector>& inputs,
+             oc::BitVector& output, u8* data, u64 bits, u64 bytes)
+    {
+
+        auto size = bytes * 8;
+        // Filling extra bits with zero
+        u64 rem = size - bits;
+        inputs[1].reset(rem);
+        inputs[1].append(data , bits);
+
+        // i64 cc = 0;
+        // memcpy(&cc, inputs[0].data(), inputs[0].sizeBytes());  
+        // std::cout << " input1: " << cc;                  
+
+        std::vector<oc::BitVector> tempOutputs = {output};
+        cir->evaluate( inputs, tempOutputs );
+
+        return tempOutputs[0];
     }
 
     Table join(const ColRef& l, const ColRef& r, std::vector<ColRef> select)

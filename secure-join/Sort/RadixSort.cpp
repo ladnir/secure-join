@@ -1199,7 +1199,7 @@ namespace secJoin
         }
 
         if (mDebug)
-            MC_AWAIT_SET(debugPerms, debugGenPerm(k, comm));
+            MC_AWAIT_SET(debugPerms, debugGenPerm(k, comm));        
 
         ll = oc::divCeil(k.bitsPerEntry(), mL);
         kIdx = 0;

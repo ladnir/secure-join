@@ -536,12 +536,14 @@ void printStatus(coproto::LocalAsyncSocket& s0)
 
     auto name = [](coproto::internal::SockScheduler::Slot& s) -> std::string
     {
-        if (s.mName.size())
-            return  s.mName;
+        return {};
 
-        std::stringstream ss;
-        ss << s.mSessionID;
-        return ss.str();
+        //if (s.mName.size())
+        //    return  s.mName;
+
+        //std::stringstream ss;
+        //ss << s.mSessionID;
+        //return ss.str();
     };
 
     std::cout << "send buffers: " << std::endl;

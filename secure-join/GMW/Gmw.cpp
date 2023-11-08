@@ -349,7 +349,9 @@ namespace secJoin
             j = 0;
             for (gate = gates.begin(); gate < gates.end(); ++gate)
             {
-
+                assert(mWords[gate->mInput[0]]);
+                assert(mWords[gate->mInput[1]]);
+                assert(mWords[gate->mOutput]);
                 in[0] = mWords[gate->mInput[0]];
                 in[1] = mWords[gate->mInput[1]];
                 out = mWords[gate->mOutput];
@@ -439,7 +441,7 @@ namespace secJoin
                     gate->mType == oc::GateType::Nor)
                 {
 
-                    if ((roundRem && buff.size() == 0) || buffIter == (buff.data() + buff.size()))
+                    if ((roundRem && buff.size() == 0) || buffIter == buff.data() + buff.size())
                     {
                         buff.resize(oc::roundUpTo(std::min<u64>(batchSize, roundRem), mN128 * 2));
                         roundRem -= buff.size();
@@ -448,9 +450,12 @@ namespace secJoin
                     }
 
 
+                    assert(mWords[gate->mInput[0]]);
+                    assert(mWords[gate->mInput[1]]);
+                    assert(mWords[gate->mOutput]);
                     in[0] = mWords[gate->mInput[0]];
                     in[1] = mWords[gate->mInput[1]];
-                    out = mWords[gate->mOutput];
+                    out   = mWords[gate->mOutput]  ;
 
                     buffIter = multRecv(in[0], in[1], out, gate->mType,
                         b.data() + j,
@@ -690,15 +695,15 @@ namespace secJoin
                 u[i] = (a[i] ^ x[i] ^ oc::AllOneBlock);
         }
 
-        return u += width;
+        return u+(width);
     }
 
     block* Gmw::multSendP2(block* y, oc::GateType gt,
         block* c, block* w)
     {
         auto width = mN128;
-        //c = mC.subspan(0, width);
-        //mC = mC.subspan(width);
+        //c = mC+(0, width);
+        //mC = mC+(width);
 
         if (invertB(gt) == false)
         {
@@ -711,7 +716,7 @@ namespace secJoin
             for (u64 i = 0; i < width; ++i)
                 w[i] = (c[i] ^ (y[i] ^ oc::AllOneBlock));
         }
-        return w + width;
+        return w+(width);
     }
 
     block* Gmw::multRecvP1(block* x, block* z, oc::GateType gt,
@@ -733,7 +738,7 @@ namespace secJoin
                 z[i] = ((oc::AllOneBlock ^ x[i]) & w[i]) ^ b[i];
             }
         }
-        return w + width;
+        return w+(width);
     }
 
     block* Gmw::multRecvP2(
@@ -751,7 +756,7 @@ namespace secJoin
             z[i] = (c[i] & u[i]) ^ d[i];
         }
 
-        return u + width;
+        return u+(width);
     }
 
     block* Gmw::multSendP1(block* x, block* y, oc::GateType gt,

@@ -34,57 +34,63 @@ namespace secJoin
     BaseRequest OleBatch::getBaseRequest()
     {
         BaseRequest r;
-        if (mSendRecv.index() == 0)
-        {
-            auto& send = std::get<0>(mSendRecv);
-            send.mSender.configure(mSize);
-            r.mSendSize = send.mSender.silentBaseOtCount();
-        }
-        else
-        {
-            auto& recv = std::get<1>(mSendRecv);
-            recv.mReceiver.configure(mSize);
-            r.mChoice = recv.mReceiver.sampleBaseChoiceBits(mPrng);
-        }
+
+        mSendRecv | match{
+            [&](SendBatch& send) {
+                send.mSender.configure(mSize);
+                r.mSendSize = send.mSender.silentBaseOtCount();
+            },
+
+            [&](RecvBatch& recv) {
+                recv.mReceiver.configure(mSize);
+                r.mChoice = recv.mReceiver.sampleBaseChoiceBits(mPrng);
+            }
+        };
         return r;
     }
 
     void OleBatch::setBase(span<oc::block> rMsg, span<std::array<oc::block, 2>> sMsg)
     {
-        if (mSendRecv.index() == 0)
-        {
-            if (rMsg.size())
-                std::terminate();
-            auto& send = std::get<0>(mSendRecv);
-            send.mSender.setSilentBaseOts(sMsg);
-        }
-        else
-        {
-            if (sMsg.size())
-                std::terminate();
-            auto& recv = std::get<1>(mSendRecv);
-            recv.mReceiver.setSilentBaseOts(rMsg);
-        }
+
+        mSendRecv | match{
+            [&](SendBatch& send) {
+                if (rMsg.size())
+                    std::terminate();
+                send.mSender.setSilentBaseOts(sMsg);
+            },
+            [&](RecvBatch& recv) {
+                if (sMsg.size())
+                    std::terminate();
+                recv.mReceiver.setSilentBaseOts(rMsg);
+            }
+        };
         mHaveBase.set();
     }
 
     macoro::task<> OleBatch::getTask()
     {
-        if (mSendRecv.index() == 0)
-            return std::get<0>(mSendRecv).sendTask(mPrng, mSock, mAdd, mMult, mCorReady, mHaveBase);
-        else
-            return std::get<1>(mSendRecv).recvTask(mPrng, mSock, mAdd, mMult, mCorReady, mHaveBase);
+        return mSendRecv | match{
+            [&](SendBatch& send) {
+                   return send.sendTask(mPrng, mSock, mAdd, mMult, mCorReady, mHaveBase);
+            },
+            [&](RecvBatch& recv) {
+                  return  recv.recvTask(mPrng, mSock, mAdd, mMult, mCorReady, mHaveBase);
+            }
+        };
     }
 
     void OleBatch::mock(u64 batchIdx)
     {
         mAdd.resize(mSize / 128);
         mMult.resize(mSize / 128);
-
-        if (mSendRecv.index() == 0)
-            return std::get<0>(mSendRecv).mock(batchIdx, mAdd, mMult);
-        else
-            return std::get<1>(mSendRecv).mock(batchIdx, mAdd, mMult);
+        mSendRecv | match{
+            [&](SendBatch& send) {
+                send.mock(batchIdx, mAdd, mMult);
+            },
+            [&](RecvBatch& recv) {
+                recv.mock(batchIdx, mAdd, mMult);
+            }
+        };
 
     }
     void OleBatch::SendBatch::mock(u64 batchIdx, span<oc::block> add, span<oc::block> mult)
@@ -185,7 +191,7 @@ namespace secJoin
     {
         MC_BEGIN(macoro::task<>, this, &prng, &sock, &add, &mult, &corReady, &haveBase,
             mChoice = oc::BitVector{},
-            mMsg =oc::AlignedUnVector<oc::block>{});
+            mMsg = oc::AlignedUnVector<oc::block>{});
 
         MC_AWAIT(haveBase);
         mChoice.resize(mReceiver.mRequestedNumOts);

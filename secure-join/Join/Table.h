@@ -6,6 +6,8 @@
 #include "secure-join/Util/Matrix.h"
 #include "secure-join/Defines.h"
 #include "coproto/coproto.h"
+#include "cryptoTools/Common/BitVector.h"
+#include "cryptoTools/Circuit/BetaCircuit.h"
 #include <vector>
 
 namespace secJoin
@@ -185,6 +187,14 @@ namespace secJoin
     void share(Table& table, std::array<Table, 2>& shares,
         PRNG& prng);
     Table join(const ColRef& l, const ColRef& r, std::vector<ColRef> select);
+    oc::BitVector cirEval(oc::BetaCircuit* cir, std::vector<oc::BitVector>& inputs,
+        oc::BitVector& output, u8* data, u64 bits, u64 bytes);
+    void populateOutTable(Table& out, std::vector<ColRef> avgCol,
+        ColRef groupByCol, u64 nOutRows);
+    void copyTableEntry(Table& out, ColRef groupByCol, std::vector<ColRef> avgCol,
+        std::vector<oc::BitVector>& inputs, BinMatrix& ones,
+        u64 curOutRow, u64 nOutRows, u64 row);
+    Table average(ColRef groupByCol, std::vector<ColRef> avgCol);
     // class SharedTable
     // {
     // public:

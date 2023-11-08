@@ -33,7 +33,7 @@ namespace secJoin
         for (u32 i = 0; i < mMsg.size(); ++i)
         {
             oc::block m0 = block(i, i);// prng.get();
-            oc::block m1 = block(~i, ~i);//prng.get();
+            oc::block m1 = block(~u64(i), ~u64(i));//prng.get();
 
             m0 = m0 ^ s;
             m1 = m1 ^ s;
@@ -54,7 +54,7 @@ namespace secJoin
         for (u32 i = 0; i < mMsg2.size(); ++i)
         {
             mMsg2.data()[i][0] = block(i, i);// prng.get();
-            mMsg2.data()[i][1] = block(~i, ~i);//prng.get();
+            mMsg2.data()[i][1] = block(~u64(i), ~u64(i));//prng.get();
 
 
             mMsg2.data()[i][0] = mMsg2.data()[i][0] ^ s;
@@ -65,104 +65,104 @@ namespace secJoin
 
     void OtBatch::getCor(Cor* c, u64 begin, u64 size)
     {
-        if (mSendRecv.index() == 0)
-        {
-            if (c->mType != CorType::Ot)
-                std::terminate();
 
-            auto& d = *static_cast<OtSend*>(c);
-            d.mMsg = std::get<0>(mSendRecv).mMsg2.subspan(begin, size);
-        }
-        else
-        {
-            if (c->mType != CorType::Ot )
-                std::terminate();
+        mSendRecv | match{
+            [&](SendOtBatch& send) {
+                if (c->mType != CorType::Ot)
+                    std::terminate();
 
-            auto& d = *static_cast<OtRecv*>(c);
-            auto& recv = std::get<1>(mSendRecv);
-            auto& msg = recv.mMsg;
-            auto& choice = recv.mChoice;
+                auto& d = *static_cast<OtSend*>(c);
+                d.mMsg = send.mMsg2.subspan(begin, size);
+            },
+            [&](RecvOtBatch& recv) {
+                if (c->mType != CorType::Ot)
+                    std::terminate();
 
-            d.mMsg = msg.subspan(begin, size);
+                auto& d = *static_cast<OtRecv*>(c);
+                auto& msg = recv.mMsg;
+                auto& choice = recv.mChoice;
 
-            if (size == choice.size())
-                d.mChoice = std::move(choice);
-            else
-            {
-                d.mChoice.resize(0);
-                d.mChoice.append(choice, size, begin);
+                d.mMsg = msg.subspan(begin, size);
+
+                if (size == choice.size())
+                    d.mChoice = std::move(choice);
+                else
+                {
+                    d.mChoice.resize(0);
+                    d.mChoice.append(choice, size, begin);
+                }
             }
-        }
+        };
     }
 
     BaseRequest OtBatch::getBaseRequest()
     {
         BaseRequest r;
-        if (mSendRecv.index() == 0)
-        {
-            auto& send = std::get<0>(mSendRecv);
-            send.mSender.configure(mSize);
-            r.mSendSize = send.mSender.silentBaseOtCount();
-        }
-        else
-        {
-            auto& recv = std::get<1>(mSendRecv);
-            recv.mReceiver.configure(mSize);
-            r.mChoice = recv.mReceiver.sampleBaseChoiceBits(mPrng);
-        }
+        mSendRecv | match{
+            [&](SendOtBatch& send) {
+                send.mSender.configure(mSize);
+                r.mSendSize = send.mSender.silentBaseOtCount();
+            },
+            [&](RecvOtBatch& recv) {
+                recv.mReceiver.configure(mSize);
+                r.mChoice = recv.mReceiver.sampleBaseChoiceBits(mPrng);
+            }
+        };
 
         return r;
     }
 
     void OtBatch::setBase(span<oc::block> rMsg, span<std::array<oc::block, 2>> sMsg)
     {
-        if (mSendRecv.index() == 0)
-        {
-            if (rMsg.size())
-                std::terminate();
-            auto& send = std::get<0>(mSendRecv);
-            send.mSender.setSilentBaseOts(sMsg);
-        }
-        else
-        {
-            if (sMsg.size())
-                std::terminate();
-            auto& recv = std::get<1>(mSendRecv);
-            recv.mReceiver.setSilentBaseOts(rMsg);
-        }
+        BaseRequest r;
+        mSendRecv | match{
+            [&](SendOtBatch& send) {
+                if (rMsg.size())
+                    std::terminate();
+                send.mSender.setSilentBaseOts(sMsg);
+            },
+            [&](RecvOtBatch& recv) {
+                if (sMsg.size())
+                    std::terminate();
+                recv.mReceiver.setSilentBaseOts(rMsg);
+            }
+        };
         mHaveBase.set();
     }
 
     macoro::task<> OtBatch::getTask() {
-        MC_BEGIN(macoro::task<>, this);
+        MC_BEGIN(macoro::task<>, this, 
+            t = macoro::task<>{});
 
         MC_AWAIT(mHaveBase);
 
-        if (mSendRecv.index() == 0)
-        {
-            MC_AWAIT(std::get<0>(mSendRecv).sendTask(mPrng, mSock));
-        }
-        else
-        {
-            MC_AWAIT(std::get<1>(mSendRecv).recvTask(mPrng, mSock));
-        }
+        t = mSendRecv | match{
+            [&](SendOtBatch& send) {
+                return send.sendTask(mPrng, mSock);
+            },
+            [&](RecvOtBatch& recv) {
+                return recv.recvTask(mPrng, mSock);
+            }
+        };
+        MC_AWAIT(t);
+
         mCorReady.set();
         MC_END();
     }
 
     void OtBatch::mock(u64 batchIdx)
     {
-        if (mSendRecv.index() == 0)
-        {
-            std::get<0>(mSendRecv).mMsg2.resize(mSize);
-            std::get<0>(mSendRecv).mock(batchIdx);
-        }
-        else
-        {
-            std::get<1>(mSendRecv).mChoice.resize(mSize);
-            std::get<1>(mSendRecv).mMsg.resize(mSize);
-            std::get<1>(mSendRecv).mock(batchIdx);
-        }
+        mSendRecv | match{
+            [&](SendOtBatch& send) {
+                send.mMsg2.resize(mSize);
+                send.mock(batchIdx);
+            },
+            [&](RecvOtBatch& recv) {
+                recv.mChoice.resize(mSize);
+                recv.mMsg.resize(mSize);
+                recv.mock(batchIdx);
+            }
+        };
     }
 
 
