@@ -14,6 +14,7 @@
         "SECUREJOIN_ENABLE_BOOST": false,
         "FETCH_AUTO": "ON",
         "SECUREJOIN_DEV": true,
+        "SECUREJOIN_STATIC_WRAPPER": true,
         "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}"
       },
       "vendor": {
