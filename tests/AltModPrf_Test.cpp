@@ -728,8 +728,8 @@ void AltModPrf_mod2_test(const oc::CLP& cmd)
 
     CorGenerator ole0, ole1;
     auto chls = coproto::LocalAsyncSocket::makePair();
-    ole0.init(chls[0].fork(), prng0, 0, 1<<18, cmd.getOr("mock", 1));
-    ole1.init(chls[1].fork(), prng1, 1, 1<<18, cmd.getOr("mock", 1));
+    ole0.init(chls[0].fork(), prng0, 0, 1 << 18, cmd.getOr("mock", 1));
+    ole1.init(chls[1].fork(), prng1, 1, 1 << 18, cmd.getOr("mock", 1));
 
 
     sender.init(n);
@@ -939,17 +939,16 @@ void AltModProtoCheck(AltModPrfSender& sender, AltModPrfReceiver& recver)
 
     for (u64 ii = 0; ii < n; ++ii)
     {
-        oc::block y;
 
-        std::array<u16, sender.mPrf.KeySize> h;
-        std::array<oc::block, sender.mPrf.KeySize / 128> X;
+        std::array<u16, AltModPrf::KeySize> h;
+        std::array<oc::block, AltModPrf::KeySize / 128> X;
         AltModPrf::expandInput(x[ii], X);
 
 
 
         auto kIter = oc::BitIterator((u8*)sender.mPrf.mExpandedKey.data());
         auto xIter = oc::BitIterator((u8*)X.data());
-        for (u64 i = 0; i < sender.mPrf.KeySize; ++i)
+        for (u64 i = 0; i < AltModPrf::KeySize; ++i)
         {
             if (bit(X, i) != bit(xt[i].data(), ii))
                 throw RTE_LOC;
@@ -1060,16 +1059,16 @@ void AltModPrf_proto_test(const oc::CLP& cmd)
     //sender.setKey(kk);
 
     CorGenerator ole0, ole1;
-    ole0.init(sock[0].fork(), prng0, 0, 1<<18, cmd.getOr("mock", 1));
-    ole1.init(sock[1].fork(), prng1, 1, 1<<18, cmd.getOr("mock", 1));
+    ole0.init(sock[0].fork(), prng0, 0, 1 << 18, cmd.getOr("mock", 1));
+    ole1.init(sock[1].fork(), prng1, 1, 1 << 18, cmd.getOr("mock", 1));
 
 
 
     prng0.get(x.data(), x.size());
     //memset(x.data(), -1, n * sizeof(block256));
-    std::vector<oc::block> rk(sender.mPrf.KeySize);
-    std::vector<std::array<oc::block, 2>> sk(sender.mPrf.KeySize);
-    for (u64 i = 0; i < sender.mPrf.KeySize; ++i)
+    std::vector<oc::block> rk(AltModPrf::KeySize);
+    std::vector<std::array<oc::block, 2>> sk(AltModPrf::KeySize);
+    for (u64 i = 0; i < AltModPrf::KeySize; ++i)
     {
         sk[i][0] = oc::block(i, 0);
         sk[i][1] = oc::block(i, 1);

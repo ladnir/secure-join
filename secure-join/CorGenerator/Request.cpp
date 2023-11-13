@@ -6,14 +6,14 @@
 namespace secJoin
 {
 
-    RequestState::RequestState(CorType t,bool sender, u64 size, std::shared_ptr<GenState>& state, u64 idx)
+    RequestState::RequestState(CorType t, bool sender, u64 size, std::shared_ptr<GenState>& state, u64 idx)
         : mType(t)
         , mSender(sender)
         , mSize(size)
-        , mGenState(state)
         , mReqIndex(idx)
+        , mGenState(state)
         , mSession(state->mSession)
-    { 
+    {
         if (!mSession)
         {
             std::cout << "CorGenerator Session == nullptr. " LOCATION << std::endl;
@@ -32,7 +32,7 @@ namespace secJoin
             break;
         case CorType::Ole:
             if (dynamic_cast<OleBatch*>(b.mBatch.get()) == nullptr)
-            break;
+                break;
         default:
             break;
         }

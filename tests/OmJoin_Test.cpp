@@ -76,8 +76,8 @@ void OmJoin_getControlBits_Test(const oc::CLP& cmd)
     share(k, kk[0], kk[1], prng);
 
     CorGenerator ole0, ole1;
-    ole0.init(sock[0].fork(), prng, 0, 1<<18, cmd.getOr("mock", 1));
-    ole1.init(sock[1].fork(), prng, 1, 1<<18, cmd.getOr("mock", 1));
+    ole0.init(sock[0].fork(), prng, 0, 1 << 18, cmd.getOr("mock", 1));
+    ole1.init(sock[1].fork(), prng, 1, 1 << 18, cmd.getOr("mock", 1));
 
     auto r = macoro::sync_wait(macoro::when_all_ready(
         OmJoin::getControlBits(kk[0], offset, keyBitCount, sock[0], cc[0], ole0, prng),
@@ -322,8 +322,8 @@ void OmJoin_join_Test(const oc::CLP& cmd)
 
     auto sock = coproto::LocalAsyncSocket::makePair();
     CorGenerator ole0, ole1;
-    ole0.init(sock[0].fork(), prng, 0, 1<<18, mock);
-    ole1.init(sock[1].fork(), prng, 1, 1<<18, mock);
+    ole0.init(sock[0].fork(), prng, 0, 1 << 18, mock);
+    ole1.init(sock[1].fork(), prng, 1, 1 << 18, mock);
 
     PRNG prng0(oc::ZeroBlock);
     PRNG prng1(oc::OneBlock);
@@ -386,11 +386,14 @@ void OmJoin_join_BigKey_Test(const oc::CLP& cmd)
         {"R2", TypeID::IntID, 7}
     } });
 
+    std::vector<u8> buff(L[0].mCol.getByteCount());
     for (u64 i = 0; i < nL; ++i)
     {
         // u64 k 
         auto ii = i * 3;
-        memcpy(&L.mColumns[0].mData.mData(i, 0), &ii, L.mColumns[0].mData.bytesPerEntry());
+        assert(sizeof(ii) <= buff.size());
+        memcpy(buff.data(), &ii, sizeof(ii));
+        memcpy(&L.mColumns[0].mData.mData(i, 0), buff.data(), L.mColumns[0].mData.bytesPerEntry());
         L.mColumns[1].mData.mData(i, 0) = i % 4;
         L.mColumns[1].mData.mData(i, 1) = i % 3;
     }
@@ -398,7 +401,9 @@ void OmJoin_join_BigKey_Test(const oc::CLP& cmd)
     for (u64 i = 0; i < nR; ++i)
     {
         auto ii = i / 2 * 4;
-        memcpy(&R.mColumns[0].mData.mData(i, 0), &ii, R.mColumns[0].mData.bytesPerEntry());
+        assert(sizeof(ii) <= buff.size());
+        memcpy(buff.data(), &ii, sizeof(ii));
+        memcpy(&R.mColumns[0].mData.mData(i, 0), buff.data(), R.mColumns[0].mData.bytesPerEntry());
         // R.mColumns[0].mData.mData(i, 0) = i * 2;
         R.mColumns[1].mData.mData(i) = i % 3;
     }
@@ -424,8 +429,8 @@ void OmJoin_join_BigKey_Test(const oc::CLP& cmd)
 
     CorGenerator ole0, ole1;
     auto sock = coproto::LocalAsyncSocket::makePair();
-    ole0.init(sock[0].fork(), prng, 0, 1<<18, mock);
-    ole1.init(sock[1].fork(), prng, 1, 1<<18, mock);
+    ole0.init(sock[0].fork(), prng, 0, 1 << 18, mock);
+    ole1.init(sock[1].fork(), prng, 1, 1 << 18, mock);
 
 
     PRNG prng0(oc::ZeroBlock);
@@ -523,8 +528,8 @@ void OmJoin_join_Reveal_Test(const oc::CLP& cmd)
 
     CorGenerator ole0, ole1;
     auto sock = coproto::LocalAsyncSocket::makePair();
-    ole0.init(sock[0].fork(), prng, 0, 1<<18, mock);
-    ole1.init(sock[1].fork(), prng, 1, 1<<18, mock);
+    ole0.init(sock[0].fork(), prng, 0, 1 << 18, mock);
+    ole1.init(sock[1].fork(), prng, 1, 1 << 18, mock);
 
 
     PRNG prng0(oc::ZeroBlock);
@@ -594,41 +599,41 @@ auto communicate(
 
     // write any outgoing data to a file me_i.bin where i in the message index.
     auto write = [&]()
-    {
-        // the the outbound messages that the protocol has generated.
-        // This will consist of all the outbound messages that can be 
-        // generated without receiving the next inbound message.
-        auto b = sock.getOutbound();
-
-        // If we do have outbound messages, then lets write them to a file.
-        if (b && b->size())
         {
-            std::ofstream message;
-            auto temp = me + ".tmp";
-            auto file = me + "_" + std::to_string(s) + ".bin";
-            message.open(temp, std::ios::binary | std::ios::trunc);
-            message.write((char*)b->data(), b->size());
-            message.close();
+            // the the outbound messages that the protocol has generated.
+            // This will consist of all the outbound messages that can be 
+            // generated without receiving the next inbound message.
+            auto b = sock.getOutbound();
 
-            if (verbose)
+            // If we do have outbound messages, then lets write them to a file.
+            if (b && b->size())
             {
-                // optional for debug purposes.
-                oc::RandomOracle hash(16);
-                hash.Update(b->data(), b->size());
-                oc::block h; hash.Final(h);
+                std::ofstream message;
+                auto temp = me + ".tmp";
+                auto file = me + "_" + std::to_string(s) + ".bin";
+                message.open(temp, std::ios::binary | std::ios::trunc);
+                message.write((char*)b->data(), b->size());
+                message.close();
 
-                std::cout << me << " write " << std::to_string(s) << ", " << b->size() << " bytes " << h << "\n";
+                if (verbose)
+                {
+                    // optional for debug purposes.
+                    oc::RandomOracle hash(16);
+                    hash.Update(b->data(), b->size());
+                    oc::block h; hash.Final(h);
+
+                    std::cout << me << " write " << std::to_string(s) << ", " << b->size() << " bytes " << h << "\n";
+                }
+
+                if (rename(temp.c_str(), file.c_str()) != 0)
+                    std::cout << me << " file renamed failed\n";
+                else if (verbose)
+                    std::cout << me << " file renamed successfully\n";
+
+                ++s;
             }
 
-            if (rename(temp.c_str(), file.c_str()) != 0)
-                std::cout << me << " file renamed failed\n";
-            else if (verbose)
-                std::cout << me << " file renamed successfully\n";
-
-            ++s;
-        }
-
-    };
+        };
 
     // write incoming data from a file them_i.bin where i in the message index.
     auto read = [&]() {
@@ -665,7 +670,7 @@ auto communicate(
         // run the protocol forward, possibly generating more outbound protocol
         // messages.
         sock.processInbound(buff);
-    };
+        };
 
     // The sender we generate the first message.
     if (sender)
@@ -730,8 +735,8 @@ void OmJoin_join_round_Test(const oc::CLP& cmd)
 
     CorGenerator ole0, ole1;
     std::array<coproto::BufferingSocket, 2> sock;
-    ole0.init(sock[0].fork(), prng, 0, 1<<18, mock);
-    ole1.init(sock[1].fork(), prng, 1, 1<<18, mock);
+    ole0.init(sock[0].fork(), prng, 0, 1 << 18, mock);
+    ole1.init(sock[1].fork(), prng, 1, 1 << 18, mock);
 
 
     PRNG prng0(oc::ZeroBlock);
@@ -801,8 +806,8 @@ void OmJoin_join_csv_Test(const oc::CLP& cmd)
 
     Table L, R;
 
-    L.init( lRowCount, lColInfo);
-    R.init( rRowCount, rColInfo);
+    L.init(lRowCount, lColInfo);
+    R.init(rRowCount, rColInfo);
 
     populateTable(L, visaCsvPath, lRowCount);
     populateTable(R, bankCsvPath, rRowCount);

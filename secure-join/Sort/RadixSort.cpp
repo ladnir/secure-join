@@ -95,20 +95,19 @@ namespace secJoin
         BinMatrix& f,
         OtRecvRequest& otRecvReq,
         coproto::Socket& comm
-        )
+    )
     {
-        MC_BEGIN(macoro::task<>, this, &s, &shares, &f, &otRecvReq, &comm,
+        MC_BEGIN(macoro::task<>, &s, &shares, &f, &otRecvReq, &comm,
             otRecv = OtRecv{},
             rows = u64{},
             cols = u64{},
             i = u64{},
-            otIdx = u64{},
             m = u64{},
             end = u64{},
             ec = macoro::result<void>{},
             fIter = (block*)nullptr,
             tt = std::vector<u32>{}
-            );
+        );
 
         rows = s.rows();
         cols = s.cols();
@@ -177,19 +176,17 @@ namespace secJoin
     }
 
     macoro::task<> RadixSort::hadamardSumRecv(
-        Matrix32& s, 
-        std::vector<u32>& shares, 
+        Matrix32& s,
+        std::vector<u32>& shares,
         BinMatrix& f,
-        OtSendRequest& otSendReq, 
+        OtSendRequest& otSendReq,
         coproto::Socket& comm)
     {
-        MC_BEGIN(macoro::task<>, this, &s, &shares, &f, &otSendReq, &comm,
-
+        MC_BEGIN(macoro::task<>, &s, &shares, &f, &otSendReq, &comm,
             otSend = OtSend{},
             rows = u64{},
             cols = u64{},
             i = u64{},
-            otIdx = u64{},
             m = u64{},
             end = u64{},
             fIter = (block*)nullptr,
@@ -261,12 +258,6 @@ namespace secJoin
             shares = std::vector<u32>{},
             sendShares = std::vector<u32>{},
             ec = macoro::result<void>{},
-            i = u64{},
-            m = u64{},
-            role = u64{},
-            rows = u64{},
-            cols = u64{},
-            end = u64{},
             bitCount = u64{}
         );
 
@@ -386,7 +377,7 @@ namespace secJoin
                 for (u64 ii = 0; ii < (1ull << L); ++ii)
                     std::cout << *oc::BitIterator((u8*)&(ff(j, 0)), ii) << " ";
                 std::cout << "\n";
-            };
+                };
             print();
 
             for (u64 i = 0; i < (1ull << L); ++i, ++iter)
@@ -885,7 +876,7 @@ namespace secJoin
                             return (k(a) < k(b));
                         });
                     return exp.inverse();
-                };
+                    };
                 auto p2 = genBitPerm(sk);
 
                 std::cout << "k ";
@@ -990,7 +981,7 @@ namespace secJoin
                         return (k(a) < k(b));
                     });
                 return exp.inverse();
-            };
+                };
 
             auto ll = oc::divCeil(k.bitsPerEntry(), mL);
             auto kIdx = 0;
@@ -1104,7 +1095,7 @@ namespace secJoin
         u64 pow2L = 1ull << mL;
         u64 expandedSize = mSize * pow2L;
 
-        for (u64 i = 0, j = 0; i < ll; ++i)
+        for (u64 i = 0; i < ll; ++i)
         {
             // the amount of correlated randomness for the permutations we will require.
             u64 permutationByteSize = oc::divCeil(mL, 8) + sizeof(u32);
@@ -1114,9 +1105,9 @@ namespace secJoin
                 permutationByteSize = mBytesPerElem;
 
             bool keyGen = !i;
-            mRounds[i].init(i, mRole, mSize, 
-                permutationByteSize, keyGen, 
-                expandedSize, mIndexToOneHotCircuit, 
+            mRounds[i].init(i, mRole, mSize,
+                permutationByteSize, keyGen,
+                expandedSize, mIndexToOneHotCircuit,
                 mArith2BinCir, mDebug);
             mRounds[i].request(gen);
         }
@@ -1129,7 +1120,7 @@ namespace secJoin
         PRNG& prng)
     {
         mHasPrepro = true;
-        MC_BEGIN(macoro::task<>, this, &comm,
+        MC_BEGIN(macoro::task<>, this,
             g = prng.fork(),
             i = u64{},
             tasks = std::vector<macoro::eager_task<>>{});
@@ -1139,10 +1130,10 @@ namespace secJoin
         {
 
             auto task = [&](macoro::task<>&& t) -> void
-            {
-                tasks.emplace_back(std::move(t) | macoro::make_eager());
-            };
-            if(mDebug)
+                {
+                    tasks.emplace_back(std::move(t) | macoro::make_eager());
+                };
+            if (mDebug)
                 std::cout << "rounds: " << mRounds.size() << std::endl;
             for (i = 0; i < mRounds.size(); ++i)
             {
@@ -1199,7 +1190,7 @@ namespace secJoin
         }
 
         if (mDebug)
-            MC_AWAIT_SET(debugPerms, debugGenPerm(k, comm));        
+            MC_AWAIT_SET(debugPerms, debugGenPerm(k, comm));
 
         ll = oc::divCeil(k.bitsPerEntry(), mL);
         kIdx = 0;
@@ -1276,7 +1267,7 @@ namespace secJoin
             // release the next batch of preprocessing
             if (lead < mRounds.size())
             {
-                if(mDebug)
+                if (mDebug)
                     std::cout << "main ready " << lead << std::endl;
                 mRounds[lead++].mReady->set();
             }

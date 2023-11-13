@@ -21,7 +21,7 @@ namespace secJoin
         F2LinearCode() = default;
         F2LinearCode(const F2LinearCode& cp) = default;
 
-        
+
         void init(oc::Matrix<u8> g);
 
         void generateSubcodes();
@@ -334,9 +334,9 @@ namespace secJoin
             if (mInputByteSize != sizeof(block))
                 throw RTE_LOC;//not impl
 #endif
-            const auto mInputByteSize_ = 16;
-            const auto codeSize_ = 1; // block
-            const u64 subcodeSize = 256 * codeSize_;
+            // const auto mInputByteSize_ = 16;
+            // const auto codeSize_ = 1; // block
+            // const u64 subcodeSize = 256 * codeSize_;
 
             static_assert(N % 8 == 0);
             // create a local to store the partial codeword
@@ -344,7 +344,7 @@ namespace secJoin
             oc::AlignedArray<block, N> c;
 
             block* __restrict  T = mSubcodes.data();
-            u8* inPtr = inout->data();
+            // u8* inPtr = inout->data();
 
             for (u64 i = 0; i < N; i += 8)
             {
@@ -358,7 +358,7 @@ namespace secJoin
                 c[i + 7] = T[inout[i + 7].data()[0]];
             }
 
-            u64 step = subcodeSize;
+            // u64 step = subcodeSize;
 
             for (u64 j = 1; j < 128; ++j)
             {
