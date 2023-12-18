@@ -159,7 +159,6 @@ namespace secJoin
             aes = oc::AES(),
             meta = SetupMeta(),
             pi = (const Perm*)nullptr,
-            eager = macoro::eager_task<>{},
             debugB = oc::Matrix<oc::block>{},
             debugInput = oc::Matrix<oc::block>{},
             debugKey = AltModPrf::KeyType{});
@@ -172,7 +171,7 @@ namespace secJoin
 
         if (hasPreprocessing() == false)
         {
-            eager = preprocess() | macoro::make_eager();
+            MC_AWAIT(preprocess());
         }
 
         //if(hasPreprocessing())
@@ -235,9 +234,6 @@ namespace secJoin
             }
         }
         
-        if (eager.handle())
-            MC_AWAIT(eager);
-
         MC_END();
     }
 
@@ -255,8 +251,7 @@ namespace secJoin
             AltModCipher = oc::Matrix<oc::block>(),
             blocksPerRow = u64(),
             aes = oc::AES(),
-            meta = SetupMeta(),
-            eager = macoro::eager_task<>{});
+            meta = SetupMeta());
 
         if (mNumElems == 0)
             throw std::runtime_error("AltModPermReceiver::init() must be called before setup. " LOCATION);
@@ -266,7 +261,7 @@ namespace secJoin
 
         if (hasPreprocessing() == false)
         {
-            eager = preprocess() | macoro::make_eager();
+            MC_AWAIT(preprocess());
         }
 
         blocksPerRow = oc::divCeil(mBytesPerRow, sizeof(oc::block));
@@ -296,9 +291,6 @@ namespace secJoin
             mA(i) = oc::block(0, i);
         aes.ecbEncBlocks(mA, mA);
         mSender.mPrf.eval(mA, mA);
-
-        if (eager.handle())
-            MC_AWAIT(eager);
 
         MC_END();
     }

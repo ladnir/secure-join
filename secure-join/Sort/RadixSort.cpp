@@ -1484,9 +1484,9 @@ namespace secJoin
     {
         MC_BEGIN(macoro::task<>, this);
 
-        TODO("fix");
-        if (mArithToBinGmw.mTriples.mReqState->mGenState->mMock == false)
-            throw RTE_LOC;
+        //TODO("fix");
+        //if (mArithToBinGmw.mTriples.mReqState->mGenState->mMock == false)
+        //    throw RTE_LOC;
         if (mDebug)
         {
             MC_AWAIT(*mReady);

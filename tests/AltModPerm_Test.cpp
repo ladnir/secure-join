@@ -80,6 +80,11 @@ void AltModPerm_setup_test(const oc::CLP& cmd)
         AltModPerm0.request(ole0);
         AltModPerm1.request(ole1);
 
+        //for (u64 i = 0; i < ole0.mGenState->mRequests.size(); ++i)
+        //{
+        //    std::cout << i << " " << ole0.mGenState->mRequests[i]->mSize << std::endl;
+        //    std::cout << i << " " << ole1.mGenState->mRequests[i]->mSize << std::endl;
+        //}
 
         // the preprocessing phase
         auto res = coproto::sync_wait(coproto::when_all_ready(

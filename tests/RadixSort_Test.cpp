@@ -94,16 +94,22 @@ void RadixSort_hadamardSum_test(const oc::CLP& cmd)
     s0.init(0, rows, s0.mL); s0.request(g0);
     s1.init(1, rows, s0.mL); s1.request(g1);
 
-    macoro::sync_wait(macoro::when_all_ready(
+    auto pre = macoro::sync_wait(macoro::when_all_ready(
         s0.preprocess(comm[0], prng),
         s1.preprocess(comm[1], prng)
     ));
+    std::get<0>(pre).result();
+    std::get<1>(pre).result();
+
     //s0.initArith2BinCircuit(rows);
     //s1.initArith2BinCircuit(rows);
-    macoro::sync_wait(macoro::when_all_ready(
+    auto main =  macoro::sync_wait(macoro::when_all_ready(
         s0.hadamardSum(s0.mRounds[0], l0, r0, p0, comm[0]),
         s1.hadamardSum(s1.mRounds[0], l1, r1, p1, comm[1])
     ));
+
+    std::get<0>(main).result();
+    std::get<1>(main).result();
 
     Perm ff = reveal(p0, p1);
     //auto c = reveal(c0, c1);
@@ -126,7 +132,7 @@ void RadixSort_hadamardSum_test(const oc::CLP& cmd)
     for (u64 i = 0; i < rows; ++i)
         if (exp(i) != ff[i])
         {
-            //std::cout << exp << "\n\n" << ff << std::endl;
+            std::cout << exp(i) << "\n\n" << ff[i] << std::endl;
             throw RTE_LOC;
         }
 }

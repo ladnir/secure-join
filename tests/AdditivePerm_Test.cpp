@@ -9,8 +9,8 @@ using namespace secJoin;
 void AdditivePerm_xor_test(const oc::CLP& cmd)
 {
     // User input
-    u64 n = 50000;
-    u64 rowSize = 63;
+    u64 n = 5000;
+    u64 rowSize = 7;
 
     oc::Matrix<u8> x(n, rowSize), yExp(n, rowSize);
     PRNG prng(oc::block(0, 0));

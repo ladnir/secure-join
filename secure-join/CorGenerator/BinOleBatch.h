@@ -39,6 +39,7 @@ namespace secJoin
 
             // return the task that generate the Sender correlation.
             macoro::task<> sendTask(
+                u64 batchIdx,
                 PRNG& prng,
                 oc::Socket& sock,
                 oc::AlignedUnVector<oc::block>& add,
@@ -68,6 +69,7 @@ namespace secJoin
 
             // return the task that generate the Sender correlation.
             macoro::task<> recvTask(
+                u64 batchIdx,
                 PRNG& prng,
                 oc::Socket& sock,
                 oc::AlignedUnVector<oc::block>& add,

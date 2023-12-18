@@ -81,7 +81,7 @@ void CorGenerator_Ot_Test(const oc::CLP&cmd)
 void CorGenerator_BinOle_Test(const oc::CLP&cmd)
 {
 
-    u64 n = (1ull << 16) + 3234;
+    u64 n = cmd.getOr("n",(1ull << 16) + 3234);
 
     for (auto mock : { false, true })
     {

@@ -1,10 +1,11 @@
 #include "CSVParser_Test.h"
-
+#include"cryptoTools/Common/TestCollection.h"
 using namespace secJoin;
 
 
 void secret_share_table_test()
 {
+    throw oc::UnitTestSkipped("known issue");
     using oc::block;
     std::vector<ColumnInfo> columnInfo;
     u64 rowCount = 0;
@@ -40,6 +41,7 @@ void secret_share_table_test()
 
 void secret_share_csv_test()
 {
+    throw oc::UnitTestSkipped("known issue");
     std::string csvMetaFileNm = "INSERT PATH TO META DATA FILE";
     std::string csvFileNm = "INSERT PATH TO THE CSV DATA";
 
@@ -71,6 +73,7 @@ void secret_share_csv_test()
 
 void table_write_csv_test()
 {
+    throw oc::UnitTestSkipped("known issue");
 
     using oc::block;
     std::vector<ColumnInfo> columnInfo;

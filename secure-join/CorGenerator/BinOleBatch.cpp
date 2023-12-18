@@ -71,10 +71,10 @@ namespace secJoin
     {
         return mSendRecv | match{
             [&](SendBatch& send) {
-                   return send.sendTask(mPrng, mSock, mAdd, mMult, mCorReady, mHaveBase);
+                   return send.sendTask(mIndex, mPrng, mSock, mAdd, mMult, mCorReady, mHaveBase);
             },
             [&](RecvBatch& recv) {
-                  return  recv.recvTask(mPrng, mSock, mAdd, mMult, mCorReady, mHaveBase);
+                  return  recv.recvTask(mIndex, mPrng, mSock, mAdd, mMult, mCorReady, mHaveBase);
             }
         };
     }
@@ -182,14 +182,15 @@ namespace secJoin
 
 
     macoro::task<>  OleBatch::RecvBatch::recvTask(
-        PRNG& prng,
+        u64 batchIdx,
+        PRNG& prng, 
         oc::Socket& sock,
         oc::AlignedUnVector<oc::block>& add,
         oc::AlignedUnVector<oc::block>& mult,
         macoro::async_manual_reset_event& corReady,
         macoro::async_manual_reset_event& haveBase)
     {
-        MC_BEGIN(macoro::task<>, this, &prng, &sock, &add, &mult, &corReady, &haveBase,
+        MC_BEGIN(macoro::task<>, this,batchIdx, &prng, &sock, &add, &mult, &corReady, &haveBase,
             mChoice = oc::BitVector{},
             mMsg = oc::AlignedUnVector<oc::block>{});
 
@@ -197,7 +198,9 @@ namespace secJoin
         mChoice.resize(mReceiver.mRequestedNumOts);
         mMsg.resize(mReceiver.mRequestedNumOts);
         assert(mReceiver.mGen.hasBaseOts());
+        //std::cout << "recv OleBatch begin " << batchIdx << std::endl;
         MC_AWAIT(mReceiver.silentReceive(mChoice, mMsg, prng, sock));
+        //std::cout << "recv OleBatch proto done " << batchIdx << std::endl;
         add.resize(oc::divCeil(mMsg.size(), 128));
         mult.resize(oc::divCeil(mMsg.size(), 128));
         compressRecver(mChoice, mMsg, add, mult);
@@ -208,6 +211,7 @@ namespace secJoin
     }
 
     macoro::task<>  OleBatch::SendBatch::sendTask(
+        u64 batchIdx,
         PRNG& prng,
         oc::Socket& sock,
         oc::AlignedUnVector<oc::block>& add,
@@ -215,13 +219,15 @@ namespace secJoin
         macoro::async_manual_reset_event& corReady,
         macoro::async_manual_reset_event& haveBase)
     {
-        MC_BEGIN(macoro::task<>, this, &prng, &sock, &add, &mult, &corReady, &haveBase,
+        MC_BEGIN(macoro::task<>, this, batchIdx, &prng, &sock, &add, &mult, &corReady, &haveBase,
             mMsg2 = oc::AlignedUnVector<std::array<oc::block, 2>>{});
 
         MC_AWAIT(haveBase);
         mMsg2.resize(mSender.mRequestNumOts);
         assert(mSender.mGen.hasBaseOts());
+        //std::cout << "send OleBatch begin " << batchIdx << std::endl;
         MC_AWAIT(mSender.silentSend(mMsg2, prng, sock));
+        //std::cout << "send OleBatch proto done " << batchIdx << std::endl;
         add.resize(oc::divCeil(mMsg2.size(), 128));
         mult.resize(oc::divCeil(mMsg2.size(), 128));
         compressSender(mMsg2, add, mult);
