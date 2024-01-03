@@ -25,6 +25,11 @@ namespace secJoin
         OtBatch(bool sender, oc::Socket&& s, PRNG&& p);
         OtBatch(OtBatch&&) { throw RTE_LOC; };
 
+        ~OtBatch()
+        {
+            std::cout << "~OtBatch()" << std::endl;
+        }
+
         struct SendOtBatch
         {
             oc::SilentOtExtSender mSender;
@@ -58,6 +63,8 @@ namespace secJoin
         bool sender() { return mSendRecv.index() == 0; }
 
         void mock(u64 batchIdx) override;
+
+        void clear() override;
     };
 
 

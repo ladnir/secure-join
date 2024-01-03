@@ -53,6 +53,8 @@ namespace secJoin
 
         // get the correlation. c must match the type.
         virtual void getCor(Cor* c, u64 begin, u64 size) = 0;
+
+        virtual void clear() = 0;
     };
 
     std::shared_ptr<Batch> makeBatch(u64 sender, CorType type, oc::Socket&& sock, PRNG&& p);

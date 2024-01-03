@@ -191,22 +191,31 @@ namespace secJoin
         macoro::async_manual_reset_event& haveBase)
     {
         MC_BEGIN(macoro::task<>, this,batchIdx, &prng, &sock, &add, &mult, &corReady, &haveBase,
-            mChoice = oc::BitVector{},
-            mMsg = oc::AlignedUnVector<oc::block>{});
+            cc = char{});
 
         MC_AWAIT(haveBase);
-        mChoice.resize(mReceiver.mRequestedNumOts);
-        mMsg.resize(mReceiver.mRequestedNumOts);
+        //std::cout << (u64)this << " recv ole have base  " << std::endl;
+
+        // a receive to delay the allocation 
+        MC_AWAIT(sock.recv(cc));
+        //std::cout << (u64)this << " recv ole recv  " << std::endl;
+
+        //mChoice.resize(mReceiver.mRequestedNumOts);
+        //mMsg.resize(mReceiver.mRequestedNumOts);
         assert(mReceiver.mGen.hasBaseOts());
+
+        
         //std::cout << "recv OleBatch begin " << batchIdx << std::endl;
-        MC_AWAIT(mReceiver.silentReceive(mChoice, mMsg, prng, sock));
+        MC_AWAIT(mReceiver.silentReceiveInplace(mReceiver.mRequestedNumOts, prng, sock, oc::ChoiceBitPacking::True));
         //std::cout << "recv OleBatch proto done " << batchIdx << std::endl;
-        add.resize(oc::divCeil(mMsg.size(), 128));
-        mult.resize(oc::divCeil(mMsg.size(), 128));
-        compressRecver(mChoice, mMsg, add, mult);
-        mChoice = {};
-        mMsg = {};
+        add.resize(oc::divCeil(mReceiver.mRequestedNumOts, 128));
+        mult.resize(oc::divCeil(mReceiver.mRequestedNumOts, 128));
+        compressRecver(mReceiver.mA, add, mult);
+
+        mReceiver.clear();
         corReady.set();
+        //std::cout << (u64)this << " recv ole done  " << std::endl;
+
         MC_END();
     }
 
@@ -219,52 +228,98 @@ namespace secJoin
         macoro::async_manual_reset_event& corReady,
         macoro::async_manual_reset_event& haveBase)
     {
-        MC_BEGIN(macoro::task<>, this, batchIdx, &prng, &sock, &add, &mult, &corReady, &haveBase,
-            mMsg2 = oc::AlignedUnVector<std::array<oc::block, 2>>{});
+        MC_BEGIN(macoro::task<>, this, batchIdx, &prng, &sock, &add, &mult, &corReady, &haveBase);
 
         MC_AWAIT(haveBase);
-        mMsg2.resize(mSender.mRequestNumOts);
+        //std::cout << (u64)this << " send ole set have base " << std::endl;
+
+        // send a byte so that the receiver can wait to allocate
+        MC_AWAIT(sock.send(char{ 0 }));
+
         assert(mSender.mGen.hasBaseOts());
         //std::cout << "send OleBatch begin " << batchIdx << std::endl;
-        MC_AWAIT(mSender.silentSend(mMsg2, prng, sock));
+        MC_AWAIT(mSender.silentSendInplace(prng.get(), mSender.mRequestNumOts, prng, sock));
         //std::cout << "send OleBatch proto done " << batchIdx << std::endl;
-        add.resize(oc::divCeil(mMsg2.size(), 128));
-        mult.resize(oc::divCeil(mMsg2.size(), 128));
-        compressSender(mMsg2, add, mult);
+        add.resize(oc::divCeil(mSender.mB.size(), 128));
+        mult.resize(oc::divCeil(mSender.mB.size(), 128));
+        compressSender(mSender.mDelta, mSender.mB, add, mult);
+        mSender.clear();
+        //std::cout << (u64)this << " send ole done  " << std::endl;
         corReady.set();
-        mMsg2 = {};
+        //mMsg2 = {};
         MC_END();
     }
 
 
 
+    // the LSB of A is the choice bit of the OT.
 
     void OleBatch::RecvBatch::compressRecver(
-        oc::BitVector& bv,
-        span<oc::block> recvMsg,
+        span<oc::block> A,
         span<oc::block> add,
         span<oc::block> mult)
     {
         auto aIter16 = (u16*)add.data();
-        auto bIter16 = (u16*)mult.data();
+        auto bIter8 = (u8*)mult.data();
 
-        if (bv.size() != recvMsg.size())
+
+        if (add.size() * 128 != A.size())
             throw RTE_LOC;
-        if (add.size() * 128 != recvMsg.size())
+        if (mult.size() * 128 != A.size())
             throw RTE_LOC;
-        if (mult.size() * 128 != recvMsg.size())
-            throw RTE_LOC;
-        using block = oc::block;
 
         auto shuffle = std::array<block, 16>{};
         memset(shuffle.data(), 1 << 7, sizeof(*shuffle.data()) * shuffle.size());
         for (u64 i = 0; i < 16; ++i)
             shuffle[i].set<u8>(i, 0);
 
-        memcpy(bIter16, bv.data(), bv.sizeBytes());
+        auto OneBlock = block(1);
+        auto AllOneBlock = block(~0ull, ~0ull);
+        block mask = OneBlock ^ AllOneBlock;
 
-        for (u64 i = 0; i < recvMsg.size(); i += 16)
+        auto m = &A[0];
+
+        for (u64 i = 0; i < A.size(); i += 16)
         {
+            for (u64 j = 0; j < 2; ++j)
+            {
+                // extract the choice bit from the LSB of m
+                u32 b0 = m[0].testc(OneBlock);
+                u32 b1 = m[1].testc(OneBlock);
+                u32 b2 = m[2].testc(OneBlock);
+                u32 b3 = m[3].testc(OneBlock);
+                u32 b4 = m[4].testc(OneBlock);
+                u32 b5 = m[5].testc(OneBlock);
+                u32 b6 = m[6].testc(OneBlock);
+                u32 b7 = m[7].testc(OneBlock);
+
+                // pack the choice bits.
+                *bIter8++ =
+                    b0 ^
+                    (b1 << 1) ^
+                    (b2 << 2) ^
+                    (b3 << 3) ^
+                    (b4 << 4) ^
+                    (b5 << 5) ^
+                    (b6 << 6) ^
+                    (b7 << 7);
+
+                // mask of the choice bit which is stored in the LSB
+                m[0] = m[0] & mask;
+                m[1] = m[1] & mask;
+                m[2] = m[2] & mask;
+                m[3] = m[3] & mask;
+                m[4] = m[4] & mask;
+                m[5] = m[5] & mask;
+                m[6] = m[6] & mask;
+                m[7] = m[7] & mask;
+
+                oc::mAesFixedKey.hashBlocks<8>(m, m);
+
+                m += 8;
+            }
+            m -= 16;
+
             // _mm_shuffle_epi8(a, b): 
             //     FOR j := 0 to 15
             //         i: = j * 8
@@ -279,22 +334,22 @@ namespace secJoin
             // _mm_sll_epi16 : shifts 16 bit works left
             // _mm_movemask_epi8: packs together the MSG
 
-            block a00 = _mm_shuffle_epi8(recvMsg[i + 0], shuffle[0]);
-            block a01 = _mm_shuffle_epi8(recvMsg[i + 1], shuffle[1]);
-            block a02 = _mm_shuffle_epi8(recvMsg[i + 2], shuffle[2]);
-            block a03 = _mm_shuffle_epi8(recvMsg[i + 3], shuffle[3]);
-            block a04 = _mm_shuffle_epi8(recvMsg[i + 4], shuffle[4]);
-            block a05 = _mm_shuffle_epi8(recvMsg[i + 5], shuffle[5]);
-            block a06 = _mm_shuffle_epi8(recvMsg[i + 6], shuffle[6]);
-            block a07 = _mm_shuffle_epi8(recvMsg[i + 7], shuffle[7]);
-            block a08 = _mm_shuffle_epi8(recvMsg[i + 8], shuffle[8]);
-            block a09 = _mm_shuffle_epi8(recvMsg[i + 9], shuffle[9]);
-            block a10 = _mm_shuffle_epi8(recvMsg[i + 10], shuffle[10]);
-            block a11 = _mm_shuffle_epi8(recvMsg[i + 11], shuffle[11]);
-            block a12 = _mm_shuffle_epi8(recvMsg[i + 12], shuffle[12]);
-            block a13 = _mm_shuffle_epi8(recvMsg[i + 13], shuffle[13]);
-            block a14 = _mm_shuffle_epi8(recvMsg[i + 14], shuffle[14]);
-            block a15 = _mm_shuffle_epi8(recvMsg[i + 15], shuffle[15]);
+            block a00 = _mm_shuffle_epi8(m[0], shuffle[0]);
+            block a01 = _mm_shuffle_epi8(m[1], shuffle[1]);
+            block a02 = _mm_shuffle_epi8(m[2], shuffle[2]);
+            block a03 = _mm_shuffle_epi8(m[3], shuffle[3]);
+            block a04 = _mm_shuffle_epi8(m[4], shuffle[4]);
+            block a05 = _mm_shuffle_epi8(m[5], shuffle[5]);
+            block a06 = _mm_shuffle_epi8(m[6], shuffle[6]);
+            block a07 = _mm_shuffle_epi8(m[7], shuffle[7]);
+            block a08 = _mm_shuffle_epi8(m[8], shuffle[8]);
+            block a09 = _mm_shuffle_epi8(m[9], shuffle[9]);
+            block a10 = _mm_shuffle_epi8(m[10], shuffle[10]);
+            block a11 = _mm_shuffle_epi8(m[11], shuffle[11]);
+            block a12 = _mm_shuffle_epi8(m[12], shuffle[12]);
+            block a13 = _mm_shuffle_epi8(m[13], shuffle[13]);
+            block a14 = _mm_shuffle_epi8(m[14], shuffle[14]);
+            block a15 = _mm_shuffle_epi8(m[15], shuffle[15]);
 
             a00 = a00 ^ a08;
             a01 = a01 ^ a09;
@@ -320,19 +375,25 @@ namespace secJoin
             u16 ap = _mm_movemask_epi8(a00);
 
             *aIter16++ = ap;
+            m += 16;
+
         }
     }
 
 
-    void OleBatch::SendBatch::compressSender(span<std::array<oc::block, 2>> sendMsg, span<oc::block> add, span<oc::block> mult)
+    void OleBatch::SendBatch::compressSender(
+        block delta,
+        span<oc::block> B, 
+        span<oc::block> add, 
+        span<oc::block> mult)
     {
 
         auto bIter16 = (u16*)add.data();
         auto aIter16 = (u16*)mult.data();
 
-        if (add.size() * 128 != sendMsg.size())
+        if (add.size() * 128 != B.size())
             throw RTE_LOC;
-        if (mult.size() * 128 != sendMsg.size())
+        if (mult.size() * 128 != B.size())
             throw RTE_LOC;
         using block = oc::block;
 
@@ -341,41 +402,88 @@ namespace secJoin
         for (u64 i = 0; i < 16; ++i)
             shuffle[i].set<u8>(i, 0);
 
-        for (u64 i = 0; i < sendMsg.size(); i += 16)
-        {
-            block a00 = _mm_shuffle_epi8(sendMsg[i + 0][0], shuffle[0]);
-            block a01 = _mm_shuffle_epi8(sendMsg[i + 1][0], shuffle[1]);
-            block a02 = _mm_shuffle_epi8(sendMsg[i + 2][0], shuffle[2]);
-            block a03 = _mm_shuffle_epi8(sendMsg[i + 3][0], shuffle[3]);
-            block a04 = _mm_shuffle_epi8(sendMsg[i + 4][0], shuffle[4]);
-            block a05 = _mm_shuffle_epi8(sendMsg[i + 5][0], shuffle[5]);
-            block a06 = _mm_shuffle_epi8(sendMsg[i + 6][0], shuffle[6]);
-            block a07 = _mm_shuffle_epi8(sendMsg[i + 7][0], shuffle[7]);
-            block a08 = _mm_shuffle_epi8(sendMsg[i + 8][0], shuffle[8]);
-            block a09 = _mm_shuffle_epi8(sendMsg[i + 9][0], shuffle[9]);
-            block a10 = _mm_shuffle_epi8(sendMsg[i + 10][0], shuffle[10]);
-            block a11 = _mm_shuffle_epi8(sendMsg[i + 11][0], shuffle[11]);
-            block a12 = _mm_shuffle_epi8(sendMsg[i + 12][0], shuffle[12]);
-            block a13 = _mm_shuffle_epi8(sendMsg[i + 13][0], shuffle[13]);
-            block a14 = _mm_shuffle_epi8(sendMsg[i + 14][0], shuffle[14]);
-            block a15 = _mm_shuffle_epi8(sendMsg[i + 15][0], shuffle[15]);
+        std::array<block, 16> sendMsg;
+        auto m = B.data();
 
-            block b00 = _mm_shuffle_epi8(sendMsg[i + 0][1], shuffle[0]);
-            block b01 = _mm_shuffle_epi8(sendMsg[i + 1][1], shuffle[1]);
-            block b02 = _mm_shuffle_epi8(sendMsg[i + 2][1], shuffle[2]);
-            block b03 = _mm_shuffle_epi8(sendMsg[i + 3][1], shuffle[3]);
-            block b04 = _mm_shuffle_epi8(sendMsg[i + 4][1], shuffle[4]);
-            block b05 = _mm_shuffle_epi8(sendMsg[i + 5][1], shuffle[5]);
-            block b06 = _mm_shuffle_epi8(sendMsg[i + 6][1], shuffle[6]);
-            block b07 = _mm_shuffle_epi8(sendMsg[i + 7][1], shuffle[7]);
-            block b08 = _mm_shuffle_epi8(sendMsg[i + 8][1], shuffle[8]);
-            block b09 = _mm_shuffle_epi8(sendMsg[i + 9][1], shuffle[9]);
-            block b10 = _mm_shuffle_epi8(sendMsg[i + 10][1], shuffle[10]);
-            block b11 = _mm_shuffle_epi8(sendMsg[i + 11][1], shuffle[11]);
-            block b12 = _mm_shuffle_epi8(sendMsg[i + 12][1], shuffle[12]);
-            block b13 = _mm_shuffle_epi8(sendMsg[i + 13][1], shuffle[13]);
-            block b14 = _mm_shuffle_epi8(sendMsg[i + 14][1], shuffle[14]);
-            block b15 = _mm_shuffle_epi8(sendMsg[i + 15][1], shuffle[15]);
+        auto OneBlock = block(1);
+        auto AllOneBlock = block(~0ull, ~0ull);
+        block mask = OneBlock ^ AllOneBlock;
+        delta = delta & mask;
+
+        for (u64 i = 0; i < B.size(); i += 16)
+        {
+            auto s = sendMsg.data();
+
+            for(u64 j =0; j < 2; ++j)
+            {
+                m[0]  = m [0]  & mask;
+                m[1]  = m [1]  & mask;
+                m[2]  = m [2]  & mask;
+                m[3]  = m [3]  & mask;
+                m[4]  = m [4]  & mask;
+                m[5]  = m [5]  & mask;
+                m[6]  = m [6]  & mask;
+                m[7]  = m [7]  & mask;
+
+                oc::mAesFixedKey.hashBlocks<8>(m, s);
+
+                s += 8;
+                m += 8;
+            }
+
+
+            block a00 = _mm_shuffle_epi8(sendMsg[0], shuffle[0]);
+            block a01 = _mm_shuffle_epi8(sendMsg[1], shuffle[1]);
+            block a02 = _mm_shuffle_epi8(sendMsg[2], shuffle[2]);
+            block a03 = _mm_shuffle_epi8(sendMsg[3], shuffle[3]);
+            block a04 = _mm_shuffle_epi8(sendMsg[4], shuffle[4]);
+            block a05 = _mm_shuffle_epi8(sendMsg[5], shuffle[5]);
+            block a06 = _mm_shuffle_epi8(sendMsg[6], shuffle[6]);
+            block a07 = _mm_shuffle_epi8(sendMsg[7], shuffle[7]);
+            block a08 = _mm_shuffle_epi8(sendMsg[8], shuffle[8]);
+            block a09 = _mm_shuffle_epi8(sendMsg[9], shuffle[9]);
+            block a10 = _mm_shuffle_epi8(sendMsg[10], shuffle[10]);
+            block a11 = _mm_shuffle_epi8(sendMsg[11], shuffle[11]);
+            block a12 = _mm_shuffle_epi8(sendMsg[12], shuffle[12]);
+            block a13 = _mm_shuffle_epi8(sendMsg[13], shuffle[13]);
+            block a14 = _mm_shuffle_epi8(sendMsg[14], shuffle[14]);
+            block a15 = _mm_shuffle_epi8(sendMsg[15], shuffle[15]);
+
+            s = sendMsg.data();
+            m -= 16;
+            for (u64 j = 0; j < 2; ++j)
+            {
+                s[0] = m[0] ^ delta;
+                s[1] = m[1] ^ delta;
+                s[2] = m[2] ^ delta;
+                s[3] = m[3] ^ delta;
+                s[4] = m[4] ^ delta;
+                s[5] = m[5] ^ delta;
+                s[6] = m[6] ^ delta;
+                s[7] = m[7] ^ delta;
+
+                oc::mAesFixedKey.hashBlocks<8>(s, s);
+
+                s += 8;
+                m += 8;
+            }
+
+            block b00 = _mm_shuffle_epi8(sendMsg[0], shuffle[0]);
+            block b01 = _mm_shuffle_epi8(sendMsg[1], shuffle[1]);
+            block b02 = _mm_shuffle_epi8(sendMsg[2], shuffle[2]);
+            block b03 = _mm_shuffle_epi8(sendMsg[3], shuffle[3]);
+            block b04 = _mm_shuffle_epi8(sendMsg[4], shuffle[4]);
+            block b05 = _mm_shuffle_epi8(sendMsg[5], shuffle[5]);
+            block b06 = _mm_shuffle_epi8(sendMsg[6], shuffle[6]);
+            block b07 = _mm_shuffle_epi8(sendMsg[7], shuffle[7]);
+            block b08 = _mm_shuffle_epi8(sendMsg[8], shuffle[8]);
+            block b09 = _mm_shuffle_epi8(sendMsg[9], shuffle[9]);
+            block b10 = _mm_shuffle_epi8(sendMsg[10], shuffle[10]);
+            block b11 = _mm_shuffle_epi8(sendMsg[11], shuffle[11]);
+            block b12 = _mm_shuffle_epi8(sendMsg[12], shuffle[12]);
+            block b13 = _mm_shuffle_epi8(sendMsg[13], shuffle[13]);
+            block b14 = _mm_shuffle_epi8(sendMsg[14], shuffle[14]);
+            block b15 = _mm_shuffle_epi8(sendMsg[15], shuffle[15]);
 
             a00 = a00 ^ a08;
             a01 = a01 ^ a09;

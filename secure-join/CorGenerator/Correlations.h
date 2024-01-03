@@ -12,6 +12,7 @@
 namespace secJoin
 {
     
+    struct Batch;
 
     struct RequestState;
     enum class CorType
@@ -45,7 +46,8 @@ namespace secJoin
         CorType mType;
 
         // The request associated with this correlation.
-        std::shared_ptr<RequestState> mRequest;
+        //std::shared_ptr<RequestState> mRequest;
+        std::shared_ptr<Batch> mBatch;
     };
 
     // A receiver OT correlation.

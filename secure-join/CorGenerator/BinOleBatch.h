@@ -29,6 +29,11 @@ namespace secJoin
     {
         OleBatch(bool sender, oc::Socket&& s, PRNG&& p);
 
+        ~OleBatch()
+        {
+            std::cout << "~OleBatch()" << std::endl;
+        }
+
         // The "send" specific state
         struct SendBatch
         {
@@ -50,7 +55,8 @@ namespace secJoin
             // The routine that compresses the sender's OT messages
             // into OLEs. Basically, it just tasks the LSB of the OTs.
             void compressSender(
-                span<std::array<oc::block, 2>> sendMsg,
+                block delta,
+                span<oc::block> sendMsg,
                 span<oc::block> add,
                 span<oc::block> mult);
 
@@ -79,7 +85,7 @@ namespace secJoin
 
             // The routine that compresses the sender's OT messages
             // into OLEs. Basically, it just tasks the LSB of the OTs.
-            void compressRecver(oc::BitVector& bv, span<oc::block> recvMsg, span<oc::block> add, span<oc::block> mult);
+            void compressRecver(span<oc::block> recvMsg, span<oc::block> add, span<oc::block> mult);
 
             void mock(u64 batchIdx, span<oc::block> add, span<oc::block> mult);
 
@@ -99,6 +105,13 @@ namespace secJoin
         macoro::task<> getTask() override;
 
         void mock(u64 batchIdx) override;
+
+
+        void clear() override
+        {
+            mAdd = {};
+            mMult = {};
+        }
     };
 
 

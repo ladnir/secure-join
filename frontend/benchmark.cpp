@@ -5,6 +5,139 @@
 
 namespace secJoin
 {
+    void CorGen_benchmark(const oc::CLP& cmd)
+    {
+        // request size
+        u64 n = cmd.getOr("n", 1ull << cmd.getOr("nn", 20));
+
+        // number of ole requests
+        u64 ole = cmd.getOr("ole", 32);
+
+        // number of ot requests
+        u64 ot = cmd.getOr("ot", 32);
+
+        // batch size
+        u64 batch = 1ull<< cmd.getOr("b", 18);
+
+        u64 trials = cmd.getOr("trials", 1);
+
+        bool gen = cmd.isSet("gen");
+
+        u64 chunk = cmd.getOr("chunk", 5);
+
+        oc::Timer timer;
+
+        RadixSort s0, s1;
+
+        s0.setTimer(timer);
+        s1.setTimer(timer);
+
+        std::vector<oc::block> x(n);
+        std::vector<oc::block> y0(n), y1(n);
+
+        auto sock = coproto::LocalAsyncSocket::makePair();
+
+        PRNG prng0(oc::ZeroBlock);
+        PRNG prng1(oc::OneBlock);
+
+        for (u64 trial = 0; trial < trials; ++trial)
+        {
+            timer.setTimePoint("begin");
+
+            CorGenerator g[2];
+
+            g[0].init(std::move(sock[0]), prng0, 0, batch);
+            g[1].init(std::move(sock[1]), prng1, 1, batch);
+
+            std::vector<std::array<BinOleRequest, 2>> oleReqs(ole);
+            std::vector<OtRecvRequest> otRecvReqs(ot);
+            std::vector<OtSendRequest> otSendReqs(ot);
+
+            for (u64 i = 0; i < std::max<u64>(ole, ot); ++i)
+            {
+                if (i < ole)
+                {
+                    oleReqs[i][0] = g[0].binOleRequest(n);
+                    oleReqs[i][1] = g[1].binOleRequest(n);
+                }
+                if (i < ot)
+                {
+                    otRecvReqs[i] = g[0].recvOtRequest(n);
+                    otSendReqs[i] = g[1].sendOtRequest(n);
+                }
+            }
+            std::cout << "request done \n\n" << std::endl;
+            for (u64 i = 0; i < std::max<u64>(ole, ot); )
+            {
+                std::cout << "\ni = "<<i<<" \n\n" << std::endl;
+
+                std::vector<macoro::eager_task<>> tasks;
+
+                for (u64 b = 0; b < chunk; ++b, ++i)
+                {
+                    if (i < ole)
+                    {
+                        tasks.push_back(oleReqs[i][0].start() | macoro::make_eager());
+                        tasks.push_back(oleReqs[i][1].start() | macoro::make_eager());
+                    }
+                    if (i < ot)
+                    {
+                        tasks.push_back(otRecvReqs[i].start() | macoro::make_eager());
+                        tasks.push_back(otSendReqs[i].start() | macoro::make_eager());
+                    }
+                }
+
+
+                i -= chunk;
+                std::cout << "\nget i = " << i << " \n" << std::endl;
+                for (u64 b = 0; b < chunk; ++b, ++i)
+                {
+                    if (i < ole)
+                    {
+                        u64 m = 0;
+                        BinOle o[2];
+                        while (m < n)
+                        {
+                            std::cout << "OLE get " << i << std::endl;
+                            macoro::sync_wait(macoro::when_all_ready(
+                                oleReqs[i][0].get(o[0]),
+                                oleReqs[i][1].get(o[1])));
+
+                            m += o[0].size();
+                        }
+                    }
+                    std::cout << "OLE done " << i << std::endl;
+
+                    if (i < ot)
+                    {
+                        u64 m = 0;
+                        OtRecv r;
+                        OtSend s;
+                        while (m < n)
+                        {
+                            macoro::sync_wait(macoro::when_all_ready(
+                                otRecvReqs[i].get(r),
+                                otSendReqs[i].get(s)));
+                            m += r.size();
+                        }
+                    }
+                }
+
+                for (auto& tt : tasks)
+                    macoro::sync_wait(tt);
+
+            }
+            timer.setTimePoint("end");
+
+        }
+
+        if (cmd.isSet("v"))
+        {
+            std::cout << timer << std::endl;
+        }
+    }
+
+
     void Radix_benchmark(const oc::CLP& cmd)
     {
 
@@ -122,9 +255,9 @@ namespace secJoin
         ));
         auto end = timer.setTimePoint("end");
 
-        std::cout << "radix Ln:" << nL << ", Rn:"<<nR<<" m:" << keySize << "  Ld: "<<dL << ", Rd:" <<dR << "  ~ "<<
+        std::cout << "radix Ln:" << nL << ", Rn:" << nR << " m:" << keySize << "  Ld: " << dL << ", Rd:" << dR << "  ~ " <<
             std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "ms " <<
-            sock[0].bytesSent() / double(nL+nR) << "+" << sock[0].bytesReceived() / double(nL + nR) << "=" <<
+            sock[0].bytesSent() / double(nL + nR) << "+" << sock[0].bytesReceived() / double(nL + nR) << "=" <<
             (sock[0].bytesSent() + sock[0].bytesReceived()) / double(nL + nR) << " bytes/elem " << std::endl;
 
         if (cmd.isSet("timing"))
@@ -250,15 +383,15 @@ namespace secJoin
     {
 
         F3AccPermCode c;
-        auto l = cmd.getOr("n",1<< cmd.getOr("nn", 18));
+        auto l = cmd.getOr("n", 1 << cmd.getOr("nn", 18));
         auto k = cmd.getOr("k", 128 * 4);
         auto p = cmd.getOr("p", 0);
-        auto batch = 1ull<<cmd.getOr("b", 10);
+        auto batch = 1ull << cmd.getOr("b", 10);
         auto n = k / 2;
         c.init(k, n, p);
 
         {
-            oc::Matrix<block>msb(k, l/128), lsb(k, l / 128);
+            oc::Matrix<block>msb(k, l / 128), lsb(k, l / 128);
             oc::Matrix<block>msbOut(n, l / 128), lsbOut(n, l / 128);
             PRNG prng(oc::ZeroBlock);
             sampleMod3Lookup(prng, msb, lsb);

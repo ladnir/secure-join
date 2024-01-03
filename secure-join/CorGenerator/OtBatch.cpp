@@ -132,9 +132,19 @@ namespace secJoin
 
     macoro::task<> OtBatch::getTask() {
         MC_BEGIN(macoro::task<>, this, 
-            t = macoro::task<>{});
+            t = macoro::task<>{},
+            c = char{0});
 
         MC_AWAIT(mHaveBase);
+
+        //if (mSendRecv.index() == 0)
+        //{
+        //    MC_AWAIT(mSock.send(std::move(c)));
+        //}
+        //else 
+        //{
+        //    MC_AWAIT(mSock.recv(c));
+        //}
 
         t = mSendRecv | match{
             [&](SendOtBatch& send) {
@@ -148,6 +158,19 @@ namespace secJoin
 
         mCorReady.set();
         MC_END();
+    }
+
+    void OtBatch::clear()
+    {
+        mSendRecv | match{
+            [&](SendOtBatch& send) {
+                send.mMsg2 = {};
+            },
+            [&](RecvOtBatch& recv) {
+                recv.mChoice = {};
+                recv.mMsg = {};
+            }
+        };
     }
 
     void OtBatch::mock(u64 batchIdx)

@@ -15,6 +15,11 @@ int main(int argc, char** argv)
 
     if (clp.isSet("bench"))
     {
+
+        if (clp.isSet("CorGen"))
+        {
+            CorGen_benchmark(clp);
+        }
         if (clp.isSet("join"))
         {
             OmJoin_benchmark(clp);

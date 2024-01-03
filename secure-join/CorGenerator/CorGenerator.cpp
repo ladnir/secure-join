@@ -87,6 +87,9 @@ namespace secJoin
                     //for (auto& slot : ss.mImpl->mSlots_)
                     //    if (slot.mSessionID == ss.mId)
                     //        slot.mName = std::string("gen_") + std::to_string(batches.size());
+
+                    //oc::PRNG prng;prng.SetSeed(mPrng.get(), 8);
+                    //batches.push_back(makeBatch(requests[i]->mSender, requests[i]->mType, std::move(ss), std::move(prng)));
                     batches.push_back(makeBatch(requests[i]->mSender, requests[i]->mType, std::move(ss), mPrng.fork()));
                     batches.back()->mIndex = batches.size();
                     batch = batches.back();
@@ -219,6 +222,8 @@ namespace secJoin
             MC_AWAIT(rProto);
         }
 
+
+        //std::cout << (u64)this << " setting base " << std::endl;
         for (i = 0, r = 0, s = 0; i < batches.size(); ++i)
         {
             auto& batch = *batches[i];
@@ -228,10 +233,20 @@ namespace secJoin
             auto sBase = sMsg.subspan(s, reqs[i].mSendSize);
             s += reqs[i].mSendSize;
 
+            //for (u64 j = 0; j < rBase.size(); ++j)
+            //{
+            //    std::cout << i << " " << j << " r " << rBase[j] << " " << reqs[i].mChoice[j] << std::endl;
+            //}
+            //for (u64 j = 0; j < sBase.size(); ++j)
+            //{
+            //    std::cout << i << " " << j << " s " << sBase[j][0] << " " << sBase[j][1] << std::endl;
+            //}
+
             batch.setBase(rBase, sBase);
             batch.mHaveBase.set();
         }
-
+        //std::cout << (u64)this << " base set " << std::endl;
+        batches = {};
         //mGenerationInProgress = false;
 
         MC_END();

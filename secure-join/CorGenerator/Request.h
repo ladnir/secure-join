@@ -92,8 +92,8 @@ namespace secJoin
             batch = &mReqState->mBatches_[mReqState->mNextBatchIdx++];
             MC_AWAIT(batch->mBatch->mCorReady);
 
-            d.mRequest = mReqState;
             batch->mBatch->getCor(&d, batch->mBegin, batch->mSize);
+            d.mBatch = std::move(batch->mBatch);
 
             MC_END();
         }
