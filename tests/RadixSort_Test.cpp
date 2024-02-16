@@ -66,8 +66,9 @@ void RadixSort_hadamardSum_test(const oc::CLP& cmd)
 
     oc::Matrix<u32> r0(rows, cols), r1(rows, cols);
     AdditivePerm p0, p1;
-    p0.init2(0, rows);
-    p1.init2(1, rows);
+
+    //p0.init2(0, rows);
+    //p1.init2(1, rows);
 
     auto lIter = oc::BitIterator(l.data());
     for (u64 i = 0; i < rows; ++i)
@@ -91,19 +92,15 @@ void RadixSort_hadamardSum_test(const oc::CLP& cmd)
     s1.mDebug = cmd.isSet("debug");
 
     //s0.request(
-    s0.init(0, rows, s0.mL); s0.request(g0);
-    s1.init(1, rows, s0.mL); s1.request(g1);
+    s0.init(0, rows, s0.mL, g0);
+    s1.init(1, rows, s0.mL, g1);
 
-    auto pre = macoro::sync_wait(macoro::when_all_ready(
-        s0.preprocess(comm[0], prng),
-        s1.preprocess(comm[1], prng)
-    ));
-    std::get<0>(pre).result();
-    std::get<1>(pre).result();
+    s0.preprocess();
+    s1.preprocess();
 
-    //s0.initArith2BinCircuit(rows);
-    //s1.initArith2BinCircuit(rows);
     auto main =  macoro::sync_wait(macoro::when_all_ready(
+        g0.start(),
+        g1.start(),
         s0.hadamardSum(s0.mRounds[0], l0, r0, p0, comm[0]),
         s1.hadamardSum(s1.mRounds[0], l1, r1, p1, comm[1])
     ));
@@ -162,15 +159,16 @@ void RadixSort_oneHot_test(const oc::CLP& cmd)
     auto cir = rs.mIndexToOneHotCircuit;
 
     std::array<Gmw, 2> gmw;
-    gmw[0].init(n, cir);
-    gmw[1].init(n, cir);
+    gmw[0].init(n, cir, g[0]);
+    gmw[1].init(n, cir, g[1]);
 
     gmw[0].setInput(0, k[0]);
     gmw[1].setInput(0, k[1]);
 
     macoro::sync_wait(macoro::when_all_ready(
-        gmw[0].run(g[0], comm[0], prng),
-        gmw[1].run(g[1], comm[1], prng)
+        gmw[0].run(comm[0]),
+        gmw[1].run(comm[1]),
+        g[0].start(), g[1].start()
     ));
 
     bits[0].resize(n, 1);
@@ -226,21 +224,16 @@ void RadixSort_bitInjection_test(const oc::CLP& cmd)
 
     BitInject bi0, bi1;
 
+    bi0.init(n, L, g0);
+    bi1.init(n, L, g1);
 
-    bi0.init(n, L);
-    bi1.init(n, L);
-
-    bi0.request(g0);
-    bi1.request(g1);
-
-    macoro::sync_wait(macoro::when_all_ready(
-        bi0.preprocess(),
-        bi1.preprocess()
-        ));
+    bi0.preprocess();
+    bi1.preprocess();
 
     macoro::sync_wait(macoro::when_all_ready(
         bi0.bitInjection(k0, 32, f0, comm[0]),
-        bi1.bitInjection(k1, 32, f1, comm[1])
+        bi1.bitInjection(k1, 32, f1, comm[1]),
+        g0.start(), g1.start()
     ));
 
     auto ff = reveal(f0, f1);
@@ -300,16 +293,17 @@ void RadixSort_genValMasks2_test(const oc::CLP& cmd)
             s0.mL = L;
             s1.mL = L;
 
-            s0.init(0, n, L);
-            s1.init(1, n, L);
-            s0.request(g0);
-            s1.request(g1);
+            s0.init(0, n, L, g0);
+            s1.init(1, n, L, g1);
+            s0.mDebug = cmd.isSet("debug");
+            s1.mDebug = cmd.isSet("debug");
+
+            s0.preprocess();
+            s1.preprocess();
 
             macoro::sync_wait(macoro::when_all_ready(
-                s0.preprocess(comm[0], prng),
-                s1.preprocess(comm[1], prng)
-            ));
-            macoro::sync_wait(macoro::when_all_ready(
+                g0.start(),
+                g1.start(),
                 s0.genValMasks2(s0.mRounds[0], L, k0, f0, fBin0, comm[0]),
                 s1.genValMasks2(s1.mRounds[0], L, k1, f1, fBin1, comm[1])
             ));
@@ -434,7 +428,7 @@ void RadixSort_genBitPerm_test(const oc::CLP& cmd)
     //u64 L = 4;
     //u64 n = 40;
     u64 trials = 1;
-    for (auto m : { 3, 10, 15 })
+    for (auto m : { /*2,*/ 10, 15 })
         for (auto n : { 10ull, 40ull, 1ull << cmd.getOr("nn", 10)  })
         {
             for (auto L : { 1, 3, 5 })
@@ -443,7 +437,7 @@ void RadixSort_genBitPerm_test(const oc::CLP& cmd)
                 if (L > m)
                     continue;
 
-                for (u64 tt = 1; tt < trials; ++tt)
+                for (u64 tt = 0; tt < trials; ++tt)
                 {
                     PRNG prng(block(tt, 0));
                     RadixSort s[2];
@@ -453,9 +447,19 @@ void RadixSort_genBitPerm_test(const oc::CLP& cmd)
                     BinMatrix k(n, m);
                     BinMatrix sk[2];
                     CorGenerator g[2];
+
                     g[0].init(comm[0].fork(), prng, 0, 1<<18, cmd.getOr("mock", 1));
                     g[1].init(comm[1].fork(), prng, 1, 1<<18, cmd.getOr("mock", 1));
 
+                    g[0].mGenState->mDebug = cmd.isSet("debug");
+                    g[1].mGenState->mDebug = cmd.isSet("debug");
+
+                    s[0].mDebug = cmd.isSet("debug");
+                    s[1].mDebug = cmd.isSet("debug");
+                    s[0].mL = L;
+                    s[1].mL = L;
+                    s[0].init(0, n, m, g[0]);
+                    s[1].init(1, n, m, g[1]);
                     //m = L;
                     auto ll = oc::divCeil(m, L);
                     std::vector<Perm> exp(ll);
@@ -498,6 +502,17 @@ void RadixSort_genBitPerm_test(const oc::CLP& cmd)
 
                     share(k, sk[0], sk[1], prng);
 
+                    auto gg = macoro::make_eager(macoro::when_all_ready(
+                        g[0].start(),
+                        g[1].start()
+                    ));
+
+                    s[0].mPreProLead = s[0].mRounds.size();
+                    s[1].mPreProLead = s[1].mRounds.size();
+                    auto pre = macoro::make_eager(macoro::when_all_ready(
+                        s[0].genPrePerm(comm[0].fork(), prng),
+                        s[1].genPrePerm(comm[1].fork(), prng)
+                    ));
 
                     for (u64 j = 0; j < ll; ++j)
                     {
@@ -516,7 +531,8 @@ void RadixSort_genBitPerm_test(const oc::CLP& cmd)
                             throw RTE_LOC;
                         }
 
-                        macoro::sync_wait(macoro::when_all_ready(
+
+                        auto pre = macoro::sync_wait(macoro::when_all_ready(
                             s[0].genBitPerm(s[0].mRounds[j], L, kk[0], p[0][j], comm[0]),
                             s[1].genBitPerm(s[1].mRounds[j], L, kk[1], p[1][j], comm[1])
                         ));
@@ -526,11 +542,18 @@ void RadixSort_genBitPerm_test(const oc::CLP& cmd)
                         if (exp[j] != act)
                         {
                             std::cout << j << " " << ll << std::endl;
-                            std::cout << "\n" << exp[j] << "\n" << act << std::endl;
+                            std::cout << "\nexp " << exp[j] << "\nact" << act << std::endl;
                             throw RTE_LOC;
                         }
                     }
 
+                    auto gr = macoro::sync_wait(std::move(gg));
+                    std::get<0>(gr).result();
+                    std::get<1>(gr).result();
+
+                    auto prer = macoro::sync_wait(std::move(pre));
+                    std::get<0>(prer).result();
+                    std::get<1>(prer).result();
                     //std::cout << L << " passed" << std::endl;
                 }
             }
@@ -638,8 +661,8 @@ void RadixSort_genPerm_test(const oc::CLP& cmd)
                     s0.mL = L;
                     s1.mL = L;
 
-                    //s0.mDebug = true;
-                    //s1.mDebug = true;
+                    s0.mDebug = cmd.isSet("debug");
+                    s1.mDebug = cmd.isSet("debug");
 
                     oc::Timer timer;
                     s0.setTimer(timer);
@@ -669,19 +692,15 @@ void RadixSort_genPerm_test(const oc::CLP& cmd)
 
                     share(k, k0, k1, prng);
 
-                    s0.init(0, n, bitCount);
-                    s1.init(1, n, bitCount);
-                    s0.request(g0);
-                    s1.request(g1);
-                    //auto t = std::thread([&]() {
-                    //    std::this_thread::sleep_for(std::chrono::milliseconds(10000));
-                    //    printStatus(comm[0], comm[1]);
-                    //    });
+                    s0.mDebug = cmd.isSet("debug");
+                    s1.mDebug = cmd.isSet("debug");
+                    s0.init(0, n, bitCount, g0);
+                    s1.init(1, n, bitCount, g1);
+
+
                     macoro::sync_wait(macoro::when_all_ready(
-                        s0.preprocess(comm[0], prng),
-                        s1.preprocess(comm[1], prng)
-                    ));
-                    macoro::sync_wait(macoro::when_all_ready(
+                        g0.start(),
+                        g1.start(),
                         s0.genPerm(k0, p0, comm[0], prng),
                         s1.genPerm(k1, p1, comm[1], prng)
                     ));
@@ -755,15 +774,9 @@ void RadixSort_mock_test(const oc::CLP& cmd)
 
                 share(k, k0, k1, prng);
 
-                s0.init(0, n, bitCount);
-                s1.init(1, n, bitCount);
-                s0.request(g0);
-                s1.request(g1);
+                s0.init(0, n, bitCount, g0);
+                s1.init(1, n, bitCount, g1);
 
-                macoro::sync_wait(macoro::when_all_ready(
-                    s0.preprocess(comm[0], prng),
-                    s1.preprocess(comm[1], prng)
-                ));
                 macoro::sync_wait(macoro::when_all_ready(
                     s0.genPerm(k0, p0, comm[0], prng),
                     s1.genPerm(k1, p1, comm[1], prng)

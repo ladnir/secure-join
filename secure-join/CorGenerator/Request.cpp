@@ -12,17 +12,17 @@ namespace secJoin
         , mSize(size)
         , mReqIndex(idx)
         , mGenState(state)
-        , mSession(state->mSession)
+        //, mSession(state->mSession)
     {
-        if (!mSession)
-        {
-            std::cout << "CorGenerator Session == nullptr. " LOCATION << std::endl;
-            std::terminate();
-        }
+        //if (!mSession)
+        //{
+        //    std::cout << "CorGenerator Session == nullptr. " LOCATION << std::endl;
+        //    std::terminate();
+        //}
     }
 
 
-    void RequestState::addBatch(BatchOffset b)
+    void RequestState::addBatch(BatchSegment b)
     {
         switch (mType)
         {
@@ -40,51 +40,16 @@ namespace secJoin
         mBatches_.emplace_back(std::move(b));
     }
 
-    macoro::task<> RequestState::startReq()
+    void RequestState::startReq()
     {
-        MC_BEGIN(macoro::task<>, this,
-            i = u64{},
-            s = bool{},
-            tasks = std::vector<macoro::eager_task<>>{}
-        );
-        // check to see if the base OTs have been started.
-        s = mSession->mBaseStarted.exchange(true);
-        if (s == false)
+        for (u64 i = 0; i < mBatches_.size(); ++i)
         {
-            mGenState->mSession = {};
-            MC_AWAIT(mGenState->startBaseOts());
+            // the batch might have already finished. lets see if it exists
+            // and if it needs to be started.
+            auto batch = mBatches_[i].mWeakBatch.lock();
+            if(batch)
+                batch->start();
         }
-
-        if (mGenState->mMock)
-        {
-
-            for (i = 0; i < mBatches_.size(); ++i)
-            {
-                if (mBatches_[i].mBatch->mStarted.exchange(true) == false)
-                {
-                    mBatches_[i].mBatch->mock(mBatches_[i].mBatch->mIndex);
-                    mBatches_[i].mBatch->mCorReady.set();
-                }
-            }
-        }
-        else
-        {
-            tasks.reserve(mBatches_.size());
-            for (i = 0; i < mBatches_.size(); ++i)
-            {
-                if (mBatches_[i].mBatch->mStarted.exchange(true) == false)
-                {
-                    tasks.emplace_back(mBatches_[i].mBatch->getTask() | macoro::make_eager());
-                }
-            }
-
-            for (i = 0; i < tasks.size(); ++i)
-            {
-                MC_AWAIT(tasks[i]);
-            }
-        }
-
-        MC_END();
     }
 
     u64 RequestState::batchCount()

@@ -27,12 +27,12 @@ namespace secJoin
 
     struct OleBatch : Batch
     {
-        OleBatch(bool sender, oc::Socket&& s, PRNG&& p);
+        OleBatch(GenState* state, bool sender, oc::Socket&& s, PRNG&& p);
 
-        ~OleBatch()
-        {
-            std::cout << "~OleBatch()" << std::endl;
-        }
+        //~OleBatch()
+        //{
+        //    std::cout << "~OleBatch()" << std::endl;
+        //}
 
         // The "send" specific state
         struct SendBatch
@@ -44,13 +44,14 @@ namespace secJoin
 
             // return the task that generate the Sender correlation.
             macoro::task<> sendTask(
+                GenState* state,
                 u64 batchIdx,
+                u64 size,
                 PRNG& prng,
                 oc::Socket& sock,
                 oc::AlignedUnVector<oc::block>& add,
                 oc::AlignedUnVector<oc::block>& mult,
-                macoro::async_manual_reset_event& corReady,
-                macoro::async_manual_reset_event& haveBase);
+                macoro::async_manual_reset_event& corReady);
 
             // The routine that compresses the sender's OT messages
             // into OLEs. Basically, it just tasks the LSB of the OTs.
@@ -75,13 +76,14 @@ namespace secJoin
 
             // return the task that generate the Sender correlation.
             macoro::task<> recvTask(
+                GenState* state,
                 u64 batchIdx,
+                u64 size,
                 PRNG& prng,
                 oc::Socket& sock,
                 oc::AlignedUnVector<oc::block>& add,
                 oc::AlignedUnVector<oc::block>& mult,
-                macoro::async_manual_reset_event& corReady,
-                macoro::async_manual_reset_event& haveBase);
+                macoro::async_manual_reset_event& corReady);
 
             // The routine that compresses the sender's OT messages
             // into OLEs. Basically, it just tasks the LSB of the OTs.
@@ -104,7 +106,12 @@ namespace secJoin
         // Get the task associated with this batch.
         macoro::task<> getTask() override;
 
-        void mock(u64 batchIdx) override;
+        //void mock(u64 batchIdx) override;
+
+        u64 getBatchTypeId() override
+        {
+            return mSendRecv.index();
+        }
 
 
         void clear() override

@@ -42,11 +42,33 @@ namespace secJoin
         oc::SoftSpokenShOtSender<> mSendBase;
         oc::SoftSpokenShOtReceiver<> mRecvBase;
 
+        // next request index
+        u64 mReqIndex = 0;
 
-        std::shared_ptr<Session> mSession;
 
-        // all of the requests. These are broken down into batches.
-        std::vector<std::shared_ptr<RequestState>> mRequests;
+        struct ReqInfo
+        {
+            CorType mType;
+            u64 mRole;
+            u64 mSize;
+
+            bool operator!=(const ReqInfo& r)const
+            {
+                return
+                    mType != r.mType ||
+                    mRole != r.mRole ||
+                    mSize != r.mSize;
+            }
+            bool operator==(const ReqInfo& r) const
+            {
+                return !(*this != r);
+            }
+        };
+        std::vector<ReqInfo> mReqs;
+        //std::shared_ptr<Session> mSession;
+
+        // all of the requests. These are broken down into mBatches.
+        //std::vector<std::shared_ptr<RequestState>> mRequests;
 
         // randomness source
         PRNG mPrng;
@@ -66,11 +88,36 @@ namespace secJoin
         // used to determine which party should go first when its ambiguous.
         u64 mPartyIdx = -1;
 
-        // returns a task that constructs the base OTs and assigns them to batches.
-        macoro::task<> startBaseOts();
+        std::atomic<u64> mBatchStartIdx = 0;
+
+        // returns a task that constructs the base OTs and assigns them to mBatches.
+        macoro::task<> start();
+
+        std::array<std::shared_ptr<Batch>, 2> mOtBatch;
+        std::array<std::shared_ptr<Batch>, 2> mOleBatch;
+        std::vector<std::shared_ptr<Batch>> mBatches;
+
 
         void set(SendBase& b);
         void set(RecvBase& b);
+
+
+        void startBatch(Batch* b)
+        {
+            u64 idx = mBatchStartIdx;
+            //assert(b->mIndex < mBatches.size());
+            //assert(mBatches[b->mIndex].get() == b);
+            
+            while (b->mIndex >= idx)
+            {
+                bool s = mBatchStartIdx.compare_exchange_strong(idx, idx + 1);
+                if (s)
+                {
+                    mBatches[idx]->mStart.set();
+                    ++idx;
+                }
+            }
+        }
     };
 
     struct CorGenerator
@@ -98,11 +145,6 @@ namespace secJoin
             mGenState->set(rb);
         }
 
-        //bool started()const
-        //{
-        //    return mGenState && mGenState->mGenerationInProgress;
-        //}
-
         bool initialized()const
         {
             return mGenState.get();
@@ -115,36 +157,15 @@ namespace secJoin
             return mGenState->mPartyIdx;
         }
 
-        //std::unordered_map<CorType, std::vector<std::shared_ptr<RequestState>>> getRequestsByType() const
-        //{
-        //    std::unordered_map < CorType, std::vector<std::shared_ptr<RequestState>>> r;
-        //    for (u64 i = 0; i < mGenState->mRequests.size(); ++i)
-        //        r[mGenState->mRequests[i]->mType].push_back(mGenState->mRequests[i]);
-        //    return r;
-        //}
+        macoro::task<> start()
+        {
+           return std::exchange(mGenState, nullptr)->start();
+        }
 
-        //bool operator==(const CorGenerator& o) const
-        //{
-        //    auto res0 = getRequestsByType();
-        //    auto res1 = o.getRequestsByType();
-        //    if (res0.size() != res1.size())
-        //        return false;
-
-        //    for (auto& s0 : res0)
-        //    {
-        //        if (res1.find(s0.first) == res1.end())
-        //            return false;
-
-        //        auto& s1 = res1[s0.first];
-
-        //        if (s0.second.size() != s1.size())
-        //            return false;
-
-        //        if()
-        //    }
-
-        //    return true;
-        //}
+        void startBatch(Batch* b)
+        {
+            mGenState->startBatch(b);
+        }
 
     private:
 

@@ -1,22 +1,18 @@
 #include "BinOleBatch.h"
+#include "CorGenerator.h"
 
 namespace secJoin
 {
 
 
 
-    OleBatch::OleBatch(bool sender, oc::Socket&& s, PRNG&& p)
+    OleBatch::OleBatch(GenState* state, bool sender, oc::Socket&& s, PRNG&& p)
+        : Batch(state, std::move(s), std::move(p))
     {
-        mSock = std::move(s);
-        mPrng = std::move(p);
         if (sender)
-        {
             mSendRecv.emplace<0>();
-        }
         else
-        {
             mSendRecv.emplace<1>();
-        }
     }
 
     void OleBatch::getCor(Cor* c, u64 begin, u64 size)
@@ -35,6 +31,9 @@ namespace secJoin
     {
         BaseRequest r;
 
+        if (mGenState->mMock)
+            return r;
+
         mSendRecv | match{
             [&](SendBatch& send) {
                 send.mSender.configure(mSize);
@@ -52,6 +51,9 @@ namespace secJoin
     void OleBatch::setBase(span<oc::block> rMsg, span<std::array<oc::block, 2>> sMsg)
     {
 
+        if (mGenState->mMock)
+            return;
+
         mSendRecv | match{
             [&](SendBatch& send) {
                 if (rMsg.size())
@@ -64,35 +66,26 @@ namespace secJoin
                 recv.mReceiver.setSilentBaseOts(rMsg);
             }
         };
-        mHaveBase.set();
     }
 
     macoro::task<> OleBatch::getTask()
     {
         return mSendRecv | match{
             [&](SendBatch& send) {
-                   return send.sendTask(mIndex, mPrng, mSock, mAdd, mMult, mCorReady, mHaveBase);
+                   return send.sendTask(mGenState, mIndex, mSize, mPrng, mSock, mAdd, mMult, mCorReady);
             },
             [&](RecvBatch& recv) {
-                  return  recv.recvTask(mIndex, mPrng, mSock, mAdd, mMult, mCorReady, mHaveBase);
+                  return  recv.recvTask(mGenState,mIndex, mSize, mPrng, mSock, mAdd, mMult, mCorReady);
             }
         };
     }
 
-    void OleBatch::mock(u64 batchIdx)
-    {
-        mAdd.resize(mSize / 128);
-        mMult.resize(mSize / 128);
-        mSendRecv | match{
-            [&](SendBatch& send) {
-                send.mock(batchIdx, mAdd, mMult);
-            },
-            [&](RecvBatch& recv) {
-                recv.mock(batchIdx, mAdd, mMult);
-            }
-        };
+    //void OleBatch::mock(u64 batchIdx)
+    //{
 
-    }
+    //    mCorReady.set();
+
+    //}
     void OleBatch::SendBatch::mock(u64 batchIdx, span<oc::block> add, span<oc::block> mult)
     {
         //memset(add, 0);
@@ -110,21 +103,21 @@ namespace secJoin
         while (i < m8)
         {
             mult.data()[i + 0] = mm;
-            mult.data()[i + 1] = mm;
-            mult.data()[i + 2] = mm;
-            mult.data()[i + 3] = mm;
-            mult.data()[i + 4] = mm;
-            mult.data()[i + 5] = mm;
-            mult.data()[i + 6] = mm;
-            mult.data()[i + 7] = mm;
+            mult.data()[i + 1] = mm >> 1 | mm << 1;
+            mult.data()[i + 2] = mm >> 2 | mm << 2;
+            mult.data()[i + 3] = mm >> 3 | mm << 3;
+            mult.data()[i + 4] = mm >> 4 | mm << 4;
+            mult.data()[i + 5] = mm >> 5 | mm << 5;
+            mult.data()[i + 6] = mm >> 6 | mm << 6;
+            mult.data()[i + 7] = mm >> 7 | mm << 7;
             add.data()[i + 0] = aa;
-            add.data()[i + 1] = aa;
-            add.data()[i + 2] = aa;
-            add.data()[i + 3] = aa;
-            add.data()[i + 4] = aa;
-            add.data()[i + 5] = aa;
-            add.data()[i + 6] = aa;
-            add.data()[i + 7] = aa;
+            add.data()[i + 1] = aa >> 1 | aa << 1;
+            add.data()[i + 2] = aa >> 2 | aa << 2;
+            add.data()[i + 3] = aa >> 3 | aa << 3;
+            add.data()[i + 4] = aa >> 4 | aa << 4;
+            add.data()[i + 5] = aa >> 5 | aa << 5;
+            add.data()[i + 6] = aa >> 6 | aa << 6;
+            add.data()[i + 7] = aa >> 7 | aa << 7;
             mm += mm8;
             aa += aa8;
             i += 8;
@@ -154,21 +147,21 @@ namespace secJoin
         while (i < m8)
         {
             mult.data()[i + 0] = mm;
-            mult.data()[i + 1] = mm;
-            mult.data()[i + 2] = mm;
-            mult.data()[i + 3] = mm;
-            mult.data()[i + 4] = mm;
-            mult.data()[i + 5] = mm;
-            mult.data()[i + 6] = mm;
-            mult.data()[i + 7] = mm;
+            mult.data()[i + 1] = mm >> 1 | mm << 1;
+            mult.data()[i + 2] = mm >> 2 | mm << 2;
+            mult.data()[i + 3] = mm >> 3 | mm << 3;
+            mult.data()[i + 4] = mm >> 4 | mm << 4;
+            mult.data()[i + 5] = mm >> 5 | mm << 5;
+            mult.data()[i + 6] = mm >> 6 | mm << 6;
+            mult.data()[i + 7] = mm >> 7 | mm << 7;
             add.data()[i + 0] = aa;
-            add.data()[i + 1] = aa;
-            add.data()[i + 2] = aa;
-            add.data()[i + 3] = aa;
-            add.data()[i + 4] = aa;
-            add.data()[i + 5] = aa;
-            add.data()[i + 6] = aa;
-            add.data()[i + 7] = aa;
+            add.data()[i + 1] = aa >> 1 | aa << 1;
+            add.data()[i + 2] = aa >> 2 | aa << 2;
+            add.data()[i + 3] = aa >> 3 | aa << 3;
+            add.data()[i + 4] = aa >> 4 | aa << 4;
+            add.data()[i + 5] = aa >> 5 | aa << 5;
+            add.data()[i + 6] = aa >> 6 | aa << 6;
+            add.data()[i + 7] = aa >> 7 | aa << 7;
             mm += mm8;
             aa += aa8;
             i += 8;
@@ -182,71 +175,91 @@ namespace secJoin
 
 
     macoro::task<>  OleBatch::RecvBatch::recvTask(
+        GenState* state,
         u64 batchIdx,
-        PRNG& prng, 
-        oc::Socket& sock,
-        oc::AlignedUnVector<oc::block>& add,
-        oc::AlignedUnVector<oc::block>& mult,
-        macoro::async_manual_reset_event& corReady,
-        macoro::async_manual_reset_event& haveBase)
-    {
-        MC_BEGIN(macoro::task<>, this,batchIdx, &prng, &sock, &add, &mult, &corReady, &haveBase,
-            cc = char{});
-
-        MC_AWAIT(haveBase);
-        //std::cout << (u64)this << " recv ole have base  " << std::endl;
-
-        // a receive to delay the allocation 
-        MC_AWAIT(sock.recv(cc));
-        //std::cout << (u64)this << " recv ole recv  " << std::endl;
-
-        //mChoice.resize(mReceiver.mRequestedNumOts);
-        //mMsg.resize(mReceiver.mRequestedNumOts);
-        assert(mReceiver.mGen.hasBaseOts());
-
-        
-        //std::cout << "recv OleBatch begin " << batchIdx << std::endl;
-        MC_AWAIT(mReceiver.silentReceiveInplace(mReceiver.mRequestedNumOts, prng, sock, oc::ChoiceBitPacking::True));
-        //std::cout << "recv OleBatch proto done " << batchIdx << std::endl;
-        add.resize(oc::divCeil(mReceiver.mRequestedNumOts, 128));
-        mult.resize(oc::divCeil(mReceiver.mRequestedNumOts, 128));
-        compressRecver(mReceiver.mA, add, mult);
-
-        mReceiver.clear();
-        corReady.set();
-        //std::cout << (u64)this << " recv ole done  " << std::endl;
-
-        MC_END();
-    }
-
-    macoro::task<>  OleBatch::SendBatch::sendTask(
-        u64 batchIdx,
+        u64 size,
         PRNG& prng,
         oc::Socket& sock,
         oc::AlignedUnVector<oc::block>& add,
         oc::AlignedUnVector<oc::block>& mult,
-        macoro::async_manual_reset_event& corReady,
-        macoro::async_manual_reset_event& haveBase)
+        macoro::async_manual_reset_event& corReady)
     {
-        MC_BEGIN(macoro::task<>, this, batchIdx, &prng, &sock, &add, &mult, &corReady, &haveBase);
+        MC_BEGIN(macoro::task<>, this, state, batchIdx, size, &prng, &sock, &add, &mult, &corReady,
+            baseSend = std::vector<std::array<block, 2>>{});
 
-        MC_AWAIT(haveBase);
-        //std::cout << (u64)this << " send ole set have base " << std::endl;
+        add.resize(oc::divCeil(size, 128));
+        mult.resize(oc::divCeil(size, 128));
+        if (state->mMock)
+        {
+            mock(batchIdx, add, mult);
+        }
+        else
+        {
 
-        // send a byte so that the receiver can wait to allocate
-        MC_AWAIT(sock.send(char{ 0 }));
+            if (state->mDebug)
+            {
+                baseSend.resize(mReceiver.silentBaseOtCount());
+                MC_AWAIT(sock.recv(baseSend));
 
-        assert(mSender.mGen.hasBaseOts());
-        //std::cout << "send OleBatch begin " << batchIdx << std::endl;
-        MC_AWAIT(mSender.silentSendInplace(prng.get(), mSender.mRequestNumOts, prng, sock));
-        //std::cout << "send OleBatch proto done " << batchIdx << std::endl;
-        add.resize(oc::divCeil(mSender.mB.size(), 128));
-        mult.resize(oc::divCeil(mSender.mB.size(), 128));
-        compressSender(mSender.mDelta, mSender.mB, add, mult);
-        mSender.clear();
-        //std::cout << (u64)this << " send ole done  " << std::endl;
+                {
+                    for (u64 i = 0; i < baseSend.size(); ++i)
+                    {
+                        if (mReceiver.mGen.mBaseOTs(i) != baseSend[i][mReceiver.mGen.mBaseChoices(i)])
+                        {
+                            std::cout << "OleBatch::getTask() base OTs do not match. " << LOCATION << std::endl;
+                            std::terminate();
+                        }
+                    }
+                }
+            }
+
+            assert(mReceiver.mGen.hasBaseOts());
+            mReceiver.mMultType = oc::MultType::Tungsten;
+            MC_AWAIT(mReceiver.silentReceiveInplace(mReceiver.mRequestNumOts, prng, sock, oc::ChoiceBitPacking::True));
+            compressRecver(mReceiver.mA, add, mult);
+            mReceiver.clear();
+        }
+
         corReady.set();
-        //mMsg2 = {};
+        MC_END();
+    }
+
+    macoro::task<>  OleBatch::SendBatch::sendTask(
+        GenState* state,
+        u64 batchIdx,
+        u64 size,
+        PRNG& prng,
+        oc::Socket& sock,
+        oc::AlignedUnVector<oc::block>& add,
+        oc::AlignedUnVector<oc::block>& mult,
+        macoro::async_manual_reset_event& corReady)
+    {
+        MC_BEGIN(macoro::task<>, this, state, batchIdx, size, &prng, &sock, &add, &mult, &corReady);
+
+
+        add.resize(oc::divCeil(size, 128));
+        mult.resize(oc::divCeil(size, 128));
+        if (state->mMock)
+        {
+            mock(batchIdx, add, mult);
+        }
+        else
+        {
+
+            if (state->mDebug)
+            {
+                MC_AWAIT(sock.send(coproto::copy(mSender.mGen.mBaseOTs)));
+            }
+
+            assert(mSender.mGen.hasBaseOts());
+            mSender.mMultType = oc::MultType::Tungsten;
+            MC_AWAIT(mSender.silentSendInplace(prng.get(), mSender.mRequestNumOts, prng, sock));
+            compressSender(mSender.mDelta, mSender.mB, add, mult);
+            mSender.clear();
+        }
+
+
+        corReady.set();
         MC_END();
     }
 
@@ -383,8 +396,8 @@ namespace secJoin
 
     void OleBatch::SendBatch::compressSender(
         block delta,
-        span<oc::block> B, 
-        span<oc::block> add, 
+        span<oc::block> B,
+        span<oc::block> add,
         span<oc::block> mult)
     {
 
@@ -414,16 +427,16 @@ namespace secJoin
         {
             auto s = sendMsg.data();
 
-            for(u64 j =0; j < 2; ++j)
+            for (u64 j = 0; j < 2; ++j)
             {
-                m[0]  = m [0]  & mask;
-                m[1]  = m [1]  & mask;
-                m[2]  = m [2]  & mask;
-                m[3]  = m [3]  & mask;
-                m[4]  = m [4]  & mask;
-                m[5]  = m [5]  & mask;
-                m[6]  = m [6]  & mask;
-                m[7]  = m [7]  & mask;
+                m[0] = m[0] & mask;
+                m[1] = m[1] & mask;
+                m[2] = m[2] & mask;
+                m[3] = m[3] & mask;
+                m[4] = m[4] & mask;
+                m[5] = m[5] & mask;
+                m[6] = m[6] & mask;
+                m[7] = m[7] & mask;
 
                 oc::mAesFixedKey.hashBlocks<8>(m, s);
 

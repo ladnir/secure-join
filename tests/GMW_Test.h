@@ -9,20 +9,12 @@
 #include "cryptoTools/Common/CLP.h"
 namespace secJoin_Tests
 {
-    void generateBase_test();
-    void SilentTripleGen_test();
-    //void IknpTripleGen_test();
-
     void Gmw_half_test(const oc::CLP& cmd);
     void Gmw_basic_test(const oc::CLP& cmd);
     void Gmw_inOut_test(const oc::CLP& cmd);
-    void Gmw_xor_test(const oc::CLP& cmd);
-    void Gmw_and_test(const oc::CLP& cmd);
-    void Gmw_na_and_test(const oc::CLP& cmd);
-    void Gmw_or_test(const oc::CLP& cmd);
+    void Gmw_gate_test(const oc::CLP& cmd);
     void Gmw_xor_and_test(const oc::CLP& cmd);
     void Gmw_aa_na_and_test(const oc::CLP& cmd);
-
     void Gmw_add_test(const oc::CLP& cmd);
     void Gmw_noLevelize_test(const oc::CLP& cmd);
 }

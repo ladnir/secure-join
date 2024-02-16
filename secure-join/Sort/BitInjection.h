@@ -39,17 +39,24 @@ namespace secJoin
 
         // n =  the number of rows the input will have.
         // inBitCount = the number of bit injections per row.
-        void init(u64 n, u64 inBitCount)
+        void init(
+            u64 n, 
+            u64 inBitCount,
+            CorGenerator& gen)
         {
             mRowCount = n;
             mInBitCount = inBitCount;
+
+            mRole = (u64)gen.partyIdx();
+            if (gen.partyIdx())
+                mRecvReq = gen.recvOtRequest(mRowCount * mInBitCount);
+            else
+                mSendReq = gen.sendOtRequest(mRowCount * mInBitCount);
+            mRequested = true;
         }
 
-        // request the correlated randomness. Call preprocess to start the generation.
-        void request(CorGenerator& gen);
 
-
-        macoro::task<> preprocess();
+        void preprocess();
 
         // convert each bit of the binary secret sharing `in`
         // to integer Z_{2^outBitCount} arithmetic sharings.

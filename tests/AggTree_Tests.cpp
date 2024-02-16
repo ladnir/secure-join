@@ -42,7 +42,7 @@ void eval(BetaCircuit& cir,
         for (u64 i = 0; i < 2; ++i)
         {
             gen[i].init(comm[i].fork(), prng, i, 1<<18, mock);
-            bin[i].init(numShares, cir);
+            bin[i].init(numShares, cir, gen[i]);
         }
 
         for (u64 i = 0; i < numInputs; ++i)
@@ -67,8 +67,8 @@ void eval(BetaCircuit& cir,
         }
 
         auto mR = macoro::sync_wait(macoro::when_all_ready(
-            bin[0].run(gen[0], comm[0], prng),
-            bin[1].run(gen[1], comm[1], prng)
+            bin[0].run(comm[0]),
+            bin[1].run(comm[1])
         ));
 
         std::get<0>(mR).result();

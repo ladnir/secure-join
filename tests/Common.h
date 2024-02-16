@@ -9,14 +9,35 @@
 #include "macoro/task.h"
 #include "macoro/sync_wait.h"
 #include "macoro/when_all.h"
-
-namespace
+#include "secure-join/CorGenerator/CorGenerator.h"
+namespace secJoin
 {
-    inline auto eval(macoro::task<>& t0, macoro::task<>& t1)
+    inline auto eval(
+        macoro::task<>& t0, 
+        macoro::task<>& t1)
     {
         auto r = macoro::sync_wait(macoro::when_all_ready(std::move(t0), std::move(t1)));
         std::get<0>(r).result();
         std::get<1>(r).result();
+    }
+
+    inline auto eval(
+        macoro::task<>& t0,
+        macoro::task<>& t1,
+        CorGenerator& g0,
+        CorGenerator& g1
+    )
+    {
+        auto r = macoro::sync_wait(macoro::when_all_ready(
+            std::move(t0),
+            std::move(t1),
+            g0.start(),
+            g1.start()
+        ));
+        std::get<0>(r).result();
+        std::get<1>(r).result();
+        std::get<2>(r).result();
+        std::get<3>(r).result();
     }
 
 }

@@ -329,18 +329,37 @@ namespace secJoin
     }
 
 
+    template<typename T, typename = void>
+    struct has_cols
+        : std::false_type
+    {};
+    template<typename T>
+    struct has_cols <T, std::void_t<decltype(std::declval<T>().cols() == u64{0}) >>
+        : std::true_type
+    {};
+
+
     template<typename T, typename U>
     oc::MatrixView<T> matrixCast(U&& u)
     {
         using UT = decltype(*u.data());
-
         static_assert(sizeof(UT) % sizeof(T) == 0 || sizeof(UT) > sizeof(T));
-        if (sizeof(UT) > sizeof(T))
+
+        if constexpr (has_cols<U>::value)
         {
-            if (sizeof(UT) * u.cols() % sizeof(T))
-                throw RTE_LOC;
+
+            if (sizeof(UT) > sizeof(T))
+            {
+                if (sizeof(UT) * u.cols() % sizeof(T))
+                    throw RTE_LOC;
+            }
+            return oc::MatrixView<T>((T*)u.data(), u.rows(), u.cols() * sizeof(UT) / sizeof(T));
         }
-        return oc::MatrixView<T>((T*)u.data(), u.rows(), u.cols() * sizeof(UT) / sizeof(T));
+        else
+        {
+            static_assert(sizeof(UT) % sizeof(T) == 0);
+            return oc::MatrixView<T>((T*)u.data(), u.size(), sizeof(UT) / sizeof(T));
+        }
     }
 
 

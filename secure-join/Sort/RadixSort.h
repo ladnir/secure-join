@@ -1,10 +1,12 @@
 #pragma once
 
 #include "secure-join/Perm/ComposedPerm.h"
+#include "secure-join/Perm/AltModComposedPerm.h"
 #include "secure-join/Perm/AdditivePerm.h"
 #include "secure-join/Defines.h"
 #include "secure-join/CorGenerator/CorGenerator.h"
 #include "secure-join/Sort/BitInjection.h"
+#include "secure-join/GMW/Gmw.h"
 
 #include "cryptoTools/Circuit/BetaLibrary.h"
 #include "cryptoTools/Common/Log.h"
@@ -41,20 +43,11 @@ namespace secJoin
         // mock the sorting protocol (insecure).
         bool mInsecureMock = false;
 
-        // has request been called.
-        bool mHasRequest = false;
-
-        // has preprocess been called.
-        bool mHasPrepro = false;
-
         // The number of item we are sorting.
         u64 mSize = 0;
 
         // The bit count of the items we are sorting.
         u64 mBitCount = 0;
-
-        // The requested amount of preprocessing that the output permutation should have.
-        u64 mBytesPerElem = 0;
 
         // The bit step size of the genBitPerm protocol.
         u64 mL = 2;
@@ -71,76 +64,123 @@ namespace secJoin
         // A circuit that takes an input two values x0,x1 and return y=x0+x1.
         oc::BetaCircuit mArith2BinCir;
 
+        // has the pre perm started
+        bool mPrePermStarted = false;
+
         // This will hold the correlated randomness for each round of the radix sort 
         // protocol. We will preprocess the correlated randomness on demand so its ready
         // just in time.
         struct Round
         {
+            // a flag that tells the round when it can start preprocessing.
+            std::unique_ptr<macoro::async_manual_reset_event> mStartPrepro, mPrePermReady;
+
+            // role of this party
+            u64 mRole = -1;
+
+            // index of the round.
+            u64 mIdx = -1;
+
+            // perm size
+            u64 mSize = 0;
+
+            // number of bytes that the perm should be
+            u64 mPermBytes = 0;
+
+            // 1 << mL, the size of the "one-hot" key
+            u64 mExpandedBitSize = 0;
+
+            //
+            //bool mPrecomputePerm = false;
+            //bool mPreproDone = false;
+
+            // the sorting permutation for this round.
+            // We will preprocess this as a random perm
+            // and then derandomize it to the sorting perm.
+            ComposedPerm mPerm;
+
+            // the protocol to generate the mPrePerm.
+            AltModComposedPerm mPrePermGen;
+
+            // the bit injection protocol for converting exanded
+            // sort value one-hot count u32-vector.
+            BitInject mBitInject;
+
+            // the Gmw protocol that converts an index i
+            // onto a one-hot vector 00010000
+            // where the 1 is at index i.
+            Gmw mIndexToOneHotGmw;
+            
+            // This will convert the u32 version of
+            // the permutation (computed by the sum
+            // of one-hot vectors) into a binary sharing.
+            Gmw mArithToBinGmw;
+
+            // OT used to multiply a binary sharing by an aithmetic share
+            OtRecvRequest mHadamardSumRecvOts;
+
+            // OT used to multiply a binary sharing by an aithmetic share
+            OtSendRequest mHadamardSumSendOts;
+            
+            // run debugging checks.
+            bool mDebug = false;
+
+            bool mPerPermStarted = false;
+
+            // the socket that the random perm will be generated on.
+            //coproto::Socket mChl;
+
+            // the PRNG that the random perm will be generated with.
+            //PRNG mPrng;
+
             Round() = default;
             Round(const Round&) = delete;
             Round(Round&&) = default;
             Round&operator=(Round&&) = default;
 
-
-
+            // init the round.
             void init(
                 u64 idx,
-                u64 role, u64 size,
+                u64 role, 
+                u64 size,
                 u64 permutationByteSize,
-                bool AltModKeyGen,
                 u64 expandedBitsSize,
+                CorGenerator& cor,
                 oc::BetaCircuit& mIndexToOneHotCircuit,
                 oc::BetaCircuit& mArith2BinCir,
                 bool debug)
             {
                 mIdx = idx;
                 mRole = role;
+                mSize = size;
                 mPermBytes = permutationByteSize;
                 mExpandedBitSize = expandedBitsSize;
-                mPerm.init2(role, size, permutationByteSize, AltModKeyGen);
-                mBitInject.init(1, expandedBitsSize);
-                mIndexToOneHotGmw.init(size, mIndexToOneHotCircuit);
-                mArithToBinGmw.init(size, mArith2BinCir);
-                mReady = std::make_unique<macoro::async_manual_reset_event>();
+
+                if(permutationByteSize)
+                    mPrePermGen.init(role, size, permutationByteSize, cor);
+                mBitInject.init(1, expandedBitsSize, cor);
+                mIndexToOneHotGmw.init(size, mIndexToOneHotCircuit, cor);
+                mArithToBinGmw.init(size, mArith2BinCir, cor);
+                mStartPrepro = std::make_unique<macoro::async_manual_reset_event>();
+                mPrePermReady = std::make_unique<macoro::async_manual_reset_event>();
                 mDebug = debug;
-            }
-
-            void request(CorGenerator& gen)
-            {
-                if (mPermBytes)
-                    mPerm.request(gen);
-
-                mBitInject.request(gen);
-                mIndexToOneHotGmw.request(gen);
-                mArithToBinGmw.request(gen);
 
                 if (mRole)
                 {
-                    mHadamardSumRecvOts = gen.recvOtRequest(mExpandedBitSize);
-                    mHadamardSumSendOts = gen.sendOtRequest(mExpandedBitSize);
+                    mHadamardSumRecvOts = cor.recvOtRequest(mExpandedBitSize);
+                    mHadamardSumSendOts = cor.sendOtRequest(mExpandedBitSize);
                 }
                 else
                 {
-                    mHadamardSumSendOts = gen.sendOtRequest(mExpandedBitSize);
-                    mHadamardSumRecvOts = gen.recvOtRequest(mExpandedBitSize);
+                    mHadamardSumSendOts = cor.sendOtRequest(mExpandedBitSize);
+                    mHadamardSumRecvOts = cor.recvOtRequest(mExpandedBitSize);
                 }
             }
 
-            macoro::task<> preprocess();
+            void preprocess();
 
+            macoro::task<> preGenPerm(coproto::Socket sock, PRNG prng);
 
-            std::unique_ptr<macoro::async_manual_reset_event> mReady;
-            u64 mRole = -1;
-            u64 mIdx = -1;
-            u64 mPermBytes = 0;
-            u64 mExpandedBitSize = 0;
-            bool mPreproDone = false;
-            AdditivePerm mPerm;
-            BitInject mBitInject;
-            Gmw mIndexToOneHotGmw, mArithToBinGmw;
-            OtRecvRequest mHadamardSumRecvOts;
-            OtSendRequest mHadamardSumSendOts;
-            bool mDebug = false;
         };
 
         // The correlated randomness for each round.
@@ -154,14 +194,16 @@ namespace secJoin
             u64 role,
             u64 n,
             u64 bitCount,
-            u64 bytesPerElem = 0);
+            CorGenerator& gen);
 
         // Once init it called, this will request the required correlated randomness
         // from CorGenerator. To start the generation of the randomness, call preprocess().
-        void request(CorGenerator& gen);
+        //void request();
+
+        void preprocess();
 
         // Start the generation of the requested correlated randomness.
-        macoro::task<> preprocess(
+        macoro::task<> genPrePerm(
             coproto::Socket& comm,
             PRNG& prng);
 
@@ -170,30 +212,20 @@ namespace secJoin
         RadixSort() = default;
         RadixSort(RadixSort&&) = default;
 
-        // returns true if request() has been called.
-        bool hasRequest()
-        {
-            return mHasRequest;
-        }
-
-        bool hasPreprocessing()
-        {
-            return mHasPrepro;
-        }
 
         macoro::task<> hadamardSumSend(
-            Matrix32& s,
+            const Matrix32& s,
+            const BinMatrix& f,
             std::vector<u32>& shares,
-            BinMatrix& f,
             OtRecvRequest& req,
             coproto::Socket& comm);
+
         macoro::task<> hadamardSumRecv(
-            Matrix32& s,
+            const Matrix32& s,
+            const BinMatrix& f,
             std::vector<u32>& shares,
-            BinMatrix& f,
             OtSendRequest& req,
             coproto::Socket& comm);
-
 
         // compute dst = sum_i f.col(i) * s.col(i) where * 
         // is the hadamard (component-wise) product. 

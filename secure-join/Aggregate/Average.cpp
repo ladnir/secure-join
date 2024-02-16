@@ -83,8 +83,7 @@ namespace secJoin {
         cir.addOutputBundle(c);
 
         cir.addGate(a.mWires[0], b.mWires[0], oc::GateType::na_And, c.mWires[0]);
-        gmw.init(data.rows(), cir);
-        gmw.request(ole);
+        gmw.init(data.rows(), cir, ole);
 
         if (data.bitsPerEntry() % 8 != 1)
         {
@@ -179,29 +178,31 @@ namespace secJoin {
         }
 
         sort.mInsecureMock = mInsecureMockSubroutines;
-        sPerm.mInsecureMock = mInsecureMockSubroutines;
+        //sPerm.mInsecureMock = mInsecureMockSubroutines;
 
         // need to set sort ole.
-        sort.init(ole.partyIdx(), keys.rows(), keys.bitsPerEntry(), data.bytesPerEntry() + keys.bytesPerEntry());
-        sort.request(ole);
+        sort.init(ole.partyIdx(), keys.rows(), keys.bitsPerEntry(), ole);
 
         MC_AWAIT(sort.genPerm(keys, sPerm, sock, prng));
         concatColumns(groupByCol, avgCol, data, offsets, ole);
         
+        throw std::runtime_error("we need to generate perm, data.bytesPerEntry() + keys.bytesPerEntry() bytes. " LOCATION);
+        MC_AWAIT(perm.derandomize(sPerm, sock));
+
         if (mInsecurePrint)
             MC_AWAIT(OmJoin::print(data, controlBits, sock, ole.partyIdx(), "preSort", offsets));
 
         temp.resize(data.numEntries(), data.bytesPerEntry() * 8);
 
         // Apply the sortin permutation to both keys & concat columns
-        MC_AWAIT(sPerm.apply(PermOp::Inverse, data, temp, prng, sock));
+        MC_AWAIT(perm.apply<u8>(PermOp::Inverse, data, temp, sock));
         std::swap(data, temp);
 
         if (mInsecurePrint)
             MC_AWAIT(OmJoin::print(data, controlBits, sock, ole.partyIdx(), "sort-data", offsets));
 
         temp.resize(keys.numEntries(), keys.bitsPerEntry());
-        MC_AWAIT(sPerm.apply(PermOp::Inverse, keys, temp, prng, sock));
+        MC_AWAIT(perm.apply<u8>(PermOp::Inverse, keys, temp, sock));
         std::swap(keys, temp);
         
         if (mInsecurePrint)
@@ -357,8 +358,7 @@ namespace secJoin {
         // {
         //     memcpy(sKeys.data(i + 1), keys.data(i), keyByteSize);
         // }
-        bin.init(n, cir);
-        bin.request(ole);
+        bin.init(n, cir, ole);
 
         bin.setInput(0, sKeys.subMatrix(0, n));
         bin.setInput(1, sKeys.subMatrix(1, n));

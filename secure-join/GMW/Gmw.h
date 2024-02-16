@@ -83,39 +83,33 @@ namespace secJoin
         // the binary triples used in by the protocol.
         BinOleRequest mTriples;
 
-        bool mHasPreprocessing = 0;
+        //bool mHasPreprocessing = 0;
 
-        bool mHasRequest = 0;
+        //bool mHasRequest = 0;
 
         macoro::task<> mPreproTask;
 
-        // initialize this gmw to eval n copies of the circuit cir.
-        // use correlations provided by ole.
-        void init(
-            u64 n,
-            const BetaCircuit& cir);
+        //// initialize this gmw to eval n copies of the circuit cir.
+        //// use correlations provided by ole.
+        //void init(
+        //    u64 n,
+        //    const BetaCircuit& cir);
 
         void init(
             u64 n,
             const BetaCircuit& cir,
-            CorGenerator& gen)
-        {
-            init(n, cir);
-            request(gen);
-        }
+            CorGenerator& gen);
 
-        bool hasRequest()
-        {
-            return mHasRequest;
-        }
+        //bool hasRequest()
+        //{
+        //    return mHasRequest;
+        //}
+        //void request(CorGenerator& gen);
 
-        void request(CorGenerator& gen);
-
-
-        bool hasPreprocessing() const
-        {
-            return mHasPreprocessing;
-        }
+        //bool hasPreprocessing() const
+        //{
+        //    return mHasPreprocessing;
+        //}
 
         // set the i'th input. There should be mN rows of `input`, each row holding
         // mCur.mInput[i].size() bits (rounded up to 8 * sizeof(T)).
@@ -209,11 +203,9 @@ namespace secJoin
 
 
 
-        macoro::task<> preprocess();
+        void preprocess();
 
         // run the gmw protocol.
-        coproto::task<> run(CorGenerator& gen, coproto::Socket& chl, PRNG& prng);
-
         coproto::task<> run(coproto::Socket& chl);
 
         void getOutput(u64 i, BinMatrix& out)

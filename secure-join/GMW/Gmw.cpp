@@ -13,7 +13,8 @@ namespace secJoin
 
     void Gmw::init(
         u64 n,
-        const BetaCircuit& cir)
+        const BetaCircuit& cir,
+        CorGenerator& gen)
     {
         mN = n;
 
@@ -22,26 +23,21 @@ namespace secJoin
 
         if (mCir.mLevelCounts.size() == 0)
             mCir.levelByAndDepth(mLevelize);
-        
+
         mNumRounds = mCir.mLevelCounts.size();
         mGates = mCir.mGates;
         mWords.resize(0);
-        mWords.resize(mCir.mWireCount);//,
+        mWords.resize(mCir.mWireCount);
         mRemainingMappings = mCir.mWireCount;
         mMem.clear();
         mPrint = mCir.mPrints.begin();
-    }
 
-    void Gmw::request(CorGenerator& gen)
-    {
-        if (mCir.mGates.size() == 0)
-            throw std::runtime_error("inint was not been called." LOCATION);
 
         mRole = gen.partyIdx();
-        mHasRequest = true;
-        if(mCir.mNonlinearGateCount)
+        if (mCir.mNonlinearGateCount)
             mTriples = gen.binOleRequest(2 * mCir.mNonlinearGateCount * oc::roundUpTo(mN, 128));
     }
+
 
     void Gmw::implSetInput(u64 i, oc::MatrixView<u8> input, u64 alignment)
     {
@@ -149,24 +145,21 @@ namespace secJoin
         return memView;
     }
 
-    macoro::task<> Gmw::preprocess()
+    void Gmw::preprocess()
     {
         if (mCir.mGates.size() == 0)
             throw std::runtime_error("init(...) must be called first. " LOCATION);
 
-        mHasPreprocessing = true;
-
-        if (mCir.mNonlinearGateCount == 0)
+        if (mCir.mNonlinearGateCount)
         {
-            MC_BEGIN(macoro::task<>);
-            MC_END();
+            mTriples.start();
         }
-
-        if (mTriples.initialized() == false)
-            throw std::runtime_error("request(gen) not called. " LOCATION);
-
-        return mTriples.start();
     }
+
+    struct DebugCheckSums
+    {
+        block a, b, c, d;
+    };
 
     // The basic protocol where the inputs are not shared:
     // Sender has 
@@ -204,14 +197,6 @@ namespace secJoin
     // Recver outputs: z2 = x2y2 + z12 + z22 
     //                    = x2y2 + r1 + r2
     //                    = x2y2 + r
-    coproto::task<> Gmw::run(CorGenerator& gen, coproto::Socket& chl, PRNG& prng)
-    {
-        if(hasRequest() == false)
-            request(gen);
-
-        return run(chl);
-    }
-
     coproto::task<> Gmw::run(coproto::Socket& chl)
     {
         MC_BEGIN(coproto::task<>, this, &chl,
@@ -222,6 +207,7 @@ namespace secJoin
             in = std::array<block*, 2>{},
             out = (block*)nullptr,
             ww = std::vector<block>{},
+            debugCheckSums = std::array<DebugCheckSums,2>{},
             print = std::move(coproto::unique_function<void(u64)>{}),
             a = oc::AlignedUnVector<block>{},
             b = oc::AlignedUnVector<block>{},
@@ -235,19 +221,13 @@ namespace secJoin
             j = u64{},
             roundIdx = u64{},
             roundRem = u64{},
-            batchSize = 1ull << 14,
-            pre = macoro::eager_task<>{}
+            batchSize = 1ull << 14
         );
 
         if (mRole > 1)
             std::terminate();
         if (mCir.mGates.size() == 0ull)
             throw std::runtime_error("Gmw::init(...) was not called");
-
-        if (hasPreprocessing() == false)
-        {
-            pre = preprocess() | macoro::make_eager();
-        }
 
         finalizeMapping();
         if (mO.mDebug)
@@ -269,6 +249,8 @@ namespace secJoin
                 for (u64 j = 0; j < mN128; ++j)
                     mO.mWords(i, j) = mO.mWords(i, j) ^ mWords[i][j];
             }
+
+            memset(&debugCheckSums, 0, sizeof(debugCheckSums));
         }
 
         for (roundIdx = 0; roundIdx < numRounds(); ++roundIdx)
@@ -285,16 +267,20 @@ namespace secJoin
                 pinnedInputs.resize(mCir.mWireCount, 0);
             }
 
-
+            // a  * c  = b  + d
+            // a' * c' = b' + d'
             a.resize(mN128 * mCir.mLevelAndCounts[roundIdx]);
             b.resize(mN128 * mCir.mLevelAndCounts[roundIdx]);
             c.resize(mN128 * mCir.mLevelAndCounts[roundIdx]);
             d.resize(mN128 * mCir.mLevelAndCounts[roundIdx]);
             roundRem = mN128 * mCir.mLevelAndCounts[roundIdx] * 2;
 
+
+            // get enough correlated randomness to cover the current round.
             j = 0;
             while (j != a.size())
             {
+                // if we are out, get more random triples.
                 if (add.size() == 0)
                 {
                     MC_AWAIT(mTriples.get(triple));
@@ -302,10 +288,11 @@ namespace secJoin
                     mult = triple.mMult;
                 }
 
-                // a  * c  = b  + d
-                // a' * c' = b' + d'
+                // the number of multiplications that we can do in this batch.
                 auto min = std::min<u64>(a.size() - j, add.size() / 2);
 
+                // depending on the role, we need to take the first or second half of the triples
+                // as the first correlation.
                 span<block> aa, bb, cc, dd;
                 if (mRole)
                 {
@@ -322,6 +309,7 @@ namespace secJoin
                     bb = add.subspan(min, min);
                 }
 
+                // we copy the triples into the current batch.
                 std::copy(aa.begin(), aa.end(), a.begin() + j);
                 std::copy(bb.begin(), bb.end(), b.begin() + j);
                 std::copy(cc.begin(), cc.end(), c.begin() + j);
@@ -340,12 +328,21 @@ namespace secJoin
 
                 mult = mult.subspan(min * 2);
                 add = add.subspan(min * 2);
-
                 j += min;
-
             }
 
+            if (mO.mDebug)
+            {
+                for (u64 i = 0; i < a.size(); ++i)
+                {
+                    debugCheckSums[0].a ^= a[i];
+                    debugCheckSums[0].b ^= b[i];
+                    debugCheckSums[0].c ^= c[i];
+                    debugCheckSums[0].d ^= d[i];
+                }
+            }
 
+            // now process the round.
             j = 0;
             for (gate = gates.begin(); gate < gates.end(); ++gate)
             {
@@ -357,6 +354,8 @@ namespace secJoin
                 out = mWords[gate->mOutput];
 
 
+                // check that inputs to this level are non-linear outputs also computed this round.
+                // this isn't allows because we still have not received the other share of the output.
                 if (mO.mDebug)
                 {
                     if (dirtyBits[gate->mInput[0]] ||
@@ -371,6 +370,7 @@ namespace secJoin
                     }
                 }
 
+                // copy gates.
                 if (gate->mType == oc::GateType::a)
                 {
                     for (u64 i = 0; i < mN128; ++i)
@@ -380,8 +380,9 @@ namespace secJoin
                     gate->mType == oc::GateType::nb_And ||
                     gate->mType == oc::GateType::And ||
                     gate->mType == oc::GateType::Nor ||
-                    gate->mType == oc::GateType::Or)
+                    gate->mType == oc::GateType::Or) 
                 {
+
                     if (buff.size() == 0 && roundRem)
                     {
                         auto min = oc::roundUpTo(std::min<u64>(batchSize, roundRem), mN128 * 2);
@@ -390,6 +391,7 @@ namespace secJoin
                         buffIter = buff.data();
                     }
 
+                    // compute the first half of the protocol.
                     buffIter = multSend(
                         in[0], in[1],
                         gate->mType,
@@ -408,23 +410,23 @@ namespace secJoin
 
                     if (buffIter == buff.data() + buff.size())
                         MC_AWAIT(chl.send(std::move(buff)));
+
                 }
-                else if (
-                    gate->mType == oc::GateType::Xor ||
-                    gate->mType == oc::GateType::Nxor)
-                {
-
-                    for (u64 i = 0; i < mN128; ++i)
-                        out[i] = in[0][i] ^ in[1][i];
-
-                    if (gate->mType == oc::GateType::Nxor && mRole)
+                else if (gate->mType == oc::GateType::Xor ||
+                        gate->mType == oc::GateType::Nxor)
                     {
+
                         for (u64 i = 0; i < mN128; ++i)
-                            out[i] = out[i] ^ oc::AllOneBlock;
+                            out[i] = in[0][i] ^ in[1][i];
+
+                        if (gate->mType == oc::GateType::Nxor && mRole)
+                        {
+                            for (u64 i = 0; i < mN128; ++i)
+                                out[i] = out[i] ^ oc::AllOneBlock;
+                        }
                     }
-                }
-                else
-                    throw RTE_LOC;
+                    else
+                        throw RTE_LOC;
 
             }
 
@@ -455,7 +457,7 @@ namespace secJoin
                     assert(mWords[gate->mOutput]);
                     in[0] = mWords[gate->mInput[0]];
                     in[1] = mWords[gate->mInput[1]];
-                    out   = mWords[gate->mOutput]  ;
+                    out = mWords[gate->mOutput];
 
                     buffIter = multRecv(in[0], in[1], out, gate->mType,
                         b.data() + j,
@@ -493,7 +495,7 @@ namespace secJoin
 
                         ++mPrint;
                     }
-                };
+                    };
 
                 for (auto& gate : gates)
                 {
@@ -557,9 +559,16 @@ namespace secJoin
                     for (u64 j = 0; j < mN128; ++j)
                         ww[i * mN128 + j] = mWords[i][j];
                 MC_AWAIT(chl.send(std::move(ww)));
+                MC_AWAIT(chl.send(std::move(debugCheckSums[0])));
 
                 ww.resize(mWords.size() * mN128);
                 MC_AWAIT(chl.recv(ww));
+                MC_AWAIT(chl.recv(debugCheckSums[1]));
+
+                if ((debugCheckSums[0].b ^ debugCheckSums[1].d) != (debugCheckSums[0].a & debugCheckSums[1].c))
+                    throw RTE_LOC;
+                if ((debugCheckSums[1].b ^ debugCheckSums[0].d) != (debugCheckSums[1].a & debugCheckSums[0].c))
+                    throw RTE_LOC;
 
                 for (u64 i = 0; i < mWords.size(); ++i)
                 {
@@ -567,7 +576,7 @@ namespace secJoin
                     {
 
                         auto exp = mO.mWords(i, j);
-                        auto act = ww[i] ^ mWords[i][j];
+                        auto act = ww[i * mN128 + j] ^ mWords[i][j];
 
                         if (neq(exp, act))
                         {
@@ -587,12 +596,14 @@ namespace secJoin
 
         }
 
-        mTriples = {};
-        mHasPreprocessing = 0;
-        mHasRequest = 0;
+        //if (pre.handle())
+        //{
+        //    MC_AWAIT(pre);
+        //    mTriples = {};
+        //}
 
-        if (pre.handle())
-            MC_AWAIT(pre);
+        //mHasPreprocessing = 0;
+        //mHasRequest = 0;
 
         MC_END();
     }
@@ -695,7 +706,7 @@ namespace secJoin
                 u[i] = (a[i] ^ x[i] ^ oc::AllOneBlock);
         }
 
-        return u+(width);
+        return u + (width);
     }
 
     block* Gmw::multSendP2(block* y, oc::GateType gt,
@@ -716,7 +727,7 @@ namespace secJoin
             for (u64 i = 0; i < width; ++i)
                 w[i] = (c[i] ^ (y[i] ^ oc::AllOneBlock));
         }
-        return w+(width);
+        return w + (width);
     }
 
     block* Gmw::multRecvP1(block* x, block* z, oc::GateType gt,
@@ -738,7 +749,7 @@ namespace secJoin
                 z[i] = ((oc::AllOneBlock ^ x[i]) & w[i]) ^ b[i];
             }
         }
-        return w+(width);
+        return w + (width);
     }
 
     block* Gmw::multRecvP2(
@@ -756,7 +767,7 @@ namespace secJoin
             z[i] = (c[i] & u[i]) ^ d[i];
         }
 
-        return u+(width);
+        return u + (width);
     }
 
     block* Gmw::multSendP1(block* x, block* y, oc::GateType gt,

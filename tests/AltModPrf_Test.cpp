@@ -732,21 +732,29 @@ void AltModPrf_mod2_test(const oc::CLP& cmd)
     ole1.init(chls[1].fork(), prng1, 1, 1 << 18, cmd.getOr("mock", 1));
 
 
-    sender.init(n);
-    recver.init(n);
+    //sender.init(n, ole0);
+    //recver.init(n, ole1);
     //    sender.request(ole0);
     //    recver.request(ole1);
-    sender.mOleReq = ole0.binOleRequest(u0s[0].rows() * u0s[0].cols() * 256);
-    recver.mOleReq = ole1.binOleRequest(u0s[0].rows() * u0s[0].cols() * 256);
+    sender.mOleReq_ = ole0.binOleRequest(u0s[0].rows() * u0s[0].cols() * 256);
+    recver.mOleReq_ = ole1.binOleRequest(u0s[0].rows() * u0s[0].cols() * 256);
 
-    auto s0 = sender.mOleReq.start() | macoro::make_eager();
-    auto s1 = recver.mOleReq.start() | macoro::make_eager();
+    //auto s0 = sender.mOleReq_.start() | macoro::make_eager();
+    //auto s1 = recver.mOleReq_.start() | macoro::make_eager();
+    //sender.mHasOleRequest = true;
+    //recver.mHasOleRequest = true;
 
-    macoro::sync_wait(macoro::when_all_ready(
+    auto r = macoro::sync_wait(macoro::when_all_ready(
         sender.mod2(u0s[0], u1s[0], outs[0], sock[0]),
-        recver.mod2(u0s[1], u1s[1], outs[1], sock[1])
+        recver.mod2(u0s[1], u1s[1], outs[1], sock[1]),
+        ole0.start(),
+        ole1.start()
     ));
-    macoro::sync_wait(macoro::when_all_ready(std::move(s0), std::move(s1)));
+
+    std::get<0>(r).result();
+    std::get<1>(r).result();
+    std::get<2>(r).result();
+    std::get<3>(r).result();
 
     auto out = reveal(outs);
 
@@ -1054,36 +1062,45 @@ void AltModPrf_proto_test(const oc::CLP& cmd)
     PRNG prng0(oc::ZeroBlock);
     PRNG prng1(oc::OneBlock);
 
-    AltModPrf dm;
-    dm.setKey(prng0.get());
-    //sender.setKey(kk);
+    AltModPrf dm(prng0.get());
 
     CorGenerator ole0, ole1;
     ole0.init(sock[0].fork(), prng0, 0, 1 << 18, cmd.getOr("mock", 1));
     ole1.init(sock[1].fork(), prng1, 1, 1 << 18, cmd.getOr("mock", 1));
 
-
-
     prng0.get(x.data(), x.size());
-    //memset(x.data(), -1, n * sizeof(block256));
-    std::vector<oc::block> rk(AltModPrf::KeySize);
-    std::vector<std::array<oc::block, 2>> sk(AltModPrf::KeySize);
-    for (u64 i = 0; i < AltModPrf::KeySize; ++i)
+
+
+    if (cmd.isSet("doKeyGen") == false)
     {
-        sk[i][0] = oc::block(i, 0);
-        sk[i][1] = oc::block(i, 1);
-        rk[i] = oc::block(i, *oc::BitIterator((u8*)&dm.mExpandedKey, i));
+        std::vector<oc::block> rk(AltModPrf::KeySize);
+        std::vector<std::array<oc::block, 2>> sk(AltModPrf::KeySize);
+        for (u64 i = 0; i < AltModPrf::KeySize; ++i)
+        {
+            sk[i][0] = oc::block(i, 0);
+            sk[i][1] = oc::block(i, 1);
+            rk[i] = oc::block(i, *oc::BitIterator((u8*)&dm.mExpandedKey, i));
+        }
+        sender.init(n, ole0, dm.getKey(), rk);
+        recver.init(n, ole1, sk);
     }
-    sender.setKeyOts(dm.getKey(), rk);
-    recver.setKeyOts(sk);
+    else
+    {
+        sender.init(n, ole0);
+        recver.init(n, ole1);
+    }
 
     auto r = coproto::sync_wait(coproto::when_all_ready(
-        sender.evaluate(y0, sock[0], prng0, ole0),
-        recver.evaluate(x, y1, sock[1], prng1, ole1)
+        sender.evaluate(y0, sock[0], prng0),
+        recver.evaluate(x, y1, sock[1], prng1),
+        ole0.start(),
+        ole1.start()
     ));
 
     std::get<0>(r).result();
     std::get<1>(r).result();
+    std::get<2>(r).result();
+    std::get<3>(r).result();
 
 
     if (cmd.isSet("v"))

@@ -11,13 +11,11 @@
 namespace secJoin
 {
 	
-	using PRNG = PRNG;
-
-	struct Xor
-	{
-		template<typename T>
-		auto operator()(const T& x, const T& y) const { return x ^ y; }
-	};
+	//struct Xor
+	//{
+	//	template<typename T>
+	//	auto operator()(const T& x, const T& y) const { return x ^ y; }
+	//};
 
 	enum class PermOp
 	{
@@ -90,8 +88,12 @@ namespace secJoin
 		template <typename T>
 		void apply(oc::MatrixView<const T> src, oc::MatrixView<T> dst, PermOp op = PermOp::Regular) const
 		{
-			assert(src.rows() == size());
-			assert(src.cols() == dst.cols());
+			if (src.rows() != size())
+				throw RTE_LOC;
+			if (dst.rows() != size())
+				throw RTE_LOC;
+			if (src.cols() != dst.cols())
+				throw RTE_LOC;;
 			auto cols = src.cols();
 
 			if (op == PermOp::Regular)
@@ -104,14 +106,14 @@ namespace secJoin
 					u64 i = 0;
 					for (; i < size8; i += 8)
 					{
-						const T* __restrict  s0 = &src(mPi[i + 0], 0);
-						const T* __restrict  s1 = &src(mPi[i + 1], 0);
-						const T* __restrict  s2 = &src(mPi[i + 2], 0);
-						const T* __restrict  s3 = &src(mPi[i + 3], 0);
-						const T* __restrict  s4 = &src(mPi[i + 4], 0);
-						const T* __restrict  s5 = &src(mPi[i + 5], 0);
-						const T* __restrict  s6 = &src(mPi[i + 6], 0);
-						const T* __restrict  s7 = &src(mPi[i + 7], 0);
+						const T* __restrict  s0 = src.data(mPi.data()[i + 0]);
+						const T* __restrict  s1 = src.data(mPi.data()[i + 1]);
+						const T* __restrict  s2 = src.data(mPi.data()[i + 2]);
+						const T* __restrict  s3 = src.data(mPi.data()[i + 3]);
+						const T* __restrict  s4 = src.data(mPi.data()[i + 4]);
+						const T* __restrict  s5 = src.data(mPi.data()[i + 5]);
+						const T* __restrict  s6 = src.data(mPi.data()[i + 6]);
+						const T* __restrict  s7 = src.data(mPi.data()[i + 7]);
 						T* __restrict  d0 = d + 0 * cols;
 						T* __restrict  d1 = d + 1 * cols;
 						T* __restrict  d2 = d + 2 * cols;
@@ -162,14 +164,14 @@ namespace secJoin
 					u64 i = 0;
 					for (; i < size8; i += 8)
 					{
-						T* __restrict d0 = &dst(mPi[i + 0], 0);
-						T* __restrict d1 = &dst(mPi[i + 1], 0);
-						T* __restrict d2 = &dst(mPi[i + 2], 0);
-						T* __restrict d3 = &dst(mPi[i + 3], 0);
-						T* __restrict d4 = &dst(mPi[i + 4], 0);
-						T* __restrict d5 = &dst(mPi[i + 5], 0);
-						T* __restrict d6 = &dst(mPi[i + 6], 0);
-						T* __restrict d7 = &dst(mPi[i + 7], 0);
+						T* __restrict d0 = dst.data(mPi.data()[i + 0]);
+						T* __restrict d1 = dst.data(mPi.data()[i + 1]);
+						T* __restrict d2 = dst.data(mPi.data()[i + 2]);
+						T* __restrict d3 = dst.data(mPi.data()[i + 3]);
+						T* __restrict d4 = dst.data(mPi.data()[i + 4]);
+						T* __restrict d5 = dst.data(mPi.data()[i + 5]);
+						T* __restrict d6 = dst.data(mPi.data()[i + 6]);
+						T* __restrict d7 = dst.data(mPi.data()[i + 7]);
 						const T* __restrict  s0 = s + 0 * cols;
 						const T* __restrict  s1 = s + 1 * cols;
 						const T* __restrict  s2 = s + 2 * cols;
@@ -310,7 +312,7 @@ namespace secJoin
 	{
 		o << "[";
 		for (auto pp : p.mPi)
-			o << std::hex << pp << " ";
+			o << pp << " ";
 		o << "]" << std::dec;
 		return o;
 	}

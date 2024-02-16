@@ -3,6 +3,7 @@
 #include "cryptoTools/Crypto/PRNG.h"
 #include "secure-join/Defines.h"
 #include <vector>
+#include "secure-join/Perm/Permutation.h"
 #include "secure-join/Perm/AdditivePerm.h"
 #include "secure-join/Join/Table.h"
 
@@ -108,21 +109,9 @@ namespace secJoin
     }
     inline Perm reveal(const AdditivePerm& x0, const AdditivePerm& x1)
     {
-        if (x0.mRho != x1.mRho)
-            throw RTE_LOC;
         Perm p(x0.size());
-
-        {
-            for (u64 i = 0; i < p.size(); ++i)
-                p.mPi[i] = x0.mShare[i] ^ x1.mShare[i];
-        }
-        // else
-        //{
-        //     for (u64 i = 0; i < p.size(); ++i)
-        //         p.mPi[i] = x0.mShare[i] + x1.mShare[i];
-        // }
-
-        // p.validate();
+        for (u64 i = 0; i < p.size(); ++i)
+            p.mPi[i] = x0.mShare[i] ^ x1.mShare[i];
         return p;
     }
 

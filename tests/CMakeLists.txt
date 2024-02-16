@@ -41,11 +41,12 @@ endfunction()
 
 set(SRCS
 	UnitTests.cpp
+	PermCor_Test.cpp
 	LowMCPerm_Test.cpp
 	ComposedPerm_Test.cpp
 	PaillierPerm_Test.cpp
 	AdditivePerm_Test.cpp
-	"AltModPrf_Test.cpp"
+	AltModPrf_Test.cpp
 	CorGenerator_Test.cpp
 	GMW_Test.cpp
 	RadixSort_Test.cpp

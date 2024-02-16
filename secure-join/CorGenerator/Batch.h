@@ -13,8 +13,18 @@
 
 namespace secJoin
 {
+    struct GenState;
     struct Batch
     {
+
+        Batch(GenState* state, oc::Socket&& s, PRNG&& p)
+            : mGenState(state)
+            , mSock(std::move(s))
+            , mPrng(std::move(p))
+        {}
+
+        GenState* mGenState = nullptr;
+
         // The size of the batch
         u64 mSize = 0;
 
@@ -24,10 +34,8 @@ namespace secJoin
         // true if the correlation is ready to be consumed.
         macoro::async_manual_reset_event mCorReady;
 
-
-        // true once the base OTs have been set and 
-        // ready for the main phase to begin.
-        macoro::async_manual_reset_event mHaveBase;
+        // true once the batch has been requested to start
+        macoro::async_manual_reset_event mStart;
 
         // The socket that this batch runs on
         coproto::Socket mSock;
@@ -49,17 +57,24 @@ namespace secJoin
         // has already been retrieved, this will be empty.
         virtual macoro::task<> getTask() = 0;
 
-        virtual void mock(u64 batchIdx) = 0;
+        //virtual void mock(u64 batchIdx) = 0;
 
         // get the correlation. c must match the type.
         virtual void getCor(Cor* c, u64 begin, u64 size) = 0;
 
         virtual void clear() = 0;
+
+        void start();
+
+        virtual u64 getBatchTypeId() = 0;
     };
 
-    std::shared_ptr<Batch> makeBatch(u64 sender, CorType type, oc::Socket&& sock, PRNG&& p);
+    std::shared_ptr<Batch> makeBatch(GenState* state, u64 sender, CorType type, oc::Socket&& sock, PRNG&& p);
 
-    struct BatchOffset {
+
+    // represents a subset of a batch. 
+    struct BatchSegment 
+    {
 
         // The batch being referenced.
         std::shared_ptr<Batch> mBatch;
@@ -69,6 +84,16 @@ namespace secJoin
 
         // the size of the correlation with respect to the referenced batch.
         u64 mSize = 0;
+
+        BatchSegment(std::shared_ptr<Batch>& b, u64 begin, u64 size)
+            : mBatch(b)
+            , mBegin(begin)
+            , mSize(size)
+            , mWeakBatch(mBatch)
+        {
+        }
+
+        std::weak_ptr<Batch> mWeakBatch;
     };
 
 

@@ -85,6 +85,13 @@ namespace secJoin
         using KeyType = std::array<oc::block, KeySize / 128>;
         KeyType mExpandedKey;
 
+        AltModPrf() = default;
+        AltModPrf(const AltModPrf&) = default;
+        AltModPrf&operator=(const AltModPrf&) = default;
+        AltModPrf(KeyType k)
+        {
+            setKey(k);
+        }
 
         // set the key
         void setKey(KeyType k);
@@ -123,20 +130,11 @@ namespace secJoin
         // The number of input we will have.
         u64 mInputSize = 0;
 
-        // Generate the key when we run the protocol.
-        macoro::optional<bool> mDoKeyGen;
-
-        // Has the key OTs been set.
-        bool mHasKeyOts = false;
-
-        // Has the preprocessing been performed.
-        bool mHasPrepro = false;
-
         // The Ole request that will be used for the mod2 operation
-        BinOleRequest mOleReq;
+        BinOleRequest mOleReq_;
 
         // The base ot request that will be used for the key
-        OtRecvRequest mKeyReq;
+        OtRecvRequest mKeyReq_;
 
         // variables that are used for debugging.
         oc::Matrix<oc::block> mDebugXk0, mDebugXk1, mDebugU0, mDebugU1,mDebugV;
@@ -150,105 +148,70 @@ namespace secJoin
         // initialize the protocol to perform inputSize prf evals.
         // set keyGen if you explicitly want to perform (or not) the 
         // key generation. default = perform if not already set.
-        void init(u64 inputSize, macoro::optional<bool> keyGen = {})
+        void init(
+            u64 inputSize, 
+            CorGenerator& ole,
+            macoro::optional<AltModPrf::KeyType> key = {},
+            span<block> keyOts = {})
         {
             mInputSize = inputSize;
-            mDoKeyGen = keyGen;
+
+            if (key.has_value() ^ (AltModPrf::KeySize == keyOts.size()))
+                throw RTE_LOC;
+
+            if (key)
+            {
+                setKeyOts(*key, keyOts);
+            }
+            else
+            {
+                mKeyReq_ = ole.recvOtRequest(AltModPrf::KeySize);
+            }
+
+            auto numOle = oc::roundUpTo(mInputSize, 128) * AltModPrf::MidSize * 2;
+            mOleReq_ = ole.binOleRequest(numOle);
         }
 
         // clear the state. Removes any key that is set can cancels the prepro (if any).
         void clear()
         {
-            mOleReq.clear();
-            mKeyReq.clear();
+            mOleReq_.clear();
+            mKeyReq_.clear();
             mKeyOTs.clear();
-            mDoKeyGen = {};
-            mHasKeyOts = false;
-            mHasPrepro = false;
             mInputSize = 0;
             memset(mPrf.mExpandedKey.data(), 0, sizeof(mPrf.mExpandedKey));
         }
 
-        // return true if correlated randomness has been requested.
-        bool hasRequest() const
-        {
-            return mOleReq.size() > 0;
-        }
-
-        // return true if correlated randomness has been requested.
-        bool hasPreprocessing() const
-        {
-            return mHasPrepro;
-        }
-
-        // request correlated randomness. init must be called first.
-        void request(CorGenerator& ole)
-        {
-            if(mInputSize == 0)
-                throw std::runtime_error("AltModPrfSender::init must be called first. " LOCATION);
-
-            auto numOle = oc::roundUpTo(mInputSize, 128) * AltModPrf::MidSize * 2;
-            mOleReq = ole.binOleRequest(numOle);
-            if ((mDoKeyGen.has_value() == false && mHasKeyOts == false) || 
-                (mDoKeyGen.has_value() == true && *mDoKeyGen == true))
-            {
-                mKeyReq = ole.recvOtRequest(AltModPrf::KeySize);
-                mDoKeyGen = false;
-                mHasKeyOts = true;
-            }
-        }
-
         // perform the correlated randomness generation. 
-        macoro::task<> preprocess()
+        void preprocess()
         {
-            if (mOleReq.size() == 0)
-                throw std::runtime_error("AltModPrfReceiver::preprocess() was called without calling request. " LOCATION);
+            mOleReq_.start();
 
-            mHasPrepro = true;
-            if (mKeyReq.size())
-            {
-                MC_BEGIN(macoro::task<>, this);
-                MC_AWAIT(macoro::when_all_ready(mOleReq.start(), mKeyReq.start()));
-                MC_END();
-            }
-            else
-                return mOleReq.start();
+            if (mKeyReq_.size())
+                mKeyReq_.start();
         }
-
-        // returns true if the key has been set (or is being generated).
-        bool hasKeyOts() const {return mHasKeyOts;}
 
         // explicitly set the key and key OTs.
-        void setKeyOts(AltModPrf::KeyType k, span<oc::block> ots);
+        void setKeyOts(AltModPrf::KeyType k, span<const oc::block> ots);
 
         // return the key that is currently set.
-        AltModPrf::KeyType getKey() const {
-            if (mHasKeyOts == false)
-                throw RTE_LOC;
+        AltModPrf::KeyType getKey() const 
+        {
             return mPrf.mExpandedKey;
         }
 
-        // returns a key derivation of the key OTs. This can safely be used by another instance.
-        std::vector<oc::block> getKeyOts() const
-        {
-
-            if (mHasKeyOts == false)
-                throw RTE_LOC;
-            std::vector<oc::block> r(mKeyOTs.size());
-            for (u64 i = 0; i < r.size(); ++i)
-            {
-                r[i] = mKeyOTs[i].getSeed();
-            }
-            return r;
-        }
-
-        // Run the prf protocol and write the result to y. If correlated randomness has
-        // not been generated then it will be in the protocol.
-        coproto::task<> evaluate(
-            span<oc::block> y,
-            coproto::Socket& sock,
-            PRNG& _,
-            CorGenerator& gen);
+        //// returns a key derivation of the key OTs. This can safely be used by another instance.
+        //std::vector<oc::block> getKeyOts() const
+        //{
+        //    if (mHasKeyOts == false)
+        //        throw RTE_LOC;
+        //    std::vector<oc::block> r(mKeyOTs.size());
+        //    for (u64 i = 0; i < r.size(); ++i)
+        //    {
+        //        r[i] = mKeyOTs[i].getSeed();
+        //    }
+        //    return r;
+        //}
 
         // Run the prf protocol and write the result to y. Requires that correlated 
         // randomness has already been requested using the request() function.
@@ -257,17 +220,17 @@ namespace secJoin
             coproto::Socket& sock,
             PRNG& _);
 
-        // re-randomize the OTs seeds with the tweak.
-        void tweakKeyOts(oc::block tweak)
-        {
-            if (!mKeyOTs.size())
-                throw RTE_LOC;
-            oc::AES aes(tweak);
-            for (u64 i = 0; i < mKeyOTs.size(); ++i)
-            {
-                mKeyOTs[i].SetSeed(aes.hashBlock(mKeyOTs[i].getSeed()));
-            }
-        }
+        //// re-randomize the OTs seeds with the tweak.
+        //void tweakKeyOts(oc::block tweak)
+        //{
+        //    if (!mKeyOTs.size())
+        //        throw RTE_LOC;
+        //    oc::AES aes(tweak);
+        //    for (u64 i = 0; i < mKeyOTs.size(); ++i)
+        //    {
+        //        mKeyOTs[i].SetSeed(aes.hashBlock(mKeyOTs[i].getSeed()));
+        //    }
+        //}
 
         // the mod 2 subprotocol.
         macoro::task<> mod2(
@@ -292,20 +255,11 @@ namespace secJoin
         // The number of input we will have.
         u64 mInputSize = 0;
 
-        // Generate the key when we run the protocol.
-        macoro::optional<bool> mDoKeyGen;
-
-        // have the OTs been set.
-        bool mHasKeyOts = false;
-
-        // Have we performed preprocessing
-        bool mHasPrepro = false;
-
         // The Ole request that will be used for the mod2 operation
-        BinOleRequest mOleReq;
+        BinOleRequest mOleReq_;
 
         // The base ot request that will be used for the key
-        OtSendRequest mKeyReq;
+        OtSendRequest mKeyReq_;
 
         // variables that are used for debugging.
         oc::Matrix<oc::block> mDebugXk0, mDebugXk1, mDebugU0, mDebugU1, mDebugV;
@@ -317,107 +271,52 @@ namespace secJoin
         AltModPrfReceiver& operator=(const AltModPrfReceiver&) = default;
         AltModPrfReceiver& operator=(AltModPrfReceiver&&) noexcept = default;
 
-        // returns true if we have key OTs set.
-        bool hasKeyOts() const {return mHasKeyOts; }
-
-        // returns true if correlated randomness has been requested.
-        bool hasRequest() const { return mOleReq.size() > 0; }
-
-        bool hasPreprocessing() const { return mHasPrepro; }
-
         // clears any internal state.
         void clear()
         {
-            mOleReq.clear();
-            mKeyReq.clear();
+            mOleReq_.clear();
+            mKeyReq_.clear();
             mKeyOTs.clear();
-            mDoKeyGen = {};
-            mHasKeyOts = false;
-            mHasPrepro = false;
             mInputSize = 0;
         }
 
         // initialize the protocol to perform inputSize prf evals.
         // set keyGen if you explicitly want to perform (or not) the 
         // key generation. default = perform if not already set.
-        void init(u64 size, macoro::optional<bool> keyGen = {})
+        void init(u64 size,
+            CorGenerator& ole,
+            span<std::array<block, 2>> keyOts = {})
         { 
-            mInputSize = size;
-            mDoKeyGen = keyGen;
-        }
+            if (keyOts.size() != AltModPrf::KeySize && keyOts.size() != 0)
+                throw RTE_LOC;
+            if (!size)
+                throw RTE_LOC;
+            if (mInputSize)
+                throw RTE_LOC;
 
-        // request the required correlated randomness. 
-        void request(CorGenerator& ole)
-        {
-            if (mInputSize == 0)
-                throw std::runtime_error("AltModPrfSender::init must be called first. " LOCATION);
+            mInputSize = size;
+
+            if (keyOts.size() == 0)
+            {
+                mKeyReq_ = ole.sendOtRequest(AltModPrf::KeySize);
+            }
+            else
+            {
+                setKeyOts(keyOts);
+            }
 
             auto numOle = oc::roundUpTo(mInputSize, 128) * AltModPrf::MidSize * 2;
-            mOleReq = ole.binOleRequest(numOle);
-            if ((mDoKeyGen.has_value() == false && mHasKeyOts == false) || 
-                (mDoKeyGen.has_value() == true && *mDoKeyGen == true))
-            {
-                mKeyReq = ole.sendOtRequest(AltModPrf::KeySize);
-                mDoKeyGen = false;
-                mHasKeyOts = true;
-            }
+            mOleReq_ = ole.binOleRequest(numOle);
         }
 
         // Perform the preprocessing for the correlated randomness and key gen (if requested).
-        macoro::task<> preprocess()
+        void preprocess()
         {
-            if (mOleReq.size() == 0)
-                throw std::runtime_error("AltModPrfReceiver::preprocess() was called without calling request. " LOCATION);
+            mOleReq_.start();
+            if (mKeyReq_.size())
+                mKeyReq_.start();
 
-            mHasPrepro = true;
-            if (mKeyReq.size())
-            {
-                MC_BEGIN(macoro::task<>, this);
-                MC_AWAIT(macoro::when_all_ready(mOleReq.start(), mKeyReq.start()));
-                MC_END();
-            }
-            else
-                return mOleReq.start();
         }
-
-        // explicitly set the OTs for the key.
-        void setKeyOts(span<std::array<oc::block, 2>> ots);
-
-        // returns a key derivation of the key OTs. This can safely be used by another instance.
-        std::vector<std::array<oc::block, 2>> getKeyOts() const
-        {
-            if (mHasKeyOts == false)
-                throw RTE_LOC;
-            std::vector<std::array<oc::block, 2>> r(mKeyOTs.size());
-            for (u64 i = 0; i < r.size(); ++i)
-            {
-                r[i][0] = mKeyOTs[i][0].getSeed();
-                r[i][1] = mKeyOTs[i][1].getSeed();
-            }
-            return r;
-        }
-
-        // re-randomize the OTs seeds with the tweak.
-        //void tweakKeyOts(oc::block tweak)
-        //{
-        //    if (!mKeyOTs.size())
-        //        throw RTE_LOC;
-        //    oc::AES aes(tweak);
-        //    for (u64 i = 0; i < mKeyOTs.size(); ++i)
-        //    {
-        //        mKeyOTs[i][0].SetSeed(aes.hashBlock(mKeyOTs[i][0].getSeed()));
-        //        mKeyOTs[i][1].SetSeed(aes.hashBlock(mKeyOTs[i][1].getSeed()));
-        //    }
-        //}
-
-        // Run the prf protocol and write the result to y. If correlated randomness has
-        // not been generated then it will be in the protocol.
-        coproto::task<> evaluate(
-            span<oc::block> x,
-            span<oc::block> y,
-            coproto::Socket& sock,
-            PRNG&,
-            CorGenerator& gen);
 
         // Run the prf protocol and write the result to y. Requires that correlated 
         // randomness has already been requested using the request() function.
@@ -433,5 +332,8 @@ namespace secJoin
             oc::MatrixView<oc::block> u1,
             oc::MatrixView<oc::block> out,
             coproto::Socket& sock);
+
+        void AltModPrfReceiver::setKeyOts(span<std::array<block, 2>> ots);
+
     };
 }

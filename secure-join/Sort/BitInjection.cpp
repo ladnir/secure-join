@@ -41,84 +41,19 @@ namespace secJoin
         }
     }
 
-
-    void BitInject::request(CorGenerator& gen)
-    {
-        if (mRowCount == 0 || mInBitCount == 0)
-            throw std::runtime_error("init has not been called. " LOCATION);
-
-        mRole = (u64)gen.partyIdx();
-        if (gen.partyIdx())
-            mRecvReq = gen.recvOtRequest(mRowCount * mInBitCount);
-        else
-            mSendReq = gen.sendOtRequest(mRowCount * mInBitCount);
-        mRequested = true;
-    }
-
-    macoro::task<> BitInject::preprocess()
+    void BitInject::preprocess()
     {
         mHasPreprocessing = true;
         if (mRecvReq.size())
-            return mRecvReq.start();
+            mRecvReq.start();
         else if (mSendReq.size())
-            return mSendReq.start();
+            mSendReq.start();
         else
         {
             mHasPreprocessing = false;
-            throw std::runtime_error("BitInject::request() must be called before preprocess() " LOCATION);
+            throw std::runtime_error("BitInject::ini() must be called before preprocess() " LOCATION);
         }
-
     }
-
-    //macoro::task<> BitInject::preprocess(
-    //    u64 n,
-    //    u64 mInBitCount,
-    //    CorGenerator& gen_,
-    //    PRNG& prng_,
-    //    coproto::Socket& sock_)
-    //{
-    //    MC_BEGIN(macoro::task<>, this, n, mInBitCount, 
-    //        gen = gen_.fork(), 
-    //        sock = sock_.fork(), 
-    //        prng = prng_.fork());
-    //    mHasPreprocessing = true;
-    //    mRole = (int)gen.mRole;
-    //    //if (n == 0 || mInBitCount == 0)
-    //    //    throw RTE_LOC;
-
-    //    if (gen.mRole == CorGenerator::Role::Receiver)
-    //    {
-    //        MC_AWAIT(gen.recvOtRequest(mRecvReq, n * mInBitCount, sock, prng));
-    //    }
-    //    else
-    //    {
-    //        MC_AWAIT(gen.sendOtRequest(mSendReq, n * mInBitCount, sock, prng));
-    //    }
-
-    //    MC_END();
-    //}
-
-
-    // convert each bit of the binary secret sharing `in`
-     // to integer Z_{2^outBitCount} arithmetic sharings.
-     // Each row of `in` should have `mInBitCount` bits.
-     // out will therefore have dimension `in.rows()` rows 
-     // and `mInBitCount` columns.
-    //macoro::task<> BitInject::bitInjection(
-    //    const oc::Matrix<u8>& in,
-    //    u64 outBitCount,
-    //    oc::Matrix<u32>& out,
-    //    PRNG& prng,
-    //    coproto::Socket& sock)
-    //{
-    //    MC_BEGIN(macoro::task<>, this, &in, outBitCount, &out, &sock, &prng, 
-    //        pre = macoro::eager_task<>{});
-
-
-    //    MC_AWAIT(bitInjection(mInBitCount, in, outBitCount, out, sock));
-
-    //    MC_END();
-    //}
 
     // convert each bit of the binary secret sharing `in`
      // to integer Z_{2^outBitCount} arithmetic sharings.
@@ -142,8 +77,7 @@ namespace secJoin
             diff = oc::BitVector{},
             buff = oc::AlignedUnVector<u8>{},
             updates = oc::AlignedUnVector<u32>{},
-            mask = u32{},
-            pre = macoro::eager_task<>{}
+            mask = u32{}
         );
 
         if (mInBitCount > in.cols() * 8)
@@ -155,8 +89,8 @@ namespace secJoin
         if (hasRequest() == false)
             throw std::runtime_error("request must be called first. " LOCATION);
 
-        if (hasPreprocessing() == false)
-            pre = preprocess() | macoro::make_eager();
+        //if (hasPreprocessing() == false)
+        //    pre = preprocess() | macoro::make_eager();
 
 
         out.resize(in.rows(), mInBitCount);
@@ -164,8 +98,8 @@ namespace secJoin
 
         if (mRole)
         {
-            if (hasPreprocessing() == false)
-                throw RTE_LOC;
+            //if (hasPreprocessing() == false)
+            //    throw RTE_LOC;
             if (mRecvReq.size() < in.rows() * mInBitCount)
                 throw RTE_LOC;
 
@@ -187,8 +121,11 @@ namespace secJoin
 
                     diff.append((u8*)&in(row, 0), rem, off);
 
+
+                    //std::cout << "r " << i << " " << recvs.back().mChoice[j] << " " << recvs.back().mMsg[j] << std::endl;
                     i += rem;
                     j += rem;
+
                 }
 
                 diff ^= recvs.back().mChoice;
@@ -228,8 +165,8 @@ namespace secJoin
         else
         {
 
-            if (hasPreprocessing() == false)
-                throw RTE_LOC;
+            //if (hasPreprocessing() == false)
+            //    throw RTE_LOC;
             if (mSendReq.size() < in.rows() * mInBitCount)
                 throw RTE_LOC;
 
@@ -244,6 +181,8 @@ namespace secJoin
                 updates.resize(m);
                 for (u64 j = 0; j < m; ++j, ++i)
                 {
+                    //std::cout << "s " << i << " " << send.mMsg[j][0] << " " << send.mMsg[j][1] << std::endl;
+
                     auto row = i / mInBitCount;
                     auto off = i % mInBitCount;
 
@@ -266,8 +205,12 @@ namespace secJoin
         }
 
 
-        if (pre.handle())
-            MC_AWAIT(pre);
+        //if (pre.handle())
+        //{
+        //    MC_AWAIT(pre);
+        //}
+        //mRecvReq = {};
+        //mSendReq = {};
 
         MC_END();
     }

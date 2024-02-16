@@ -936,7 +936,7 @@ namespace secJoin
                     }
 
 
-                    void AltModPrfSender::setKeyOts(AltModPrf::KeyType k, span<block> ots)
+                    void AltModPrfSender::setKeyOts(AltModPrf::KeyType k, span<const block> ots)
                     {
                         if (ots.size() != AltModPrf::KeySize)
                             throw RTE_LOC;
@@ -947,8 +947,6 @@ namespace secJoin
                         {
                             mKeyOTs[i].SetSeed(ots[i]);
                         }
-                        mHasKeyOts = true;
-                        mDoKeyGen = false;
                     }
 
                     void mod3BitDecompostion(oc::MatrixView<u16> u, oc::MatrixView<block> u0, oc::MatrixView<block> u1)
@@ -1002,26 +1000,6 @@ namespace secJoin
                         }
                     }
 
-
-                    coproto::task<> AltModPrfSender::evaluate(
-                        span<block> y,
-                        coproto::Socket& sock,
-                        PRNG& prng,
-                        CorGenerator& gen)
-                    {
-                        // init has not been called, call it
-                        if (mInputSize == 0)
-                            init(y.size());
-
-                        // request the required correlated randomness if needed.
-                        if (mOleReq.size() == 0)
-                            request(gen);
-
-                        // perform the main protocol.
-                        return evaluate(y, sock, prng);
-                    }
-
-
                     coproto::task<> AltModPrfSender::evaluate(
                         span<block> y,
                         coproto::Socket& sock,
@@ -1043,29 +1021,30 @@ namespace secJoin
                             xk0 = oc::Matrix<block>{},
                             xk1 = oc::Matrix<block>{},
                             msg = oc::Matrix<block>{},
-                            pre = macoro::eager_task<>{},
                             otRecv = OtRecv{}
                         );
 
-                        if (mOleReq.size() != oc::roundUpTo(y.size(), 128) * AltModPrf::MidSize * 2)
+                        if(y.size() != mInputSize)
+                            throw std::runtime_error("output length do not match. " LOCATION);
+
+
+                        if (mOleReq_.size() != oc::roundUpTo(y.size(), 128) * AltModPrf::MidSize * 2)
                             throw std::runtime_error("do not have enough preprocessing. Call request(...) first. " LOCATION);
 
-                        // If no one has started the preprocessing, then lets start it.
-                        if (mHasPrepro == false)
-                            pre = preprocess() | macoro::make_eager();
-
                         // if we are doing the key gen, get the results.
-                        if (mKeyReq.size())
+                        if (mKeyReq_.size())
                         {
-                            MC_AWAIT(mKeyReq.get(otRecv));
+                            MC_AWAIT(mKeyReq_.get(otRecv));
+
                             if (oc::divCeil(otRecv.mChoice.size(), 8) != sizeof(AltModPrf::KeyType))
                                 throw RTE_LOC;
+                            
                             auto k = otRecv.mChoice.getSpan<AltModPrf::KeyType>()[0];
                             setKeyOts(k, otRecv.mMsg);
                         }
 
                         // make sure we have a key.
-                        if (!mHasKeyOts)
+                        if (mKeyOTs.size() != AltModPrf::KeySize)
                             throw std::runtime_error("AltMod was called without a key and keyGen was not requested. " LOCATION);
 
                         // debugging, make sure we have the correct key OTs.
@@ -1152,12 +1131,6 @@ namespace secJoin
                         // Compute y = B * v
                         compressB(v, y);
 
-                        // cleanup
-                        if (pre.handle())
-                            MC_AWAIT(pre);
-                        mHasPrepro = false;
-                        mOleReq = {};
-                        mKeyReq = {};
                         mInputSize = 0;
 
                         MC_END();
@@ -1173,27 +1146,6 @@ namespace secJoin
                             mKeyOTs[i][0].SetSeed(ots[i][0]);
                             mKeyOTs[i][1].SetSeed(ots[i][1]);
                         }
-                        mHasKeyOts = true;
-                        mDoKeyGen = false;
-                    }
-
-                    coproto::task<> AltModPrfReceiver::evaluate(
-                        span<block> x,
-                        span<block> y,
-                        coproto::Socket& sock,
-                        PRNG& prng,
-                        CorGenerator& gen)
-                    {
-                        // init has not been called, call it
-                        if (mInputSize == 0)
-                            init(y.size());
-
-                        // request the required correlated randomness if needed.
-                        if (mOleReq.size() == 0)
-                            request(gen);
-
-                        // perform the main protocol.
-                        return evaluate(x, y, sock, prng);
                     }
 
                     coproto::task<> AltModPrfReceiver::evaluate(
@@ -1202,6 +1154,9 @@ namespace secJoin
                         coproto::Socket& sock,
                         PRNG& prng)
                     {
+
+                        if (mInputSize == 0)
+                            throw std::runtime_error("input lengths 0. " LOCATION);
                         MC_BEGIN(coproto::task<>, x, y, this, &sock,
                             xt = oc::Matrix<block>{},
                             buffer = oc::AlignedUnVector<u8>{},
@@ -1220,25 +1175,29 @@ namespace secJoin
                             otSend = OtSend{}
                         );
 
-                        if (x.size() != y.size())
-                            throw std::runtime_error("input output lengths do not match. " LOCATION);
+                        if (x.size() != mInputSize)
+                            throw std::runtime_error("input lengths do not match. " LOCATION);
 
-                        if (mOleReq.size() != oc::roundUpTo(y.size(), 128) * AltModPrf::MidSize * 2)
+                        if (y.size() != mInputSize)
+                            throw std::runtime_error("output lengths do not match. " LOCATION);
+
+                        if (mOleReq_.size() != oc::roundUpTo(y.size(), 128) * AltModPrf::MidSize * 2)
                             throw std::runtime_error("do not have enough preprocessing. Call request(...) first. " LOCATION);
 
                         // If no one has started the preprocessing, then lets start it.
-                        if (mHasPrepro == false)
-                            pre = preprocess() | macoro::make_eager();
+                        //if (mPreproStarted == false)
+                        //    pre = preprocess() | macoro::make_eager();
 
                         // if we are doing the key gen, get the results.
-                        if (mKeyReq.size())
+                        if (mKeyReq_.size())
                         {
-                            MC_AWAIT(mKeyReq.get(otSend));
+                            MC_AWAIT(mKeyReq_.get(otSend));
                             setKeyOts(otSend.mMsg);
+                            mKeyReq_.clear();
                         }
 
                         // make sure we have a key.
-                        if (!mHasKeyOts)
+                        if (!mKeyOTs.size())
                             throw std::runtime_error("AltMod was called without a key and keyGen was not requested. " LOCATION);
 
                         // debugging, make sure we have the correct key OTs.
@@ -1326,13 +1285,6 @@ namespace secJoin
 
                         // Compute y = B * v
                         compressB(v, y);
-
-                        // cleanup
-                        if (pre.handle())
-                            MC_AWAIT(pre);
-                        mHasPrepro = false;
-                        mOleReq = {};
-                        mKeyReq = {};
                         mInputSize = 0;
 
                         MC_END();
@@ -1525,7 +1477,7 @@ namespace secJoin
 
                                 if (tIdx == tSize)
                                 {
-                                    MC_AWAIT(mOleReq.get(triple));
+                                    MC_AWAIT(mOleReq_.get(triple));
 
                                     tSize = triple.mAdd.size();
                                     tIdx = 0;
@@ -1637,10 +1589,11 @@ namespace secJoin
                             mlt = span<block>{},
                             outIter = (block*)nullptr,
                             u0Iter = (block*)nullptr,
-                            u1Iter = (block*)nullptr
+                            u1Iter = (block*)nullptr,
+                            ec = macoro::result<void, std::exception_ptr>{}
                         );
 
-                        triple.reserve(mOleReq.batchCount());
+                        triple.reserve(mOleReq_.batchCount());
                         tIdx = 0;
                         tSize = 0;
 
@@ -1653,7 +1606,7 @@ namespace secJoin
                         // we are performing mod 2. u0 is the lsb, u1 is the msb. these are packed into 128 bit blocks. 
                         // we then have a matrix of these with `rows` rows and `cols` columns. We mod requires
                         // 2 OLEs. So in total we need rows * cols * 128 * 2 OLEs.
-                        assert(mOleReq.size() == rows * cols * 128 * 2);
+                        assert(mOleReq_.size() == rows * cols * 128 * 2);
 
                         u0Iter = u0.data();
                         u1Iter = u1.data();
@@ -1666,7 +1619,7 @@ namespace secJoin
                                 {
 
                                     triple.emplace_back();
-                                    MC_AWAIT(mOleReq.get(triple.back()));
+                                    MC_AWAIT(mOleReq_.get(triple.back()));
 
                                     tSize = triple.back().mAdd.size();
                                     tIdx = 0;
@@ -1720,7 +1673,12 @@ namespace secJoin
                                     add = tIter->mAdd;
                                     ++tIter;
                                     buff.resize(tSize);
-                                    MC_AWAIT(sock.recv(buff));
+                                    MC_AWAIT_TRY(ec, sock.recv(buff));
+                                    if (ec.has_error())
+                                    {
+                                        std::cout << whatError(ec) << std::endl;
+                                        throw ec.error();
+                                    }
                                 }
 
                                 step = std::min<u64>(cols - j, (tSize - tIdx) / 2);

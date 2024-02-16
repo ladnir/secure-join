@@ -1,11 +1,11 @@
 #include "OtBatch.h"
+#include "CorGenerator.h"
 
 namespace secJoin
 {
-    OtBatch::OtBatch(bool sender, oc::Socket&& s, PRNG&& p)
+    OtBatch::OtBatch(GenState* state, bool sender, oc::Socket&& s, PRNG&& p)
+        : Batch(state, std::move(s), std::move(p))
     {
-        mSock = std::move(s);
-        mPrng = std::move(p);
         if (sender)
         {
             mSendRecv.emplace<0>();
@@ -18,9 +18,10 @@ namespace secJoin
 
     macoro::task<> OtBatch::RecvOtBatch::recvTask(PRNG& prng, oc::Socket& sock)
     {
-        mMsg.resize(mReceiver.mRequestedNumOts);
-        mChoice.resize(mReceiver.mRequestedNumOts);
+        mMsg.resize(mReceiver.mRequestNumOts);
+        mChoice.resize(mReceiver.mRequestNumOts);
         assert(mReceiver.mGen.hasBaseOts());
+        mReceiver.mMultType = oc::MultType::Tungsten;
 
         return mReceiver.silentReceive(mChoice, mMsg, prng, sock);
     }
@@ -45,6 +46,8 @@ namespace secJoin
     {
         mMsg2.resize(mSender.mRequestNumOts);
         assert(mSender.hasSilentBaseOts());
+        mSender.mMultType = oc::MultType::Tungsten;
+
         return mSender.silentSend(mMsg2, prng, sock);
     }
 
@@ -98,6 +101,10 @@ namespace secJoin
     BaseRequest OtBatch::getBaseRequest()
     {
         BaseRequest r;
+
+        if (mGenState->mMock)
+            return r;
+
         mSendRecv | match{
             [&](SendOtBatch& send) {
                 send.mSender.configure(mSize);
@@ -114,7 +121,9 @@ namespace secJoin
 
     void OtBatch::setBase(span<oc::block> rMsg, span<std::array<oc::block, 2>> sMsg)
     {
-        BaseRequest r;
+        if (mGenState->mMock)
+            return;
+
         mSendRecv | match{
             [&](SendOtBatch& send) {
                 if (rMsg.size())
@@ -127,34 +136,99 @@ namespace secJoin
                 recv.mReceiver.setSilentBaseOts(rMsg);
             }
         };
-        mHaveBase.set();
     }
 
     macoro::task<> OtBatch::getTask() {
-        MC_BEGIN(macoro::task<>, this, 
+        MC_BEGIN(macoro::task<>, this,
             t = macoro::task<>{},
-            c = char{0});
+            msg = std::vector<std::array<block, 2>>{}
+        );
 
-        MC_AWAIT(mHaveBase);
+        if (mGenState->mMock)
+        {
+            mSendRecv | match{
+                [&](SendOtBatch& send) {
+                    send.mMsg2.resize(mSize);
+                    send.mock(mIndex);
+                },
+                [&](RecvOtBatch& recv) {
+                    recv.mChoice.resize(mSize);
+                    recv.mMsg.resize(mSize);
+                    recv.mock(mIndex);
+                }
+            };
+        }
+        else
+        {
+            if (mGenState->mDebug)
+            {
+                if (mSendRecv.index() == 0)
+                {
+                    MC_AWAIT(mSock.send(coproto::copy(std::get<0>(mSendRecv).mSender.mGen.mBaseOTs)));
 
-        //if (mSendRecv.index() == 0)
-        //{
-        //    MC_AWAIT(mSock.send(std::move(c)));
-        //}
-        //else 
-        //{
-        //    MC_AWAIT(mSock.recv(c));
-        //}
+                }
+                else
+                {
 
-        t = mSendRecv | match{
-            [&](SendOtBatch& send) {
-                return send.sendTask(mPrng, mSock);
-            },
-            [&](RecvOtBatch& recv) {
-                return recv.recvTask(mPrng, mSock);
+                    msg.resize(std::get<1>(mSendRecv).mReceiver.silentBaseOtCount());
+                    MC_AWAIT(mSock.recv(msg));
+
+                    {
+                        auto& recv = std::get<1>(mSendRecv);
+                        for (u64 i = 0; i < msg.size(); ++i)
+                        {
+                            if (recv.mReceiver.mGen.mBaseOTs(i) != msg[i][recv.mReceiver.mGen.mBaseChoices(i)])
+                            {
+                                std::cout << "OtBatch::getTask() base OTs do not match. " << LOCATION << std::endl;
+                                std::terminate();
+                            }
+                        }
+                    }
+                }
             }
-        };
-        MC_AWAIT(t);
+
+
+            t = mSendRecv | match{
+                [&](SendOtBatch& send) {
+                    return send.sendTask(mPrng, mSock);
+                },
+                [&](RecvOtBatch& recv) {
+                    return recv.recvTask(mPrng, mSock);
+                }
+            };
+            MC_AWAIT(t);
+        }
+
+
+        if (mGenState->mDebug)
+        {
+            if (mSendRecv.index() == 0)
+            {
+                //std::cout << " checking ot send " << mIndex << std::endl;
+                MC_AWAIT(mSock.send(coproto::copy(std::get<0>(mSendRecv).mMsg2)));
+
+            }
+            else
+            {
+                //std::cout << " checking ot recv " << mIndex << std::endl;
+
+                msg.resize(std::get<1>(mSendRecv).mMsg.size());
+                MC_AWAIT(mSock.recv(msg));
+
+                {
+                    auto& recv = std::get<1>(mSendRecv);
+                    for (u64 i = 0; i < msg.size(); ++i)
+                    {
+                        if (recv.mMsg[i] != msg[i][recv.mChoice[i]])
+                        {
+                            std::cout << "OtBatch::getTask() OTs do not match. " << LOCATION << std::endl;
+                            std::terminate();
+                        }
+                    }
+                }
+            }
+        }
+
 
         mCorReady.set();
         MC_END();
@@ -173,20 +247,11 @@ namespace secJoin
         };
     }
 
-    void OtBatch::mock(u64 batchIdx)
-    {
-        mSendRecv | match{
-            [&](SendOtBatch& send) {
-                send.mMsg2.resize(mSize);
-                send.mock(batchIdx);
-            },
-            [&](RecvOtBatch& recv) {
-                recv.mChoice.resize(mSize);
-                recv.mMsg.resize(mSize);
-                recv.mock(batchIdx);
-            }
-        };
-    }
+    //void OtBatch::mock_(u64 batchIdx)
+    //{
+
+    //    mCorReady.set();
+    //}
 
 
 }

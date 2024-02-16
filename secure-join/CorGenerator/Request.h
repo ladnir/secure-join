@@ -11,18 +11,21 @@ namespace secJoin
 {
     struct GenState;
 
-    struct Session
-    {
-        // true if the base OTs has been started. This 
-        // will guard starting them to ensure only one 
-        // thread does it.
-        std::atomic<bool> mBaseStarted = false;
-    };
+    //struct Session
+    //{
+    //    // true if the base OTs has been started. This 
+    //    // will guard starting them to ensure only one 
+    //    // thread does it.
+    //    std::atomic<bool> mBaseStarted = false;
+
+    //    u64 mReqIndex = 0;
+    //};
 
 
     struct RequestState : std::enable_shared_from_this<RequestState>
     {
         RequestState(CorType t, bool sender, u64 size, std::shared_ptr<GenState>&, u64 idx);
+
 
         // the type of the correlation
         CorType mType;
@@ -40,26 +43,23 @@ namespace secJoin
         u64 mNextBatchIdx = 0;
 
         // a flag encoding if the request has been started.
-        std::atomic_bool mStarted = false;
+        bool mStarted = false;
 
         // Where in the i'th batch should we take the correlations.
-        std::vector<BatchOffset> mBatches_;
+        std::vector<BatchSegment> mBatches_;
 
-        void addBatch(BatchOffset b);
+        void addBatch(BatchSegment b);
 
         // The core state.
         std::shared_ptr<GenState> mGenState;
 
         // a session is a object that tracts per base OT batch information.
-        std::shared_ptr<Session> mSession;
+        //std::shared_ptr<Session> mSession;
 
-        // set by the batch when it completes.
-        //macoro::async_manual_reset_event mDone;
+        // starts the preprocessing.
+        void startReq();
 
-        // Return a task that starts the preprocessing.
-        macoro::task<> startReq();
-
-        // returns the number of batches this request has.
+        // returns the number of mBatches this request has.
         u64 batchCount();
 
         // returns the total number of correlations requested.
@@ -77,17 +77,14 @@ namespace secJoin
         macoro::task<> get(Cor& d)
         {
             MC_BEGIN(macoro::task<>, this, &d,
-                batch = (BatchOffset*)nullptr
+                batch = (BatchSegment*)nullptr
             );
-
-            if (mReqState->mStarted == false)
-                throw std::runtime_error("start() must be awaited before git is called. " LOCATION);
 
             if (mReqState->mNextBatchIdx >= mReqState->mBatches_.size())
                 throw std::runtime_error("get was call more times than there are batches. " LOCATION);
 
-            if (mReqState->mStarted == false)
-                std::terminate();
+            // make sure the request has been started.
+            start();
 
             batch = &mReqState->mBatches_[mReqState->mNextBatchIdx++];
             MC_AWAIT(batch->mBatch->mCorReady);
@@ -98,14 +95,8 @@ namespace secJoin
             MC_END();
         }
 
-        macoro::task<> start() {
-            if (mReqState->mStarted.exchange(true) == false)
-                return mReqState->startReq();
-            else
-            {
-                MC_BEGIN(macoro::task<>);
-                MC_END();
-            }
+        void start() {
+            return mReqState->startReq();
         }
 
         u64 batchCount() const { return  initialized() ? mReqState->batchCount() : 0; }

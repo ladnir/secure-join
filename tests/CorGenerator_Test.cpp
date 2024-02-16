@@ -32,8 +32,8 @@ void CorGenerator_Ot_Test(const oc::CLP&cmd)
 
         auto sReq = send.sendOtRequest(n);
         auto rReq = recv.recvOtRequest(n);
-        auto p0 = sReq.start() | macoro::make_eager();
-        auto p1 = rReq.start() | macoro::make_eager();
+        auto p0 = send.start() | macoro::make_eager();
+        auto p1 = recv.start() | macoro::make_eager();
 
 
         u64 s = 0;
@@ -54,6 +54,8 @@ void CorGenerator_Ot_Test(const oc::CLP&cmd)
             {
                 if (sot.mMsg[i][rot.mChoice[i]] != rot.mMsg[i])
                     throw RTE_LOC;
+                //if (i < 100)
+                //    std::cout << " "<< rot.mChoice[i] << std::endl;
             }
 
             s += sot.size();
@@ -111,8 +113,8 @@ void CorGenerator_BinOle_Test(const oc::CLP&cmd)
 
         auto sReq = send.binOleRequest(n);
         auto rReq = recv.binOleRequest(n);
-        auto p0 = sReq.start() | macoro::make_eager();
-        auto p1 = rReq.start() | macoro::make_eager();
+        auto p0 = send.start() | macoro::make_eager();
+        auto p1 = recv.start() | macoro::make_eager();
 
 
         u64 s = 0;
@@ -157,7 +159,6 @@ void CorGenerator_mixed_Test(const oc::CLP&cmd)
         PRNG prng(oc::ZeroBlock);
         auto sock = coproto::LocalAsyncSocket::makePair();
         CorGenerator  ole[2];
-        CorGenerator  recv;
 
         ole[0].init(std::move(sock[0]), prng, 0, 1<<18, mock);
         ole[1].init(std::move(sock[1]), prng, 1, 1<<18, mock);
@@ -179,56 +180,21 @@ void CorGenerator_mixed_Test(const oc::CLP&cmd)
             otSends[0].push_back(ole[0].sendOtRequest(reqSize));
             otRecvs[1].push_back(ole[1].recvOtRequest(reqSize));
         }
-        //auto p0 = sReq.start() | macoro::make_eager();
-        //auto p1 = rReq.start() | macoro::make_eager();
+        auto p0 = ole[0].start() | macoro::make_eager();
+        auto p1 = ole[1].start() | macoro::make_eager();
 
 
         u64 s = 0;
         u64 rIdx = 0;
         while (s < n)
         {
-            for (u64 p = 0; p < 2; ++p)
-            {
-
-                OtSend sot;
-                OtRecv rot;
-
-                auto p0 = otRecvs[p ^ 0][rIdx].start() | macoro::make_eager();
-                auto p1 = otSends[p ^ 1][rIdx].start() | macoro::make_eager();
-
-                for (u64 j = 0; j < reqSize; )
-                {
-                    auto r = macoro::sync_wait(macoro::when_all_ready(
-                        otRecvs[p ^ 0][rIdx].get(rot),
-                        otSends[p ^ 1][rIdx].get(sot)
-                    ));
-
-                    std::get<0>(r).result();
-                    std::get<1>(r).result();
-
-                    for (u64 i = 0; i < sot.mMsg.size(); ++i)
-                    {
-                        if (sot.mMsg[i][rot.mChoice[i]] != rot.mMsg[i])
-                            throw RTE_LOC;
-                    }
-
-                    j += sot.size();
-                }
-
-                auto r = macoro::sync_wait(macoro::when_all_ready(
-                    std::move(p0), std::move(p1)
-                ));
-
-                std::get<0>(r).result();
-                std::get<1>(r).result();
-            }
 
             {
                 BinOle sot;
                 BinOle rot;
 
-                auto p0 = oles[0][rIdx].start() | macoro::make_eager();
-                auto p1 = oles[1][rIdx].start() | macoro::make_eager();
+                //auto p0 = oles[0][rIdx].start() | macoro::make_eager();
+                //auto p1 = oles[1][rIdx].start() | macoro::make_eager();
                 for (u64 j = 0; j < reqSize;)
                 {
                     auto r = macoro::sync_wait(macoro::when_all_ready(
@@ -248,17 +214,63 @@ void CorGenerator_mixed_Test(const oc::CLP&cmd)
                     j += sot.size();
                 }
 
-                auto r = macoro::sync_wait(macoro::when_all_ready(
-                    std::move(p0), std::move(p1)
-                ));
+                //auto r = macoro::sync_wait(macoro::when_all_ready(
+                //    std::move(p0), std::move(p1)
+                //));
 
-                std::get<0>(r).result();
-                std::get<1>(r).result();
+                //std::get<0>(r).result();
+                //std::get<1>(r).result();
+            }
+
+            for (u64 p = 0; p < 2; ++p)
+            {
+
+                OtSend sot;
+                OtRecv rot;
+
+                //auto p0 = otRecvs[p ^ 0][rIdx].start() | macoro::make_eager();
+                //auto p1 = otSends[p ^ 1][rIdx].start() | macoro::make_eager();
+
+                for (u64 j = 0; j < reqSize; )
+                {
+                    rot.mChoice = {};
+                    auto r = macoro::sync_wait(macoro::when_all_ready(
+                        otRecvs[p ^ 0][rIdx].get(rot),
+                        otSends[p ^ 1][rIdx].get(sot)
+                    ));
+
+                    std::get<0>(r).result();
+                    std::get<1>(r).result();
+                    //std::cout << "--------------" << std::endl;
+                    u64 failed = 0;
+                    for (u64 i = 0; i < sot.mMsg.size(); ++i)
+                    {
+                        if (sot.mMsg[i][rot.mChoice[i]] != rot.mMsg[i])
+                        {
+                            std::cout << i << " " << sot.mMsg[i][0] << " " << sot.mMsg[i][1] << " != " << rot.mMsg[i] << " @ " << rot.mChoice[i] << std::endl;
+
+                            ++failed;
+                            if (failed > 40)
+                                break;
+                        }
+                    }
+                    if(failed)
+                        throw RTE_LOC;
+
+                    j += sot.size();
+                }
+
             }
             ++rIdx;
             s += reqSize;
         }
 
+        auto r = macoro::sync_wait(macoro::when_all_ready(
+            std::move(p0), std::move(p1)
+        ));
+
+        std::get<0>(r).result();
+        std::get<1>(r).result();
         //auto r = macoro::sync_wait(macoro::when_all_ready(
         //    std::move(p0), std::move(p1)
         //));

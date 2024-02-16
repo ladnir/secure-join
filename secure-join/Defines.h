@@ -6,6 +6,7 @@
 #include <sstream>
 #include <iomanip>
 #include "Paillier/Defines.h"
+#include "macoro/result.h"
 
 #ifndef SECJOIN_ENABLE_LOGGING
 #define SECJOIN_ENABLE_LOGGING false
@@ -56,6 +57,17 @@ namespace secJoin
         return hex(span<const u8>(d, s));
     }
 
+    template<typename T>
+    std::string whatError(macoro::result<T>& r)
+    {
+        try {
+            std::rethrow_exception(r.error());
+        }
+        catch (std::exception& e)
+        {
+            return e.what();
+        }
+    }
 
 
 }

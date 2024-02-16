@@ -15,18 +15,15 @@ namespace secJoin
     }
 
 
-    // A.composeSwap(B) computes the permutation AoB
+    // A.compose(B) computes the permutation A o B
     Perm Perm::compose(const Perm& rhs) const
     {
         return apply(rhs.mPi);
     }
 
-    // A.composeSwap(B) computes the permutation BoA
+    // A.composeSwap(B) computes the permutation B o A
     Perm Perm::composeSwap(const Perm& rhs) const
     {
-        //std::vector<i64> res = applyInv(rhs.mPi);
-        //return Perm(res);
-
         return rhs.apply(mPi);
     }
 

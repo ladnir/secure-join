@@ -34,6 +34,12 @@ namespace secJoin
         }
     }
 
+    inline std::ostream& operator<<(std::ostream& o, CorType c)
+    {
+        o << toString(c);
+        return o;
+    }
+
     struct Cor {
         Cor(CorType t)
             :mType(t)

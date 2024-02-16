@@ -16,128 +16,6 @@ using namespace secJoin;
 using PRNG = PRNG;
 namespace secJoin_Tests
 {
-    //void generateBase_test()
-    //{
-
-    //    RequiredBase b0, b1;
-
-    //    b0.mNumSend = 4;
-    //    b1.mNumSend = 2;
-    //    b0.mRecvChoiceBits.resize(b1.mNumSend);
-    //    b1.mRecvChoiceBits.resize(b0.mNumSend);
-
-    //    PRNG prng(oc::ZeroBlock);
-    //    b0.mRecvChoiceBits.randomize(prng);
-    //    b1.mRecvChoiceBits.randomize(prng);
-
-    //    auto sockets = LocalAsyncSocket::makePair();
-
-    //    std::vector<block> recvMsg0(b0.mRecvChoiceBits.size());
-    //    std::vector<block> recvMsg1(b1.mRecvChoiceBits.size());
-    //    std::vector<std::array<block, 2>> sendMsg0(b0.mRecvChoiceBits.size());
-    //    std::vector<std::array<block, 2>> sendMsg1(b1.mRecvChoiceBits.size());
-
-    //    auto p0 = generateBase(b0, 0, prng, sockets[0], recvMsg0, sendMsg1);
-    //    auto p1 = generateBase(b1, 1, prng, sockets[1], recvMsg1, sendMsg0);
-    //    eval(p0, p1);
-
-    //    for (u64 i = 0; i < recvMsg0.size(); i++)
-    //    {
-    //        if (neq(recvMsg0[i], sendMsg0[i][b0.mRecvChoiceBits[i]]))
-    //        {
-    //            std::cout << i << " 0 " << recvMsg0[i] << " " << b0.mRecvChoiceBits[i] << " (" << sendMsg0[i][0] << ' ' << sendMsg0[i][1] << ")" << std::endl;
-    //            throw RTE_LOC;
-    //        }
-    //        if (eq(sendMsg0[i][0], sendMsg0[i][1]))
-    //        {
-    //            std::cout << i << " 0 (" << sendMsg0[i][0] << ' ' << sendMsg0[i][1] << ")" << std::endl;
-    //            throw RTE_LOC;
-    //        }
-    //    }
-    //    for (u64 i = 0; i < recvMsg1.size(); i++)
-    //    {
-    //        if (neq(recvMsg1[i], sendMsg1[i][b1.mRecvChoiceBits[i]]))
-    //        {
-    //            std::cout << i << " 1 " << recvMsg1[i] << " " << b1.mRecvChoiceBits[i] << " (" << sendMsg1[i][0] << ' ' << sendMsg1[i][1] << ")" << std::endl;
-    //            throw RTE_LOC;
-    //        }
-    //        if (eq(sendMsg1[i][0], sendMsg1[i][1]))
-    //        {
-    //            std::cout << i << " 1 (" << sendMsg1[i][0] << ' ' << sendMsg1[i][1] << ")" << std::endl;
-    //            throw RTE_LOC;
-    //        }
-    //    }
-    //}
-
-
-    //void SilentTripleGen_test()
-    //{
-
-    //    u64 n = 4864;
-    //    u64 bs = 1000000;
-    //    u64 nt = 1;
-    //    //Mode mode = Mode::Dual;
-
-    //    SilentTripleGen t0, t1;
-    //    auto sockets = LocalAsyncSocket::makePair();
-
-
-    //    for (u64 t = 0; t < 3; ++t)
-    //    {
-    //        t0.init(n, bs, nt, Mode::Receiver, oc::ZeroBlock);
-    //        t1.init(n, bs, nt, Mode::Sender, oc::OneBlock);
-
-    //        auto b0 = t0.requiredBaseOts();
-    //        auto b1 = t1.requiredBaseOts();
-
-    //        if (b0.mNumSend != b1.mRecvChoiceBits.size() ||
-    //            b1.mNumSend != b0.mRecvChoiceBits.size())
-    //            throw RTE_LOC;
-
-    //        std::vector<block> m0(b0.mRecvChoiceBits.size()), m1(b1.mRecvChoiceBits.size());
-    //        std::vector<std::array<block, 2>> mm0(b0.mNumSend), mm1(b1.mNumSend);
-
-    //        PRNG prng(oc::CCBlock);
-    //        prng.get(mm0.data(), mm0.size());
-    //        prng.get(mm1.data(), mm1.size());
-    //        for (u64 i = 0; i < mm0.size(); ++i)
-    //            m1[i] = mm0[i][b1.mRecvChoiceBits[i]];
-    //        for (u64 i = 0; i < mm1.size(); ++i)
-    //            m0[i] = mm1[i][b0.mRecvChoiceBits[i]];
-    //        t0.setBaseOts(m0, mm0);
-    //        t1.setBaseOts(m1, mm1);
-
-
-    //        auto p0 = t0.expand(sockets[0]);
-    //        auto p1 = t1.expand(sockets[1]);
-    //        eval(p0, p1);
-
-    //        for (u64 i = 0; i < static_cast<u64>(t0.mMult.size()); ++i)
-    //        {
-    //            if (neq((t0.mMult[i] & t1.mMult[i]) ^ t0.mAdd[i], t1.mAdd[i]))
-    //                throw std::runtime_error("");
-
-    //            //if (neq((t1.mA[i] & t0.mC[i]) ^ t1.mB[i], t0.mD[i]))
-    //            //    throw std::runtime_error("");
-    //        }
-    //    }
-    //    //void validate(coproto::Socket & chl);
-
-
-    //    //if (mO.mDebug)
-    //    //{
-    //    //    block b;
-    //    //    oc::RandomOracle ro(16);
-    //    //    ro.Update(t0.mA.data(), t0.mA.size());
-    //    //    ro.Update(t0.mB.data(), t0.mB.size());
-    //    //    ro.Update(t0.mC.data(), t0.mC.size());
-    //    //    ro.Update(t0.mD.data(), t0.mD.size());
-    //    //    ro.Final(b);
-
-    //    //    oc::lout << "pp " << 0 << " " << b << std::endl;
-    //    //}
-    //}
-
 
     void makeTriple(span<block> a, span<block> b, span<block> c, span<block> d, PRNG& prng)
     {
@@ -154,9 +32,6 @@ namespace secJoin_Tests
 
     void Gmw_half_test(const oc::CLP& cmd)
     {
-        //oc::IOService ios;
-        //coproto::Socket sockets[0] = oc::Session(ios, "localhost:1212", oc::SessionMode::Server).addChannel();
-        //coproto::Socket sockets[1] = oc::Session(ios, "localhost:1212", oc::SessionMode::Client).addChannel();
 
         Gmw cmp0, cmp1;
         block seed = oc::toBlock(cmd.getOr<u64>("s", 0));
@@ -166,15 +41,20 @@ namespace secJoin_Tests
         u64 bc = cmd.getOr("bc", 16);
         //        u64 eqSize = cmd.getOr("e", n / 2);
 
+        CorGenerator gen0, gen1;
+        gen0.init(oc::Socket{}, prng, 0, 1 << 18, cmd.getOr("mock", 1));
+        gen1.init(oc::Socket{}, prng, 1, 1 << 18, cmd.getOr("mock", 1));
 
         std::vector<block> input0(n), input1(n), z0(n), z1(n);
 
         prng.get(input0.data(), input0.size());
         prng.get(input1.data(), input1.size());
 
-        auto cir = isZeroCircuit(bc);
-        cmp0.init(n * 128, cir);
-        cmp1.init(n * 128, cir);
+        //auto cir = isZeroCircuit(bc);
+        //cmp0.init(n * 128, cir, gen0);
+        //cmp1.init(n * 128, cir, gen1);
+        cmp0.mN128 = n;
+        cmp1.mN128 = n;
 
         std::vector<block> a0(n), b0(n), c0(n), d0(n);
         makeTriple(a0, b0, c0, d0, prng);
@@ -219,7 +99,6 @@ namespace secJoin_Tests
         PRNG prng(seed);
 
         u64 n = cmd.getOr("n", 100ull);
-        u64 bc = cmd.getOr("bc", 16);
 
 
         std::array<std::vector<block>, 2> x, y;
@@ -237,9 +116,10 @@ namespace secJoin_Tests
             prng.get(y[i].data(), n);
         }
 
-        auto cir = isZeroCircuit(bc);
-        cmp0.init(n * 128, cir);
-        cmp1.init(n * 128, cir);
+        CorGenerator gen0, gen1;
+        cmp0.mN128 = n;
+        cmp1.mN128 = n;
+
 
         std::vector<block> a0(n), b0(n), c0(n), d0(n);
         std::vector<block> a1(n), b1(n), c1(n), d1(n);
@@ -380,7 +260,6 @@ namespace secJoin_Tests
 
     void Gmw_inOut_test(const oc::CLP& cmd)
     {
-
         u64 w = 64;
         u64 n = 100;
         BetaCircuit cir;
@@ -392,11 +271,10 @@ namespace secJoin_Tests
 
         PRNG prng(block(0, 0));
         CorGenerator ole;
-        ole.init(oc::Socket{}, prng, 0, 1<<18, cmd.getOr("mock", 1));
-
+        ole.init(oc::Socket{}, prng, 0, 1 << 18, cmd.getOr("mock", 1));
 
         Gmw gmw;
-        gmw.init(n, cir);
+        gmw.init(n, cir, ole);
 
         Matrix<u8> in(n, oc::divCeil(w, 8));
         Matrix<u8> out(n, oc::divCeil(w, 8));
@@ -409,362 +287,157 @@ namespace secJoin_Tests
             throw RTE_LOC;
     }
 
-    void Gmw_xor_test(const oc::CLP& cmd)
+    void Gmw_test(
+        u64 n,
+        bool mock,
+        oc::BetaCircuit& cir
+    )
     {
-
-        u64 w = 64;
-        u64 n = 100;
-
-        BetaCircuit cir = *oc::BetaLibrary().int_int_bitwiseXor(w, w, w);
-
-        CorGenerator ole;
-        auto socks = coproto::LocalAsyncSocket::makePair();
-        PRNG prng(block(0, 0));
-        ole.init(std::move(socks[0]), prng, 0);
-        Gmw gmw;
-        gmw.init(n, cir);
-
-        Matrix<u8> in0(n, oc::divCeil(w, 8));
-        Matrix<u8> in1(n, oc::divCeil(w, 8));
-        Matrix<u8> out(n, oc::divCeil(w, 8));
-
-        prng.get(in0.data(), in0.size());
-        prng.get(in1.data(), in1.size());
-
-        gmw.setInput(0, in0);
-        gmw.setInput(1, in1);
-        coproto::Socket chl;
-        macoro::sync_wait(gmw.run(ole, chl, prng));
-        gmw.getOutput(0, out);
-
-        for (u64 i = 0; i < out.size(); ++i)
-            if (!((in0(i) ^ in1(i)) == out(i)))
-                throw RTE_LOC;
-    }
-
-
-    void Gmw_and_test(const oc::CLP& cmd)
-    {
-
-        u64 w = 64;
-        u64 n = 100;
 
         auto chls = LocalAsyncSocket::makePair();
 
-
-        BetaCircuit cir = *oc::BetaLibrary().int_int_bitwiseAnd(w, w, w);
         PRNG prng(block(0, 0));
 
         CorGenerator ole0, ole1;
-        ole0.init(chls[0].fork(), prng, 0, 1<<18, cmd.getOr("mock", 1));
-        ole1.init(chls[1].fork(), prng, 1, 1<<18, cmd.getOr("mock", 1));
-
-
-        //macoro::thread_pool tp;
-        //auto ww = tp.make_work();
-        //tp.create_thread();
-        //ole0.init(CorGenerator::Role::Sender, tp, chls[0], prng, 1<<20, 1<<20, 4);
-        //ole1.init(CorGenerator::Role::Receiver, tp, chls[1], prng, 1 << 20, 1 << 20, 4);
+        ole0.init(chls[0].fork(), prng, 0, 1 << 18, mock);
+        ole1.init(chls[1].fork(), prng, 1, 1 << 18, mock);
 
         Gmw gmw0, gmw1;
-        gmw0.init(n, cir);
-        gmw1.init(n, cir);
+        gmw0.init(n, cir, ole0);
+        gmw1.init(n, cir, ole1);
 
         gmw0.mO.mDebug = true;
         gmw1.mO.mDebug = true;
 
-        Matrix<u8> in0(n, oc::divCeil(w, 8));
-        Matrix<u8> in1(n, oc::divCeil(w, 8));
-        Matrix<u8> out0(n, oc::divCeil(w, 8));
-        Matrix<u8> out1(n, oc::divCeil(w, 8));
+        std::vector<Matrix<u8>> in(cir.mInputs.size());
+        std::vector<std::array<Matrix<u8>, 2>> sin(cir.mInputs.size());
 
-        prng.get(in0.data(), in0.size());
-        prng.get(in1.data(), in1.size());
-
-        auto sin0 = share(in0, prng);
-        auto sin1 = share(in1, prng);
-
-        gmw0.setInput(0, sin0[0]);
-        gmw0.setInput(1, sin1[0]);
-        gmw1.setInput(0, sin0[1]);
-        gmw1.setInput(1, sin1[1]);
-
-        auto p0 = gmw0.run(ole0, chls[0], prng);
-        auto p1 = gmw1.run(ole1, chls[1], prng);
-        eval(p0, p1);
-
-        gmw0.getOutput(0, out0);
-        gmw1.getOutput(0, out1);
-
-        for (u64 i = 0; i < out0.size(); ++i)
+        for (u64 i = 0; i < in.size(); ++i)
         {
-            auto exp = in0(i) & in1(i);
-            auto act = out0(i) ^ out1(i);
-
-            if (exp != act)
-                throw RTE_LOC;
-        }
-    }
-
-
-    void Gmw_na_and_test(const oc::CLP& cmd)
-    {
-
-        u64 w = 8;
-        u64 n = 1;
-
-        auto sockets = LocalAsyncSocket::makePair();
-
-
-        BetaCircuit cir;
-
-        BetaBundle a(w);
-        BetaBundle b(w);
-        BetaBundle t0(w);
-        BetaBundle t1(w);
-        BetaBundle c(w);
-        BetaBundle d(w);
-
-        cir.addInputBundle(a);
-        cir.addInputBundle(b);
-        //cir.addTempWireBundle(t0);
-        //cir.addTempWireBundle(t1);
-        cir.addOutputBundle(c);
-        //cir.addOutputBundle(d);
-
-        for (u64 i = 0; i < w; ++i)
-        {
-            cir.addGate(a[i], b[i], oc::GateType::na_And, c[i]);
-            //cir.addCopy(a[i], t0[i]);
-            //cir.addGate(a[i], b[i], oc::GateType::Xor, t1[i]);
-            //cir.addGate(t1[i], z[i], oc::GateType::na_And, d[i]);
+            in[i].resize(n, oc::divCeil(cir.mInputs[i].size(), 8));
+            prng.get(in[i].data(), in[i].size());
+            sin[i] = share(in[i], prng);
+            gmw0.setInput(i, sin[i][0]);
+            gmw1.setInput(i, sin[i][1]);
         }
 
-        PRNG prng(block(0, 0));
-        CorGenerator ole0, ole1;
-        ole0.init(sockets[0].fork(), prng, 0, 1<<18, cmd.getOr("mock", 1));
-        ole1.init(sockets[1].fork(), prng, 1, 1<<18, cmd.getOr("mock", 1));
-
-        Gmw gmw0, gmw1;
-        gmw0.init(n, cir);
-        gmw1.init(n, cir);
-
-        gmw0.mO.mDebug = true;
-        gmw1.mO.mDebug = true;
-
-        Matrix<u8> in0(n, oc::divCeil(w, 8));
-        Matrix<u8> in1(n, oc::divCeil(w, 8));
-        Matrix<u8> out0(n, oc::divCeil(w, 8));
-        Matrix<u8> out1(n, oc::divCeil(w, 8));
-        Matrix<u8> d0(n, oc::divCeil(w, 8));
-        Matrix<u8> d1(n, oc::divCeil(w, 8));
-
-        prng.get(in0.data(), in0.size());
-        prng.get(in1.data(), in1.size());
-
-        auto sin0 = share(in0, prng);
-        auto sin1 = share(in1, prng);
-
-        gmw0.setInput(0, sin0[0]);
-        gmw0.setInput(1, sin1[0]);
-        gmw1.setInput(0, sin0[1]);
-        gmw1.setInput(1, sin1[1]);
-
-
-
-        auto p0 = gmw0.run(ole0, sockets[0], prng);
-        auto p1 = gmw1.run(ole1, sockets[1], prng);
-        eval(p0, p1);
-
-        gmw0.getOutput(0, out0);
-        gmw1.getOutput(0, out1);
-
-
-        oc::RandomOracle ro(16);
-        ro.Update(out0.data(), out0.size());
-        ro.Update(out1.data(), out0.size());
-        block bb;
-        ro.Final(bb);
-        //std::cout << "\n\n\n\nb " << bb << std::endl;
-        //gmw0.getOutput(1, d0);
-        //gmw1.getOutput(1, d1);
-
-        for (u64 i = 0; i < out0.size(); ++i)
+        std::vector<std::array<Matrix<u8>, 2>> sout(cir.mOutputs.size());
+        for (u64 i = 0; i < sout.size(); ++i)
         {
+            sout[i][0].resize(n, oc::divCeil(cir.mOutputs[i].size(), 8));
+            sout[i][1].resize(n, oc::divCeil(cir.mOutputs[i].size(), 8));
+        }
+
+        auto p0 = gmw0.run(chls[0]);
+        auto p1 = gmw1.run(chls[1]);
+        eval(p0, p1, ole0, ole1);
+
+        for (u64 i = 0; i < sout.size(); ++i)
+        {
+            gmw0.getOutput(i, sout[i][0]);
+            gmw1.getOutput(i, sout[i][1]);
+        }
+
+        std::vector<oc::BitVector> vIn(in.size()), vOut(sout.size());
+        for (u64 i = 0; i < n; ++i)
+        {
+            for (u64 j = 0; j < vIn.size(); ++j)
             {
-                auto exp = ~in0(i) & in1(i);
-                auto act = out0(i) ^ out1(i);
-
-                if (exp != act)
-                    throw RTE_LOC;
+                vIn[j].resize(0);
+                vIn[j].append(in[j].data(i), cir.mInputs[j].size());
             }
-            //{
 
-            //    auto z = ~in0(i) & in1(i);
-            //    auto t = in0(i) ^ in1(i);
-            //    auto exp = ~t & z;
-            //    auto act = d0(i) ^ d1(i);
+            for (u64 j = 0; j < vOut.size(); ++j)
+                vOut[j].resize(cir.mOutputs[j].size());
 
-            //    if (exp != act)
-            //        throw RTE_LOC;
-            //}
+            cir.evaluate(vIn, vOut);
+
+            for (u64 j = 0; j < vOut.size(); ++j)
+            {
+
+                oc::BitVector act0(sout[j][0].data(i), vOut[j].size());
+                oc::BitVector act1(sout[j][1].data(i), vOut[j].size());
+                auto act = act0 ^ act1;
+                if (vOut[j] != act)
+                {
+                    std::cout << gateToString(cir.mGates[0].mType) << std::endl;
+                    for (u64 k = 0; k < vIn.size(); ++k)
+                        std::cout << "in"<<k<<" " << vIn[k] << std::endl;
+
+                    std::cout << "exp " << j << " " << vOut[j] << std::endl;;
+                    std::cout << "act " << j << " " << act << std::endl;
+                    throw RTE_LOC;
+                }
+            }
         }
     }
 
-    void Gmw_or_test(const oc::CLP& cmd)
+    void Gmw_gate_test(const oc::CLP& cmd)
     {
 
-        u64 w = 64;
-        u64 n = 100;
+        u64 w = cmd.getOr("w", 8);
+        u64 n = cmd.getOr("n", 441);
+        auto mock = cmd.getOr("mock", 1);
 
-        auto sockets = LocalAsyncSocket::makePair();
-
-        BetaCircuit cir;
-
-        BetaBundle a(w);
-        BetaBundle b(w);
-        BetaBundle c(w);
-
-        cir.addInputBundle(a);
-        cir.addInputBundle(b);
-        cir.addOutputBundle(c);
-
-        for (u64 i = 0; i < w; ++i)
-            cir.addGate(a[i], b[i], oc::GateType::Or, c[i]);
-
-
-        PRNG prng(block(0, 0));
-        CorGenerator ole0, ole1;
-        ole0.init(sockets[0].fork(), prng, 0, 1<<18, cmd.getOr("mock", 1));
-        ole1.init(sockets[1].fork(), prng, 1, 1<<18, cmd.getOr("mock", 1));
-        Gmw gmw0, gmw1;
-        gmw0.init(n, cir);
-        gmw1.init(n, cir);
-
-        gmw0.mO.mDebug = true;
-        gmw1.mO.mDebug = true;
-
-        Matrix<u8> in0(n, oc::divCeil(w, 8));
-        Matrix<u8> in1(n, oc::divCeil(w, 8));
-        Matrix<u8> out0(n, oc::divCeil(w, 8));
-        Matrix<u8> out1(n, oc::divCeil(w, 8));
-
-        prng.get(in0.data(), in0.size());
-        prng.get(in1.data(), in1.size());
-
-        auto sin0 = share(in0, prng);
-        auto sin1 = share(in1, prng);
-
-        gmw0.setInput(0, sin0[0]);
-        gmw0.setInput(1, sin1[0]);
-        gmw1.setInput(0, sin0[1]);
-        gmw1.setInput(1, sin1[1]);
-
-        auto p0 = gmw0.run(ole0, sockets[0], prng);
-        auto p1 = gmw1.run(ole1, sockets[1], prng);
-        eval(p0, p1);
-
-        gmw0.getOutput(0, out0);
-        gmw1.getOutput(0, out1);
-
-        for (u64 i = 0; i < out0.size(); ++i)
+        for (auto gt : {
+            oc::GateType::And,
+            oc::GateType::na_And,
+            oc::GateType::nb_And,
+            oc::GateType::Or,
+            //oc::GateType::Nand,
+            oc::GateType::Nor,
+            oc::GateType::Xor,
+            oc::GateType::Nxor
+            })
         {
-            auto exp = in0(i) | in1(i);
-            auto act = out0(i) ^ out1(i);
+            BetaCircuit cir;
+            BetaBundle a(w);
+            BetaBundle b(w);
+            BetaBundle c(w);
 
-            if (exp != act)
-                throw RTE_LOC;
+            cir.addInputBundle(a);
+            cir.addInputBundle(b);
+            cir.addOutputBundle(c);
+
+            for (u64 i = 0; i < w; ++i)
+            {
+                cir.addGate(a[i], b[i], gt, c[i]);
+                //cir << i << " " << a[i] << " " << b[i] << " " << c[i] << " " << oc::gateToString(gt) << "\n";
+            }
+
+            Gmw_test(n, mock, cir);
         }
     }
 
 
     void Gmw_xor_and_test(const oc::CLP& cmd)
     {
-
-        u64 w = 8;
-        u64 n = 1;
+        u64 w = cmd.getOr("w", 33);
+        u64 n = cmd.getOr("n", 233);
+        auto mock = cmd.getOr("mock", 1);
 
         auto sockets = LocalAsyncSocket::makePair();
 
         BetaCircuit cir;
-
         BetaBundle a(w);
         BetaBundle b(w);
         BetaBundle c(w);
         BetaBundle t0(w);
-        BetaBundle t1(w);
         BetaBundle z(w);
 
         cir.addInputBundle(a);
         cir.addInputBundle(b);
         cir.addInputBundle(c);
         cir.addTempWireBundle(t0);
-        cir.addTempWireBundle(t1);
         cir.addOutputBundle(z);
 
         for (u64 i = 0; i < w; ++i)
         {
             cir.addGate(a[i], c[i], oc::GateType::Xor, t0[i]);
-            //cir.addCopy(t0[i], t1[i]);
             cir.addGate(t0[i], b[i], oc::GateType::And, z[i]);
         }
+        Gmw_test(n, mock, cir);
 
-        Gmw gmw0, gmw1;
-        gmw0.mLevelize = BetaCircuit::LevelizeType::Reorder;
-        gmw1.mLevelize = BetaCircuit::LevelizeType::Reorder;
-
-        PRNG prng(block(0, 0));
-        CorGenerator ole0, ole1;
-        ole0.init(sockets[0].fork(), prng, 0, 1<<18, cmd.getOr("mock", 1));
-        ole1.init(sockets[1].fork(), prng, 1, 1<<18, cmd.getOr("mock", 1));
-        gmw0.init(n, cir);
-        gmw1.init(n, cir);
-        gmw0.mO.mDebug = true;
-        gmw1.mO.mDebug = true;
-
-        Matrix<u8> in0(n, oc::divCeil(w, 8));
-        Matrix<u8> in1(n, oc::divCeil(w, 8));
-        Matrix<u8> in2(n, oc::divCeil(w, 8));
-        Matrix<u8> out0(n, oc::divCeil(w, 8));
-        Matrix<u8> out1(n, oc::divCeil(w, 8));
-        Matrix<u8> d0(n, oc::divCeil(w, 8));
-        Matrix<u8> d1(n, oc::divCeil(w, 8));
-
-        prng.get(in0.data(), in0.size());
-        prng.get(in1.data(), in1.size());
-        prng.get(in2.data(), in2.size());
-
-        auto sin0 = share(in0, prng);
-        auto sin1 = share(in1, prng);
-        auto sin2 = share(in2, prng);
-
-        gmw0.setInput(0, sin0[0]);
-        gmw0.setInput(1, sin1[0]);
-        gmw0.setInput(2, sin2[0]);
-
-        gmw1.setInput(0, sin0[1]);
-        gmw1.setInput(1, sin1[1]);
-        gmw1.setInput(2, sin2[1]);
-
-
-
-        auto p0 = gmw0.run(ole0, sockets[0], prng);
-        auto p1 = gmw1.run(ole1, sockets[1], prng);
-        eval(p0, p1);
-
-        gmw0.getOutput(0, out0);
-        gmw1.getOutput(0, out1);
-
-        for (u64 i = 0; i < out0.size(); ++i)
-        {
-            {
-                auto exp = (in0(i) ^ in2(i)) & in1(i);
-                auto act = out0(i) ^ out1(i);
-
-                if (exp != act)
-                    throw RTE_LOC;
-            }
-        }
     }
 
     void Gmw_aa_na_and_test(const oc::CLP& cmd)
@@ -772,6 +445,7 @@ namespace secJoin_Tests
 
         u64 w = cmd.getOr("w", 40);
         u64 n = cmd.getOr("n", 128);
+        auto mock = cmd.getOr("mock", 1);
 
         auto sockets = LocalAsyncSocket::makePair();
 
@@ -796,72 +470,7 @@ namespace secJoin_Tests
             cir.addGate(t0[i], b[i], oc::GateType::na_And, z[i]);
         }
 
-        Gmw gmw0, gmw1;
-        gmw0.mLevelize = BetaCircuit::LevelizeType::NoReorder;
-        gmw1.mLevelize = BetaCircuit::LevelizeType::NoReorder;
-
-        PRNG prng(block(0, 0));
-        CorGenerator ole0, ole1;
-        ole0.init(sockets[0].fork(), prng, 0, 1<<18, cmd.getOr("mock", 1));
-        ole1.init(sockets[1].fork(), prng, 1, 1<<18, cmd.getOr("mock", 1));
-        gmw0.init(n, cir);
-        gmw1.init(n, cir);
-        gmw0.mO.mDebug = true;
-        gmw1.mO.mDebug = true;
-        gmw0.mO.mDebug = true;
-        gmw1.mO.mDebug = true;
-
-        Matrix<u8> in0(n, oc::divCeil(w, 8));
-        Matrix<u8> in1(n, oc::divCeil(w, 8));
-        Matrix<u8> out0(n, oc::divCeil(w, 8));
-        Matrix<u8> out1(n, oc::divCeil(w, 8));
-
-        prng.get(in0.data(), in0.size());
-        prng.get(in1.data(), in1.size());
-
-        u8 mask = ~0;
-        if (w & 7)
-        {
-            mask = (1 << (w & 7)) - 1;
-            for (u64 i = 0; i < n; ++i)
-            {
-                in0(i, in0.cols() - 1) &= mask;
-                in1(i, in1.cols() - 1) &= mask;
-            }
-        }
-
-        auto sin0 = share(in0, prng);
-        auto sin1 = share(in1, prng);
-
-        gmw0.setInput(0, sin0[0]);
-        gmw0.setInput(1, sin1[0]);
-
-        gmw1.setInput(0, sin0[1]);
-        gmw1.setInput(1, sin1[1]);
-
-        auto p0 = gmw0.run(ole0, sockets[0], prng);
-        auto p1 = gmw1.run(ole1, sockets[1], prng);
-        eval(p0, p1);
-
-        gmw0.getOutput(0, out0);
-        gmw1.getOutput(0, out1);
-
-
-        for (u64 i = 0; i < n; ++i)
-        {
-            for (u64 j = 0; j < in0.cols(); ++j)
-            {
-                u8 m = j == in0.cols() - 1 ? mask : ~u8(0);
-                auto exp = (~in0(i, j) & m) & in1(i, j);
-                auto act = out0(i, j) ^ out1(i, j);
-
-                if (exp != act)
-                {
-                    std::cout << "exp: " << exp << " act: " << act << std::endl;
-                    throw RTE_LOC;
-                }
-            }
-        }
+        Gmw_test(n, mock, cir);
     }
 
 
@@ -869,76 +478,14 @@ namespace secJoin_Tests
     {
         oc::BetaLibrary lib;
 
-        u64 bitCount = 31;
-        auto cir = *lib.uint_uint_add(bitCount, bitCount, bitCount, oc::BetaLibrary::Optimized::Depth);
-        cir.levelByAndDepth();
-        //auto cir = *lib.int_int_add(64, 64, 64);
+        u64 n = 133;
+        u64 w = 31;
+        auto mock = cmd.getOr("mock", 1);
 
-        auto sockets = LocalAsyncSocket::makePair();
-
-        Gmw gmw0, gmw1;
-        block seed = oc::toBlock(cmd.getOr<u64>("s", 0));
-        PRNG prng(seed);
-
-        u64 n = 77;
-
-        std::vector<u32> in0(n), in1(n);
-        std::array<Matrix<u32>, 2> sout;
-        sout[0].resize(n, 1);
-        sout[1].resize(n, 1);
-
-        prng.get(in0.data(), n);
-        prng.get(in1.data(), n);
-        auto sin0_ = xorShare(in0, prng);
-        auto sin1_ = xorShare(in1, prng);
-        std::array<oc::MatrixView<u32>, 2> sin0{ {
-            oc::MatrixView<u32>(sin0_[0].data(), sin0_[0].size(), 1),
-            oc::MatrixView<u32>(sin0_[1].data(), sin0_[0].size(), 1)
-        } };
-        std::array<oc::MatrixView<u32>, 2> sin1{ {
-            oc::MatrixView<u32>(sin1_[0].data(), sin1_[0].size(), 1),
-            oc::MatrixView<u32>(sin1_[1].data(), sin1_[0].size(), 1)
-        } };
-
-        CorGenerator ole0, ole1;
-        ole0.init(sockets[0].fork(), prng, 0, 1<<18, cmd.getOr("mock", 1));
-        ole1.init(sockets[1].fork(), prng, 1, 1<<18, cmd.getOr("mock", 1));
-
-        gmw0.init(n, cir);
-        gmw1.init(n, cir);
-        gmw0.mO.mDebug = true;
-        gmw1.mO.mDebug = true;
-
-        gmw0.setInput(0, sin0[0]);
-        gmw0.setInput(1, sin1[0]);
-        gmw1.setInput(0, sin0[1]);
-        gmw1.setInput(1, sin1[1]);
-
-        auto p0 = gmw0.run(ole0, sockets[0], prng);
-        auto p1 = gmw1.run(ole1, sockets[1], prng);
-        eval(p0, p1);
-
-        gmw0.getOutput(0, sout[0]);
-        gmw1.getOutput(0, sout[1]);
-
-        //out = reconstruct<u32>(sout);
-
-        for (u64 i = 0; i < n; ++i)
-        {
-            auto exp = (in0[i] + in1[i]) & ((1ull << bitCount) - 1);
-            auto act = sout[0](i)^sout[1](i);
-            if (act != exp)
-            {
-                std::cout << "i   " << i << std::endl;
-                std::cout << "exp " << exp  << " = "
-                    << (in0[i] & ((1ull << bitCount) - 1)) << " + " 
-                    << (in1[i] & ((1ull << bitCount) - 1)) << " mod 2^" << bitCount << std::endl;
-                std::cout << "act " << act << std::endl;
-                throw RTE_LOC;
-            }
-        }
-
+        auto cir = *lib.uint_uint_add(w, w, w, oc::BetaLibrary::Optimized::Depth);
+        Gmw_test(n, mock, cir);
     }
+
     void Gmw_noLevelize_test(const oc::CLP& cmd)
     {
         oc::BetaLibrary lib;
@@ -968,11 +515,11 @@ namespace secJoin_Tests
 
 
         CorGenerator ole0, ole1;
-        ole0.init(sockets[0].fork(), prng, 0, 1<<18, cmd.getOr("mock", 1));
-        ole1.init(sockets[1].fork(), prng, 1, 1<<18, cmd.getOr("mock", 1));
+        ole0.init(sockets[0].fork(), prng, 0, 1 << 18, cmd.getOr("mock", 1));
+        ole1.init(sockets[1].fork(), prng, 1, 1 << 18, cmd.getOr("mock", 1));
 
-        gmw0.init(n, cir);
-        gmw1.init(n, cir);
+        gmw0.init(n, cir, ole0);
+        gmw1.init(n, cir, ole1);
         gmw0.mO.mDebug = true;
         gmw1.mO.mDebug = true;
 
@@ -982,9 +529,9 @@ namespace secJoin_Tests
         gmw1.setInput(0, sin0[1]);
         gmw1.setInput(1, sin1[1]);
 
-        auto p0 = gmw0.run(ole0, sockets[0], prng);
-        auto p1 = gmw1.run(ole1, sockets[1], prng);
-        eval(p0, p1);
+        auto p0 = gmw0.run(sockets[0]);
+        auto p1 = gmw1.run(sockets[1]);
+        eval(p0, p1, ole0, ole1);
 
         gmw0.getOutput(0, sout[0]);
         gmw1.getOutput(0, sout[1]);

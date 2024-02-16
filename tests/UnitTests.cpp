@@ -9,6 +9,7 @@
 
 #include <functional>
 
+#include "PermCor_Test.h"
 #include "AltModPerm_Test.h"
 #include "PaillierPerm_Test.h"
 #include "ComposedPerm_Test.h"
@@ -32,51 +33,41 @@ namespace secJoin_Tests
             t.add("CorGenerator_BinOle_Test                      ", CorGenerator_BinOle_Test);
             t.add("CorGenerator_mixed_Test                       ", CorGenerator_mixed_Test);
             
-            //t.add("Generator_BinOle_Test                         ", Generator_BinOle_Test);
-            //t.add("Generator_Ot_Test                             ", Generator_Ot_Test);
-            //t.add("Generator_ArithTriple_Test                    ", Generator_ArithTriple_Test);
-
             t.add("Gmw_half_test                                 ", Gmw_half_test);
             t.add("Gmw_basic_test                                ", Gmw_basic_test);
             t.add("Gmw_inOut_test                                ", Gmw_inOut_test);
-            t.add("Gmw_xor_test                                  ", Gmw_xor_test);
-            t.add("Gmw_and_test                                  ", Gmw_and_test);
-            t.add("Gmw_na_and_test                               ", Gmw_na_and_test);
-            t.add("Gmw_or_test                                   ", Gmw_or_test);
+            t.add("Gmw_gate_test                                 ", Gmw_gate_test);
             t.add("Gmw_xor_and_test                              ", Gmw_xor_and_test);
             t.add("Gmw_aa_na_and_test                            ", Gmw_aa_na_and_test);
             t.add("Gmw_add_test                                  ", Gmw_add_test);
             t.add("Gmw_noLevelize_test                           ", Gmw_noLevelize_test);
 
-            // t.add("PaillierPerm_basic_test                       ", PaillierPerm_basic_test);
-            t.add("AltModPrf_mod3BitDecompostion_test              ", AltModPrf_mod3BitDecompostion_test);
+            t.add("AltModPrf_mod3BitDecompostion_test            ", AltModPrf_mod3BitDecompostion_test);
 
-
-            t.add("AltModPrf_AMult_test                            ", AltModPrf_AMult_test);
-            t.add("AltModPrf_BMult_test                            ", AltModPrf_BMult_test);
+            t.add("AltModPrf_AMult_test                          ", AltModPrf_AMult_test);
+            t.add("AltModPrf_BMult_test                          ", AltModPrf_BMult_test);
             
-            t.add("AltModPrf_sampleMod3_test                       ", AltModPrf_sampleMod3_test);
-            t.add("AltModPrf_mod3_test                             ", AltModPrf_mod3_test);
-            t.add("AltModPrf_mod2_test                             ", AltModPrf_mod2_test);
-            t.add("AltModPrf_plain_test                            ", AltModPrf_plain_test);
-            t.add("AltModPrf_proto_test                            ", AltModPrf_proto_test);
-
-            t.add("AltModPerm_setup_test                           ", AltModPerm_setup_test);
-            t.add("AltModPerm_apply_test                           ", AltModPerm_apply_test);
-            t.add("AltModPerm_sharedApply_test                     ", AltModPerm_sharedApply_test);
-            t.add("AltModPerm_prepro_test                          ", AltModPerm_prepro_test);
-
-            t.add("LocMC_eval_test                               ", LocMC_eval_test);
+            t.add("AltModPrf_sampleMod3_test                     ", AltModPrf_sampleMod3_test);
+            t.add("AltModPrf_mod3_test                           ", AltModPrf_mod3_test);
+            t.add("AltModPrf_mod2_test                           ", AltModPrf_mod2_test);
+            t.add("AltModPrf_plain_test                          ", AltModPrf_plain_test);
+            t.add("AltModPrf_proto_test                          ", AltModPrf_proto_test);
 
             t.add("plaintext_perm_test                           ", plaintext_perm_test);
+            t.add("PermCor_apply_test                            ", PermCor_apply_test);
+            t.add("PermCor_sharedApply_test                      ", PermCor_sharedApply_test);
+
+            t.add("ComposedPerm_apply_test                       ", ComposedPerm_apply_test);
+            t.add("ComposedPerm_compose_test                     ", ComposedPerm_compose_test);
+            t.add("ComposedPerm_derandomize_test                 ", ComposedPerm_derandomize_test);
+
+            t.add("AltModPerm_setup_test                         ", AltModPerm_setup_test);
+            t.add("AltModComposedPerm_setup_test                 ", AltModComposedPerm_setup_test);
+
+            t.add("LowMC_eval_test                               ", LowMC_eval_test);
             t.add("LowMCPerm_perm_test                           ", LowMCPerm_perm_test);
             t.add("LowMCPerm_secret_shared_input_perm_test       ", LowMCPerm_secret_shared_input_perm_test);
-            t.add("ComposedPerm_basic_test                       ", ComposedPerm_basic_test);
-            t.add("ComposedPerm_shared_test                      ", ComposedPerm_shared_test);
-            t.add("ComposedPerm_prepro_test                      ", ComposedPerm_prepro_test);
-            t.add("AdditivePerm_xor_test                         ", AdditivePerm_xor_test);
-            t.add("AdditivePerm_prepro_test                      ", AdditivePerm_prepro_test);
-
+            
             t.add("RadixSort_aggregateSum_test                   ", RadixSort_aggregateSum_test);
             t.add("RadixSort_oneHot_test                         ", RadixSort_oneHot_test);
             t.add("RadixSort_bitInjection_test                   ", RadixSort_bitInjection_test);

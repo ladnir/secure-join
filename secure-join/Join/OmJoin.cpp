@@ -139,12 +139,12 @@ namespace secJoin
         {
             memcpy(sKeys.data(i + 1), data.data(i) + keyByteOffset, keyByteSize);
         }
-        bin.init(n, cir);
+        bin.init(n, cir, ole);
 
         bin.setInput(0, sKeys.subMatrix(0, n));
         bin.setInput(1, sKeys.subMatrix(1, n));
 
-        MC_AWAIT(bin.run(ole, sock, prng));
+        MC_AWAIT(bin.run(sock));
 
         out.resize(n, 1);
         bin.getOutput(0, out);
@@ -419,7 +419,7 @@ namespace secJoin
             offset = u64{});
 
         cir = *oc::BetaLibrary{}.int_int_bitwiseAnd(1, 1, 1);
-        gmw.init(data.rows(), cir);
+        gmw.init(data.rows(), cir, ole);
 
         if (data.bitsPerEntry() % 8 != 1)
         {
@@ -438,7 +438,7 @@ namespace secJoin
         offsets.emplace_back(Offset{ 0,1 });
         //MC_AWAIT(print(temp, choice, sock, ole.partyIdx(), "active", offsets));
 
-        MC_AWAIT(gmw.run(ole, sock, prng));
+        MC_AWAIT(gmw.run(sock));
 
         gmw.getOutput(0, temp);
 
@@ -481,6 +481,7 @@ namespace secJoin
         MC_BEGIN(macoro::task<>, this, leftJoinCol, rightJoinCol, selects, &out, &prng, &ole, &sock,
             keys = BinMatrix{},
             sPerm = AdditivePerm{},
+            perm = ComposedPerm{},
             controlBits = BinMatrix{},
             data = BinMatrix{},
             temp = BinMatrix{},
@@ -506,7 +507,7 @@ namespace secJoin
         }
 
         sort.mInsecureMock = mInsecureMockSubroutines;
-        sPerm.mInsecureMock = mInsecureMockSubroutines;
+        //sPerm.mInsecureMock = mInsecureMockSubroutines;
 
 
         // if the forward direction we will permute the keys, a flag, 
@@ -526,9 +527,10 @@ namespace secJoin
             }
         }
 
-        sort.init(ole.partyIdx(), keys.rows(), keys.bitsPerEntry(), bytesPermuted0 + bytesPermuted1);
-        sort.request(ole);
-        prepro = sort.preprocess(sock, prng) |macoro::make_eager();
+        sort.init(ole.partyIdx(), keys.rows(), keys.bitsPerEntry(), ole);
+     
+        sort.preprocess();
+        prepro = sort.genPrePerm(sock, prng) |macoro::make_eager();
 
         // get the stable sorting permutation sPerm
         MC_AWAIT(sort.genPerm(keys, sPerm, sock,prng));
@@ -553,7 +555,10 @@ namespace secJoin
 
         assert(data.bytesPerEntry() == bytesPermuted0);
 
-        MC_AWAIT(sPerm.apply(PermOp::Inverse, data, temp, prng, sock));//, ole
+        throw RTE_LOC; //genPerm(perm, bytesPermuted0 + bytesPermuted1)
+        MC_AWAIT(perm.derandomize(sPerm, sock));
+
+        MC_AWAIT(perm.apply<u8>(PermOp::Inverse, data, temp, sock));
         std::swap(data, temp);
         setTimePoint("applyInv-sort");
         //std::cout << "Perm::apply done " << LOCATION << std::endl;
@@ -613,10 +618,9 @@ namespace secJoin
         temp.reshape(data.bitsPerEntry());
         temp.setZero();
         assert(data.bytesPerEntry() == bytesPermuted1);
-        MC_AWAIT(sPerm.apply(PermOp::Regular, data, temp, prng, sock));//, ole
+        MC_AWAIT(perm.apply<u8>(PermOp::Regular, data, temp, sock));//, ole
         std::swap(data, temp);
         setTimePoint("apply-sort");
-
 
         //std::cout << "Perm::Apply inv done " << LOCATION << std::endl;
 

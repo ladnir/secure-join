@@ -16,9 +16,11 @@ set(SRCS
 
     
     "Perm/Permutation.cpp"
+    "Perm/PermCorrelation.cpp"
     "Perm/ComposedPerm.cpp"
     "Perm/LowMCPerm.cpp"
-    "Perm/AdditivePerm.cpp"
+    
+    "Perm/AltModComposedPerm.cpp"
     "Perm/AltModPerm.cpp"
     
     "Perm/PaillierPerm.cpp"
