@@ -79,12 +79,13 @@ void OmJoin_getControlBits_Test(const oc::CLP& cmd)
     ole0.init(sock[0].fork(), prng, 0, 1 << 18, cmd.getOr("mock", 1));
     ole1.init(sock[1].fork(), prng, 1, 1 << 18, cmd.getOr("mock", 1));
 
-    auto r = macoro::sync_wait(macoro::when_all_ready(
-        OmJoin::getControlBits(kk[0], offset, keyBitCount, sock[0], cc[0], ole0, prng),
-        OmJoin::getControlBits(kk[1], offset, keyBitCount, sock[1], cc[1], ole1, prng)));
+    throw RTE_LOC;
+    //auto r = macoro::sync_wait(macoro::when_all_ready(
+    //    OmJoin::getControlBits(kk[0], offset, keyBitCount, sock[0], cc[0], ole0, prng),
+    //    OmJoin::getControlBits(kk[1], offset, keyBitCount, sock[1], cc[1], ole1, prng)));
 
-    std::get<0>(r).result();
-    std::get<1>(r).result();
+    //std::get<0>(r).result();
+    //std::get<1>(r).result();
 
     auto c = reveal(cc[0], cc[1]);
 
@@ -137,7 +138,9 @@ void OmJoin_concatColumns_Test()
     BinMatrix y;
     u64 offset;
     std::vector<OmJoin::Offset> offsets;
-    OmJoin::concatColumns(t0[0], select, n1, keys, offset, y, 1, offsets);
+
+    throw RTE_LOC;
+    //OmJoin::concatColumns(t0[0], select, n1, keys, offset, y, 1, offsets);
 
     for (u64 i = 0; i < n0; ++i)
     {

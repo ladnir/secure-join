@@ -309,96 +309,72 @@ namespace secJoin
     macoro::task<> AggTree::upstream(
         const BinMatrix& src,
         const BinMatrix& controlBits,
-        const Operator& op,
-        Type type,
         coproto::Socket& comm,
-        CorGenerator& gen,
         PRNG& prng,
         Level& root,
         span<SplitLevel> levels)
     {
-        MC_BEGIN(macoro::task<>, this, &src, &controlBits, &op, type, comm, &gen, &root, levels,&prng,
-            bin = Gmw{},
-            cir = oc::BetaCircuit{},
-            bitsPerEntry = u64{},
-            lvl = u64{},
-            size = u64{}
+        MC_BEGIN(macoro::task<>, this, &src, &controlBits, comm, &root, levels,&prng,
+            lvl = u64{}
         );
         if (src.numEntries() != controlBits.numEntries())
             throw RTE_LOC;
 
-        computeTreeSizes(src.numEntries());
-        bitsPerEntry = src.bitsPerEntry();
-        cir = upstreamCir(bitsPerEntry, type, op);
-
         // load the values of the leafs. Its possible that we need to split
         // these values across two levels of the tree (non-power of 2 input lengths).
-        levels[0].resize(mN16, bitsPerEntry, type);
+        levels[0].resize(mN16, mBitsPerEntry, mType);
         levels[0].setLeafVals(src, controlBits, 0, 0);
 
-        if (mLogfn != mLogn)
+        if (mCompleteTree == false)
         {
             // split the leaf values across two levels of the tree.
-            levels[1].copy(levels[0], mN0, mR, 1ull << mLogfn);
-            levels[0].reshape(mN0);
+            levels[1].copy(levels[0], mR*2, mR, mLevelSizes[1]);
+            levels[0].reshape(mLevelSizes[0]);
         }
         // we start at the preSuf and move up.
-        for (lvl = 0; lvl < mLogn; ++lvl)
+        for (lvl = 0; lvl < mUpGmw.size(); ++lvl)
         {
-            size = (type & Type::Prefix) ? levels[lvl][0].mPreBit.numEntries() : levels[lvl][0].mSufBit.numEntries();
 
             {
-
                 auto& children = levels[lvl];
                 auto& parent = root;
-                if (type & Type::Prefix)
-                {
-                    parent.mPreVal.resize(size, bitsPerEntry, 2 * sizeof(block));
-                    parent.mPreBit.resize(size, 1, 2 * sizeof(block));
-                }
-                if (type & Type::Suffix)
-                {
-                    parent.mSufVal.resize(size, bitsPerEntry, 2 * sizeof(block));
-                    parent.mSufBit.resize(size, 1, 2 * sizeof(block));
-                }
-
-                bin.init(size, cir, gen);
-
                 u64 inIdx = 0, outIdx = 0;
-                if (type & Type::Prefix)
+                if (mType & Type::Prefix)
                 {
-                    bin.mapInput(inIdx++, children[0].mPreVal);
-                    bin.mapInput(inIdx++, children[1].mPreVal);
-                    bin.mapInput(inIdx++, children[0].mPreBit);
-                    bin.mapInput(inIdx++, children[1].mPreBit);
-                    bin.mapOutput(outIdx++, parent.mPreVal);
-                    bin.mapOutput(outIdx++, parent.mPreBit);
+                    parent.mPreVal.resize(mLevelSizes[lvl]/2, mBitsPerEntry, 2 * sizeof(block));
+                    parent.mPreBit.resize(mLevelSizes[lvl]/2, 1, 2 * sizeof(block));
+                    mUpGmw[lvl].mapInput(inIdx++, children[0].mPreVal);
+                    mUpGmw[lvl].mapInput(inIdx++, children[1].mPreVal);
+                    mUpGmw[lvl].mapInput(inIdx++, children[0].mPreBit);
+                    mUpGmw[lvl].mapInput(inIdx++, children[1].mPreBit);
+                    mUpGmw[lvl].mapOutput(outIdx++, parent.mPreVal);
+                    mUpGmw[lvl].mapOutput(outIdx++, parent.mPreBit);
                 }
-                if (type & Type::Suffix)
+                if (mType & Type::Suffix)
                 {
-                    bin.mapInput(inIdx++, children[0].mSufVal);
-                    bin.mapInput(inIdx++, children[1].mSufVal);
-                    bin.mapInput(inIdx++, children[0].mSufBit);
-                    bin.mapInput(inIdx++, children[1].mSufBit);
-                    bin.mapOutput(outIdx++, parent.mSufVal);
-                    bin.mapOutput(outIdx++, parent.mSufBit);
+                    parent.mSufVal.resize(mLevelSizes[lvl] / 2, mBitsPerEntry, 2 * sizeof(block));
+                    parent.mSufBit.resize(mLevelSizes[lvl] / 2, 1, 2 * sizeof(block));
+                    mUpGmw[lvl].mapInput(inIdx++, children[0].mSufVal);
+                    mUpGmw[lvl].mapInput(inIdx++, children[1].mSufVal);
+                    mUpGmw[lvl].mapInput(inIdx++, children[0].mSufBit);
+                    mUpGmw[lvl].mapInput(inIdx++, children[1].mSufBit);
+                    mUpGmw[lvl].mapOutput(outIdx++, parent.mSufVal);
+                    mUpGmw[lvl].mapOutput(outIdx++, parent.mSufBit);
                 }
             }
 
             // eval
-            MC_AWAIT(bin.run(comm));
+            MC_AWAIT(mUpGmw[lvl].run(comm));
+            mUpGmw[lvl] = {};
 
-
-            if (size != 1)
+            if (lvl != mUpGmw.size() - 1)
             {
                 auto& parent = root;
                 auto& splitParent = levels[lvl + 1];
-                auto d = mLogn - lvl - 2;
-                auto s = 1ull << d;
-                splitParent[0].resize(s, bitsPerEntry, type);
-                splitParent[1].resize(s, bitsPerEntry, type);
+                splitParent[0].resize(mLevelSizes[lvl+1] / 2, mBitsPerEntry, mType);
+                splitParent[1].resize(mLevelSizes[lvl+1] / 2, mBitsPerEntry, mType);
 
-                if (type & Type::Prefix)
+                if (mType & Type::Prefix)
                 {
                     perfectUnshuffle(parent.mPreVal, splitParent[0].mPreVal, splitParent[1].mPreVal);
                     perfectUnshuffle(parent.mPreBit, splitParent[0].mPreBit, splitParent[1].mPreBit);
@@ -409,7 +385,7 @@ namespace secJoin
 
                 }
 
-                if (type & Type::Suffix)
+                if (mType & Type::Suffix)
                 {
                     perfectUnshuffle(parent.mSufVal, splitParent[0].mSufVal, splitParent[1].mSufVal);
                     perfectUnshuffle(parent.mSufBit, splitParent[0].mSufBit, splitParent[1].mSufBit);
@@ -420,13 +396,8 @@ namespace secJoin
                 }
 
             }
-            else
-            {
-                assert(lvl == mLogn - 1);
-            }
-
         }
-        levels[0].reshape(mN16);
+
 
 
         MC_END();
@@ -579,48 +550,36 @@ namespace secJoin
     // apply the downstream circuit to each level of the tree.
     macoro::task<> AggTree::downstream(
         const BinMatrix& src,
-
-        const Operator& op,
         Level& root,
         span<SplitLevel> levels,
         SplitLevel& newVals,
-        Type type,
         coproto::Socket& comm,
-        CorGenerator& gen,
         PRNG& prng,
         std::vector<SplitLevel>* debugLevels)
     {
-        MC_BEGIN(macoro::task<>, this, &src, &op, &root, levels, &newVals, type, &comm, &gen, debugLevels, &prng,
-            bitsPerEntry = u64{},
-            nodeCir = oc::BetaCircuit{},
-            bin = Gmw{},
+        MC_BEGIN(macoro::task<>, this, &src, &root, levels, &newVals, &comm, debugLevels, &prng,
             pLvl = u64{},
             cLvl = u64{},
-            size = u64{},
             temp = SplitLevel{}
         );
 
-        bitsPerEntry = src.bitsPerEntry();
 
         if(debugLevels)
             debugLevels->resize(levels.size());
 
-        nodeCir = downstreamCir(bitsPerEntry, op, type);
-
 
         // this will hold the downstream intermediate levels.
-        temp[0].resize(std::max<u64>(mN0, 1ull << mLogfn), bitsPerEntry, type);
-        temp[1].resize(std::max<u64>(mN0, 1ull << mLogfn), bitsPerEntry, type);
+        temp[0].resize(std::max<u64>(mLevelSizes[0], mLevelSizes[1]), mBitsPerEntry, mType);
+        temp[1].resize(std::max<u64>(mLevelSizes[0], mLevelSizes[1]), mBitsPerEntry, mType);
 
 
         // we start at the root and move down. We store intermidate 
         // levels in `temp`. levels is only read from. Once the children 
         // are computed, we combine them and write the result to `root`
-        for (pLvl = mLogn; pLvl != 0; --pLvl)
+        for (pLvl = mDownGmw.size(); pLvl != 0; --pLvl)
         {
             // how many parents are here at this level.
             // For the last level this might not be a power of 2.
-            size = (type & Type::Prefix) ? root.mPreVal.numEntries() : root.mSufVal.numEntries();
             cLvl = pLvl - 1;
 
             {
@@ -629,44 +588,43 @@ namespace secJoin
                 auto& children = levels[cLvl];
 
 
-                bin.init(size, nodeCir, gen);
-
                 u64 inIdx = 0, outIdx = 0;
-                if (type & Type::Prefix)
+                if (mType & Type::Prefix)
                 {
                     // prefix only takes the left child and parent as input
-                    bin.mapInput(inIdx++, children[0].mPreVal);
-                    bin.mapInput(inIdx++, children[0].mPreBit);
-                    bin.mapInput(inIdx++, parent.mPreVal);
+                    mDownGmw[cLvl].mapInput(inIdx++, children[0].mPreVal);
+                    mDownGmw[cLvl].mapInput(inIdx++, children[0].mPreBit);
+                    mDownGmw[cLvl].mapInput(inIdx++, parent.mPreVal);
 
                     // set number of shares we have per wire.
-                    temp[0].mPreVal.reshape(size);
-                    temp[1].mPreVal.reshape(size);
+                    temp[0].mPreVal.reshape(mLevelSizes[cLvl] / 2);
+                    temp[1].mPreVal.reshape(mLevelSizes[cLvl] / 2);
 
                     // left and right child output
-                    bin.mapOutput(outIdx++, temp[0].mPreVal);
-                    bin.mapOutput(outIdx++, temp[1].mPreVal);
+                    mDownGmw[cLvl].mapOutput(outIdx++, temp[0].mPreVal);
+                    mDownGmw[cLvl].mapOutput(outIdx++, temp[1].mPreVal);
                 }
 
-                if (type & Type::Suffix)
+                if (mType & Type::Suffix)
                 {
                     // prefix only takes the right child and parent as input
-                    bin.mapInput(inIdx++, children[1].mSufVal);
-                    bin.mapInput(inIdx++, children[1].mSufBit);
-                    bin.mapInput(inIdx++, parent.mSufVal);
+                    mDownGmw[cLvl].mapInput(inIdx++, children[1].mSufVal);
+                    mDownGmw[cLvl].mapInput(inIdx++, children[1].mSufBit);
+                    mDownGmw[cLvl].mapInput(inIdx++, parent.mSufVal);
 
                     // set number of shares we have per wire.
-                    temp[0].mSufVal.reshape(size);
-                    temp[1].mSufVal.reshape(size);
+                    temp[0].mSufVal.reshape(mLevelSizes[cLvl] / 2);
+                    temp[1].mSufVal.reshape(mLevelSizes[cLvl] / 2);
 
                     // left and right child output
-                    bin.mapOutput(outIdx++, temp[0].mSufVal);
-                    bin.mapOutput(outIdx++, temp[1].mSufVal);
+                    mDownGmw[cLvl].mapOutput(outIdx++, temp[0].mSufVal);
+                    mDownGmw[cLvl].mapOutput(outIdx++, temp[1].mSufVal);
                 }
             }
 
             // eval
-            MC_AWAIT(bin.run(comm));
+            MC_AWAIT(mDownGmw[cLvl].run(comm));
+            mDownGmw[cLvl] = {};
 
             // for unit testing, we want to save these intermediate values.
             if (debugLevels)
@@ -688,9 +646,9 @@ namespace secJoin
                 // where we will store the merged children (ie the next set of parents).
                 auto& nextParent = root;
                 auto& nextChildren = levels[cLvl - 1];
-                if (type & Type::Prefix)
+                if (mType & Type::Prefix)
                 {
-                    nextParent.mPreVal.resize(nextChildren[0].mPreVal.numEntries(), bitsPerEntry, sizeof(block));
+                    nextParent.mPreVal.resize(nextChildren[0].mPreVal.numEntries(), mBitsPerEntry, sizeof(block));
 
                     auto old = temp[0].mPreVal.numEntries();
 
@@ -708,9 +666,9 @@ namespace secJoin
                     temp[1].mPreVal.reshape(old);
                 }
 
-                if (type & Type::Suffix)
+                if (mType & Type::Suffix)
                 {
-                    nextParent.mSufVal.resize(nextChildren[0].mSufVal.numEntries(), bitsPerEntry, sizeof(block));
+                    nextParent.mSufVal.resize(nextChildren[0].mSufVal.numEntries(), mBitsPerEntry, sizeof(block));
 
                     auto old = temp[0].mSufVal.numEntries();
 
@@ -751,14 +709,14 @@ namespace secJoin
                 }
             };
 
-            bool firstPartial = mLogn != mLogfn && cLvl == 1;
-            bool secondPartial = mLogn != mLogfn && cLvl == 0;
-            bool full = mLogn == mLogfn && cLvl == 0;
+            bool firstPartial = mCompleteTree == false && cLvl == 1;
+            bool secondPartial = mCompleteTree == false && cLvl == 0;
+            bool full = mCompleteTree && cLvl == 0;
 
             if (firstPartial)
             {
-                newVals[0].resize(mN16 / 2, bitsPerEntry, type);
-                newVals[1].resize(mN16 / 2, bitsPerEntry, type);
+                newVals[0].resize(mN16 / 2, mBitsPerEntry, mType);
+                newVals[1].resize(mN16 / 2, mBitsPerEntry, mType);
             }
 
             // if we have a partial level, then we need to copy 
@@ -767,31 +725,31 @@ namespace secJoin
             // same for preSuf by shifting the bytes down.
             for (u64 j = 0; j < 2 * firstPartial; ++j)
             {
-                if (type & Type::Prefix)
+                if (mType & Type::Prefix)
                 {
                     // shift the preSuf values down.
-                    copyBytes(temp[j].mPreVal, newVals[j].mPreVal, mR / 16, mN0 / 16, mN1 / 16);
+                    copyBytes(temp[j].mPreVal, newVals[j].mPreVal, mR / 16, mLevelSizes[0] / 16, mLevelSizes[1] / 16);
                 }
 
-                if (type & Type::Suffix)
+                if (mType & Type::Suffix)
                 {
                     // shift the preSuf values down.                     
                     //shiftBytes(preSuf[j].mSufVal, mR/16, mN0/16, mN1/16);   
-                    copyBytes(temp[j].mSufVal, newVals[j].mSufVal, mR / 16, mN0 / 16, mN1 / 16);
+                    copyBytes(temp[j].mSufVal, newVals[j].mSufVal, mR / 16, mLevelSizes[0] / 16, mLevelSizes[1] / 16);
                 }
             }
 
             // copy the leaf values that are on the last (partial) level
             for (u64 j = 0; j < 2 * secondPartial; ++j)
             {
-                if (type & Type::Prefix)
+                if (mType & Type::Prefix)
                 {
-                    copyBytes(temp[j].mPreVal, newVals[j].mPreVal, 0, 0, mN0 / 16);
+                    copyBytes(temp[j].mPreVal, newVals[j].mPreVal, 0, 0, mLevelSizes[0] / 16);
                 }
 
-                if (type & Type::Suffix)
+                if (mType & Type::Suffix)
                 {
-                    copyBytes(temp[j].mSufVal, newVals[j].mSufVal, 0, 0, mN0 / 16);
+                    copyBytes(temp[j].mSufVal, newVals[j].mSufVal, 0, 0, mLevelSizes[0] / 16);
                 }
             }
 
@@ -801,9 +759,204 @@ namespace secJoin
             }
         }
 
+        levels[0].reshape(mN16);
         MC_END();
     }
 
+
+    oc::BetaCircuit AggTree::leafCircuit(u64 bitsPerEntry, const Operator& op, Type type)
+    {
+        oc::BetaLibrary lib;
+
+        oc::BetaCircuit cir;
+        oc::BetaBundle
+            leftVal(bitsPerEntry),
+            leftPreVal(bitsPerEntry),
+            leftSufVal(bitsPerEntry),
+            leftPreBit(1),
+            leftSufBit(1),
+            leftOut(bitsPerEntry),
+
+            rghtVal(bitsPerEntry),
+            rghtPreVal(bitsPerEntry),
+            rghtSufVal(bitsPerEntry),
+            rghtPreBit(1),
+            rghtSufBit(1),
+            rghtOut(bitsPerEntry),
+
+            lt1(bitsPerEntry),
+            lt2(bitsPerEntry),
+            lt3(bitsPerEntry),
+
+            rt1(bitsPerEntry),
+            rt2(bitsPerEntry),
+            rt3(bitsPerEntry);
+
+        cir.addInputBundle(leftVal);
+        cir.addInputBundle(rghtVal);
+        if (type & Type::Prefix)
+        {
+            cir.addInputBundle(leftPreVal);
+            cir.addInputBundle(rghtPreVal);
+            cir.addInputBundle(leftPreBit);
+            cir.addInputBundle(rghtPreBit);
+        }
+        if (type & Type::Suffix)
+        {
+            cir.addInputBundle(leftSufVal);
+            cir.addInputBundle(rghtSufVal);
+            cir.addInputBundle(leftSufBit);
+            cir.addInputBundle(rghtSufBit);
+        }
+
+        cir.addOutputBundle(leftOut);
+        cir.addOutputBundle(rghtOut);
+
+        cir.addTempWireBundle(lt1);
+        cir.addTempWireBundle(lt2);
+        cir.addTempWireBundle(lt3);
+        cir.addTempWireBundle(rt1);
+        cir.addTempWireBundle(rt2);
+        cir.addTempWireBundle(rt3);
+
+        switch (type)
+        {
+        case AggTreeType::Prefix:
+            op(cir, leftPreVal, leftVal, lt1);
+            op(cir, rghtPreVal, rghtVal, rt1);
+            lib.multiplex_build(cir, lt1, leftVal, leftPreBit, leftOut, lt2);
+            lib.multiplex_build(cir, rt1, rghtVal, rghtPreBit, rghtOut, rt2);
+
+            //cir << "\ncir " << leftVal << " " << leftPreVal << " " << leftPreBit << " -> " << leftOut << "\mN16";
+            break;
+        case AggTreeType::Suffix:
+            op(cir, leftVal, leftSufVal, lt1);
+            op(cir, rghtVal, rghtSufVal, rt1);
+            lib.multiplex_build(cir, lt1, leftVal, leftSufBit, leftOut, lt2);
+            lib.multiplex_build(cir, rt1, rghtVal, rghtSufBit, rghtOut, rt2);
+            break;
+        case AggTreeType::Full:
+            // t1 = preVal + val;
+            op(cir, leftPreVal, leftVal, lt1);
+            op(cir, rghtPreVal, rghtVal, rt1);
+
+            // t3 = preBit ? preVal + val : val;
+            lib.multiplex_build(cir, lt1, leftVal, leftPreBit, lt3, lt2);
+            lib.multiplex_build(cir, rt1, rghtVal, rghtPreBit, rt3, rt2);
+
+            // t1 = t3 + sufVal;
+            op(cir, lt3, leftSufVal, lt1);
+            op(cir, rt3, rghtSufVal, rt1);
+
+            // out = sufBit ? t3 + sufVal : t3;
+            //     = preVal + val + sufVal    ~ preBit=1,sufBit=1
+            //     = preVal + val             ~ preBit=1,sufBit=0
+            //     =          val + sufVal    ~ preBit=0,sufBit=1
+            //     =          val             ~ preBit=0,sufBit=0
+            lib.multiplex_build(cir, lt1, lt3, leftSufBit, leftOut, lt2);
+            lib.multiplex_build(cir, rt1, rt3, rghtSufBit, rghtOut, rt2);
+
+            break;
+        default:
+            throw RTE_LOC;
+            break;
+        }
+
+        return cir;
+    }
+
+    //	// apply the downstream circuit to each level of the tree.
+    macoro::task<> AggTree::computeLeaf(
+        SplitLevel& leaves,
+        SplitLevel& preSuf,
+        BinMatrix& dst,
+        PRNG& prng,
+        coproto::Socket& comm)
+    {
+
+        MC_BEGIN(macoro::task<>, this, &leaves, &preSuf, &dst, &comm, &prng
+        );
+
+        //bitsPerEntry = (type & Type::Prefix) ? leaves[0].mPreVal.bitsPerEntry() : leaves[0].mSufVal.bitsPerEntry();
+        //size = (type & Type::Prefix) ? leaves[0].mPreBit.numEntries() : leaves[0].mSufBit.numEntries();
+
+
+
+        {
+
+            //bin.init(size, cir, gen);
+
+            int inIdx = 0;
+            // the input values v for each leaf node.
+            if (mType & Type::Prefix)
+            {
+                mLeafGmw.mapInput(inIdx++, leaves[0].mPreVal);
+                mLeafGmw.mapInput(inIdx++, leaves[1].mPreVal);
+            }
+            else
+            {
+                mLeafGmw.mapInput(inIdx++, leaves[0].mSufVal);
+                mLeafGmw.mapInput(inIdx++, leaves[1].mSufVal);
+            }
+
+            if (mType & Type::Prefix)
+            {
+                // prefix val
+                mLeafGmw.mapInput(inIdx++, preSuf[0].mPreVal);
+                mLeafGmw.mapInput(inIdx++, preSuf[1].mPreVal);
+
+                // prefix bit
+                mLeafGmw.mapInput(inIdx++, leaves[0].mPreBit);
+                mLeafGmw.mapInput(inIdx++, leaves[1].mPreBit);
+
+            }
+
+            if (mType & Type::Suffix)
+            {
+                // prefix val
+                mLeafGmw.mapInput(inIdx++, preSuf[0].mSufVal);
+                mLeafGmw.mapInput(inIdx++, preSuf[1].mSufVal);
+
+                // prefix bit					 
+                mLeafGmw.mapInput(inIdx++, leaves[0].mSufBit);
+                mLeafGmw.mapInput(inIdx++, leaves[1].mSufBit);
+            }
+        }
+
+        MC_AWAIT(mLeafGmw.run(comm));
+
+        {
+            BinMatrix leftOut(mLeafGmw.mN, mBitsPerEntry), rghtOut(mLeafGmw.mN, mBitsPerEntry);
+            mLeafGmw.getOutput(0, leftOut);
+            mLeafGmw.getOutput(1, rghtOut);
+
+            auto d = dst.data();
+            auto ds = dst.bytesPerEntry();
+            auto l = leftOut.data();
+            auto r = rghtOut.data();
+            auto ls = leftOut.bytesPerEntry();
+            auto rs = rghtOut.bytesPerEntry();
+            assert(ds >= ls && ds >= rs);
+
+            auto n2 = mN / 2;
+            for (u64 i = 0; i < n2; ++i)
+            {
+                assert(d + ds <= dst.data() + dst.size());
+                assert(l + ls <= leftOut.data() + leftOut.size());
+                assert(r + rs <= rghtOut.data() + rghtOut.size());
+
+                memcpy(d, l, ls); d += ds; l += ls;
+                memcpy(d, r, rs); d += ds; r += rs;
+            }
+
+            if (mN & 1)
+            {
+                memcpy(d, l, ls);
+            }
+        }
+
+        MC_END();
+    }
 
 
 }

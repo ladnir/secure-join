@@ -12,7 +12,7 @@ namespace secJoin
     struct Average
     {
         bool mInsecurePrint = false, mInsecureMockSubroutines = false;
-        oc::BetaLibrary::Optimized op = oc::BetaLibrary::Optimized::Depth;
+        
 
 
         static void concatColumns(ColRef groupByCol, std::vector<ColRef> average, BinMatrix& ret,

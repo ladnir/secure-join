@@ -1,5 +1,6 @@
 #include "OtBatch.h"
 #include "CorGenerator.h"
+#include "secure-join/Util/match.h"
 
 namespace secJoin
 {

@@ -12,43 +12,45 @@ namespace secJoin
 
 	struct OmJoin : public oc::TimerAdapter
 	{
-		bool mInsecurePrint = false, mInsecureMockSubroutines = false;
-
-		// statical security parameter.
-		u64 mStatSecParam = 40;
-
-		//RadixSort mSorter;
-
-		//AggTree mAggTree;
-
-		//AdditivePerm mSortingPerm;
-
-		//void init(
-		//	ColRef leftJoinCol,
-		//	ColRef rightJoinCol,
-		//	std::vector<ColRef> selects)
-		//{
-		//	std::vector<u64> leftSizes, rightSizes;
-		//	for (auto s : selects)
-		//	{
-		//		if (&s.mTable == &leftJoinCol.mTable)
-		//			leftSizes.emplace_back(s.mCol.getBitCount());
-		//		else if (&s.mTable == &rightJoinCol.mTable)
-		//			rightSizes.emplace_back(s.mCol.getBitCount());
-		//		else
-		//			throw std::runtime_error("select statement does not match left right join cols. "LOCATION);
-		//	}
-
-		//	init(leftJoinCol.mTable.rows(), rightJoinCol.mTable.rows(), leftSizes, rightSizes);
-		//}
-
-		//void init(u64 leftSize, u64 rightSize, std::vector<u64> leftSelSizes, std::vector<u64> rightSelSize);
-
+		// we will pack columns into a matrix `data`.
+		// offset tracks where each column starts in the data matrix.
 		struct Offset
 		{
 			u64 mStart = 0, mSize = 0;
 			std::string mName;
 		};
+
+		bool mInsecurePrint = false, mInsecureMockSubroutines = false;
+
+		// statical security parameter.
+		u64 mStatSecParam = 40;
+
+		// the subprotocol that sorts the keys.
+		RadixSort mSort;
+
+		// the sorting permutation.
+		AltModComposedPerm mPerm;
+
+		// the subprotocol that will perform the copies.
+		AggTree mAggTree;
+
+		// the subprotocol that will compute the control bits.
+		Gmw mControlBitGmw;
+
+		// the number of bytes that will be stored per for of `data`.
+		u64 mDataBitsPerEntry = 0;
+
+		// the offset of the columns in the data matrix.
+		std::vector<Offset> mOffsets;
+
+		u64 mKeyIndex = -1;
+
+		void init(
+			ColRef leftJoinCol,
+			ColRef rightJoinCol,
+			std::vector<ColRef> selects,
+			CorGenerator& ole);
+
 
 		static macoro::task<> updateActiveFlag(
 			BinMatrix& data,
@@ -75,13 +77,12 @@ namespace secJoin
 		// compare each key with the key of the previous row.
 		// The keys are stored starting at data[i, keyOffset] and
 		// going to the end of each row i.
-		static macoro::task<> getControlBits(
+		macoro::task<> getControlBits(
 			BinMatrix& data,
 			u64 keyByteOffset,
 			u64 keyBitCount,
 			coproto::Socket& sock,
 			BinMatrix& out,
-			CorGenerator& ole,
 			PRNG& prng);
 
 		// concatinate all the columns
@@ -95,15 +96,12 @@ namespace secJoin
 		// to that. So it will look something like:
 		//     L | kL
 		//     0 | kR
-		static void concatColumns(
+		void concatColumns(
 			ColRef leftJoinCol,
 			span<ColRef> selects,
-			u64 numDummies,
 			BinMatrix& keys,
-			u64& keyOffset,
 			BinMatrix& out,
-			u8 role,
-			std::vector<Offset>& offsets);
+			u8 role);
 
 		// static void appendControlBits(const BinMatrix &controlBits, const BinMatrix &data, BinMatrix &out);
 

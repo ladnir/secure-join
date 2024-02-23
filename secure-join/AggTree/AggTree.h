@@ -54,18 +54,54 @@ namespace secJoin
         using Level = AggTreeLevel;
         using SplitLevel = AggTreeSplitLevel;
 
+        oc::BetaCircuit mUpCir, mDownCir, mLeafCir;
+
+        std::vector<Gmw> mUpGmw, mDownGmw;
+        Gmw mLeafGmw;
+        Type mType;
+        u64 mBitsPerEntry = 0;
+
+        void init(
+            u64 n,
+            u64 bitsPerEntry,
+            Type type,
+            const Operator& op,
+            CorGenerator& gen)
+        {
+            computeTreeSizes(n);
+            mBitsPerEntry = bitsPerEntry;
+            mType = type;
+
+            mUpCir = upstreamCir(bitsPerEntry, type, op);
+            mDownCir = downstreamCir(bitsPerEntry, op, type);
+            mLeafCir = leafCircuit(bitsPerEntry, op, type);
+
+            mUpGmw.resize(mLevelSizes.size()-1);
+            mDownGmw.resize(mLevelSizes.size()-1);
+
+            // we start at the preSuf and move up.
+            for (u64 lvl = 0; lvl < mUpGmw.size(); ++lvl)
+            {
+                mUpGmw[lvl].init(mLevelSizes[lvl] / 2, mUpCir, gen);
+            }
+
+            // we start at the preSuf and move up.
+            for (u64 lvl = mDownGmw.size()-1; lvl < mDownGmw.size(); --lvl)
+            {
+                mDownGmw[lvl].init(mLevelSizes[lvl] / 2, mDownCir, gen);
+            }
+
+            mLeafGmw.init(mN16 / 2, mLeafCir, gen);
+        }
 
         macoro::task<> apply(
             const BinMatrix& src,
             const BinMatrix& controlBits,
-            const Operator& op,
-            Type type,
             coproto::Socket& comm,
-            CorGenerator& gen,
             PRNG& prng,
             BinMatrix& dst)
         {
-            MC_BEGIN(macoro::task<>, this, &src, &controlBits, &op, type, &comm, &gen, &dst, &prng,
+            MC_BEGIN(macoro::task<>, this, &src, &controlBits, &comm, &dst, &prng,
                 root = Level{},
                 upLevels = std::vector<SplitLevel>{},
                 newVals = SplitLevel{}
@@ -73,17 +109,17 @@ namespace secJoin
 
             computeTreeSizes(src.numEntries());
 
-            upLevels.resize(mLogn);
+            upLevels.resize(mLevelSizes.size());
 
-            MC_AWAIT(upstream(src, controlBits, op, type, comm, gen, prng, root, upLevels));
-            MC_AWAIT(downstream(src, op, root, upLevels, newVals, type, comm, gen, prng));
+            MC_AWAIT(upstream(src, controlBits,  comm, prng, root, upLevels));
+            MC_AWAIT(downstream(src, root, upLevels, newVals, comm, prng));
 
             upLevels.resize(1);
 
             if (dst.numEntries() != mN || dst.bitsPerEntry() != src.bitsPerEntry())
                 dst.resize(mN, src.bitsPerEntry());
 
-            MC_AWAIT(computeLeaf(upLevels[0], newVals, op, dst, type, prng, comm, gen));
+            MC_AWAIT(computeLeaf(upLevels[0], newVals, dst, prng, comm));
 
             MC_END();
         }
@@ -140,10 +176,7 @@ namespace secJoin
         macoro::task<> upstream(
             const BinMatrix& src,
             const BinMatrix& controlBits,
-            const Operator& op,
-            Type type,
             coproto::Socket& comm,
-            CorGenerator& gen,
             PRNG& prng,
             Level& root,
             span<SplitLevel> levels);
@@ -184,210 +217,22 @@ namespace secJoin
         // apply the downstream circuit to each level of the tree.
         macoro::task<> downstream(
             const BinMatrix& src,
-            const Operator& op,
             Level& root,
             span<SplitLevel> levels,
             SplitLevel& preSuf,
-            Type type,
             coproto::Socket& comm,
-            CorGenerator& gen,
             PRNG& prng,
             std::vector<SplitLevel>* debugLevels = nullptr);
+
+        oc::BetaCircuit leafCircuit(u64 bitsPerEntry, const Operator& op, Type type);
 
         //	// apply the downstream circuit to each level of the tree.
         macoro::task<> computeLeaf(
             SplitLevel& leaves,
             SplitLevel& preSuf,
-            const Operator& op,
             BinMatrix& dst,
-            Type type,
             PRNG& prng,
-            coproto::Socket& comm,
-            CorGenerator& gen)
-        {
-
-            MC_BEGIN(macoro::task<>, this, &leaves, &preSuf, &op, &dst, type, &comm, &gen,&prng,
-                lib = oc::BetaLibrary{},
-                cir = oc::BetaCircuit{},
-                bitsPerEntry = u64{},
-                size = u64{},
-                bin = Gmw{}
-            );
-
-            bitsPerEntry = (type & Type::Prefix) ? leaves[0].mPreVal.bitsPerEntry() : leaves[0].mSufVal.bitsPerEntry();
-            size = (type & Type::Prefix) ? leaves[0].mPreBit.numEntries() : leaves[0].mSufBit.numEntries();
-
-            {
-                oc::BetaBundle
-                    leftVal(bitsPerEntry),
-                    leftPreVal(bitsPerEntry),
-                    leftSufVal(bitsPerEntry),
-                    leftPreBit(1),
-                    leftSufBit(1),
-                    leftOut(bitsPerEntry),
-
-                    rghtVal(bitsPerEntry),
-                    rghtPreVal(bitsPerEntry),
-                    rghtSufVal(bitsPerEntry),
-                    rghtPreBit(1),
-                    rghtSufBit(1),
-                    rghtOut(bitsPerEntry),
-
-                    lt1(bitsPerEntry),
-                    lt2(bitsPerEntry),
-                    lt3(bitsPerEntry),
-
-                    rt1(bitsPerEntry),
-                    rt2(bitsPerEntry),
-                    rt3(bitsPerEntry);
-
-                cir.addInputBundle(leftVal);
-                cir.addInputBundle(rghtVal);
-                if (type & Type::Prefix)
-                {
-                    cir.addInputBundle(leftPreVal);
-                    cir.addInputBundle(rghtPreVal);
-                    cir.addInputBundle(leftPreBit);
-                    cir.addInputBundle(rghtPreBit);
-                }
-                if (type & Type::Suffix)
-                {
-                    cir.addInputBundle(leftSufVal);
-                    cir.addInputBundle(rghtSufVal);
-                    cir.addInputBundle(leftSufBit);
-                    cir.addInputBundle(rghtSufBit);
-                }
-
-                cir.addOutputBundle(leftOut);
-                cir.addOutputBundle(rghtOut);
-
-                cir.addTempWireBundle(lt1);
-                cir.addTempWireBundle(lt2);
-                cir.addTempWireBundle(lt3);
-                cir.addTempWireBundle(rt1);
-                cir.addTempWireBundle(rt2);
-                cir.addTempWireBundle(rt3);
-
-                switch (type)
-                {
-                case AggTreeType::Prefix:
-                    op(cir, leftPreVal, leftVal, lt1);
-                    op(cir, rghtPreVal, rghtVal, rt1);
-                    lib.multiplex_build(cir, lt1, leftVal, leftPreBit, leftOut, lt2);
-                    lib.multiplex_build(cir, rt1, rghtVal, rghtPreBit, rghtOut, rt2);
-
-                    //cir << "\ncir " << leftVal << " " << leftPreVal << " " << leftPreBit << " -> " << leftOut << "\mN16";
-                    break;
-                case AggTreeType::Suffix:
-                    op(cir, leftVal, leftSufVal, lt1);
-                    op(cir, rghtVal, rghtSufVal, rt1);
-                    lib.multiplex_build(cir, lt1, leftVal, leftSufBit, leftOut, lt2);
-                    lib.multiplex_build(cir, rt1, rghtVal, rghtSufBit, rghtOut, rt2);
-                    break;
-                case AggTreeType::Full:
-                    // t1 = preVal + val;
-                    op(cir, leftPreVal, leftVal, lt1);
-                    op(cir, rghtPreVal, rghtVal, rt1);
-
-                    // t3 = preBit ? preVal + val : val;
-                    lib.multiplex_build(cir, lt1, leftVal, leftPreBit, lt3, lt2);
-                    lib.multiplex_build(cir, rt1, rghtVal, rghtPreBit, rt3, rt2);
-
-                    // t1 = t3 + sufVal;
-                    op(cir, lt3, leftSufVal, lt1);
-                    op(cir, rt3, rghtSufVal, rt1);
-
-                    // out = sufBit ? t3 + sufVal : t3;
-                    //     = preVal + val + sufVal    ~ preBit=1,sufBit=1
-                    //     = preVal + val             ~ preBit=1,sufBit=0
-                    //     =          val + sufVal    ~ preBit=0,sufBit=1
-                    //     =          val             ~ preBit=0,sufBit=0
-                    lib.multiplex_build(cir, lt1, lt3, leftSufBit, leftOut, lt2);
-                    lib.multiplex_build(cir, rt1, rt3, rghtSufBit, rghtOut, rt2);
-
-                    break;
-                default:
-                    throw RTE_LOC;
-                    break;
-                }
-            }
-
-
-            {
-
-                bin.init(size, cir, gen);
-
-                int inIdx = 0;
-                // the input values v for each leaf node.
-                if (type & Type::Prefix)
-                {
-                    bin.mapInput(inIdx++, leaves[0].mPreVal);
-                    bin.mapInput(inIdx++, leaves[1].mPreVal);
-                }
-                else
-                {
-                    bin.mapInput(inIdx++, leaves[0].mSufVal);
-                    bin.mapInput(inIdx++, leaves[1].mSufVal);
-                }
-
-                if (type & Type::Prefix)
-                {
-                    // prefix val
-                    bin.mapInput(inIdx++, preSuf[0].mPreVal);
-                    bin.mapInput(inIdx++, preSuf[1].mPreVal);
-
-                    // prefix bit
-                    bin.mapInput(inIdx++, leaves[0].mPreBit);
-                    bin.mapInput(inIdx++, leaves[1].mPreBit);
-
-                }
-
-                if (type & Type::Suffix)
-                {
-                    // prefix val
-                    bin.mapInput(inIdx++, preSuf[0].mSufVal);
-                    bin.mapInput(inIdx++, preSuf[1].mSufVal);
-
-                    // prefix bit					 
-                    bin.mapInput(inIdx++, leaves[0].mSufBit);
-                    bin.mapInput(inIdx++, leaves[1].mSufBit);
-                }
-            }
-
-            MC_AWAIT(bin.run(comm));
-
-            {
-                BinMatrix leftOut(size, bitsPerEntry), rghtOut(size, bitsPerEntry);
-                bin.getOutput(0, leftOut);
-                bin.getOutput(1, rghtOut);
-
-                auto d = dst.data();
-                auto ds = dst.bytesPerEntry();
-                auto l = leftOut.data();
-                auto r = rghtOut.data();
-                auto ls = leftOut.bytesPerEntry();
-                auto rs = rghtOut.bytesPerEntry();
-                assert(ds >= ls && ds >= rs);
-
-                auto n2 = mN / 2;
-                for (u64 i = 0; i < n2; ++i)
-                {
-                    assert(d + ds <= dst.data() + dst.size());
-                    assert(l + ls <= leftOut.data() + leftOut.size());
-                    assert(r + rs <= rghtOut.data() + rghtOut.size());
-
-                    memcpy(d, l, ls); d += ds; l += ls;
-                    memcpy(d, r, rs); d += ds; r += rs;
-                }
-
-                if (mN & 1)
-                {
-                    memcpy(d, l, ls);
-                }
-            }
-
-            MC_END();
-        }
+            coproto::Socket& comm);
 
 
     };

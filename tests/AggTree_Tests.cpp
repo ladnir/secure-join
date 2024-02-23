@@ -67,6 +67,8 @@ void eval(BetaCircuit& cir,
         }
 
         auto mR = macoro::sync_wait(macoro::when_all_ready(
+            gen[0].start(),
+            gen[1].start(),
             bin[0].run(comm[0]),
             bin[1].run(comm[1])
         ));
@@ -829,24 +831,24 @@ void AggTree_dup_setLeaves_Test()
 
             for (u64 p = 0; p < 2; ++p)
             {
-                if (tree.mLogfn == tree.mLogn)
+                if (tree.mCompleteTree)
                 {
                     tvs[p][0].resize(tree.mN16, m, type);
                     tvs[p][0].setLeafVals(s[p], c[p], 0, 0);
                 }
                 else
                 {
-                    tvs[p][0].resize(tree.mN0, m, type);
-                    tvs[p][1].resize(1ull << tree.mLogfn, m, type);
+                    tvs[p][0].resize(tree.mLevelSizes[0], m, type);
+                    tvs[p][1].resize(tree.mLevelSizes[1], m, type);
 
                     tvs[p][0].setLeafVals(s[p], c[p], 0, 0);
-                    tvs[p][1].setLeafVals(s[p], c[p], tree.mN0, tree.mR);
+                    tvs[p][1].setLeafVals(s[p], c[p], tree.mLevelSizes[0], tree.mR);
                 }
             }
 
             PLevel leaves[2];
 
-            if (tree.mLogfn == tree.mLogn)
+            if (tree.mCompleteTree)
             {
                 leaves[0].reveal(tvs[0][0], tvs[1][0]);
             }
@@ -859,8 +861,8 @@ void AggTree_dup_setLeaves_Test()
 
             for (u64 i = 0; i < tree.mN16; ++i)
             {
-                auto q = i < tree.mN0 ? 0 : 1;
-                auto w = i < tree.mN0 ? i : i - tree.mR;
+                auto q = i < tree.mLevelSizes[0] ? 0 : 1;
+                auto w = i < tree.mLevelSizes[0] ? i : i - tree.mR;
 
                 if (type & AggTree::Type::Prefix)
                 {
@@ -974,7 +976,7 @@ void AggTree_xor_upstream_Test(const oc::CLP& cmd)
         Level root[2];
 
         //auto mN16 = tree.mN16;
-        auto mLogn = tree.mLogn;
+        auto mLogn = tree.mLevelSizes.size()-1;
         //auto mLogfn = tree.mLogfn;
         auto s = tree.shareVals(prng);
         auto c = tree.shareBits(prng);
@@ -989,9 +991,14 @@ void AggTree_xor_upstream_Test(const oc::CLP& cmd)
         g1.init(comm[1].fork(), prng, 1, 1<<18, cmd.getOr("mock", 1));
 
 
+        t0.init(mN, m, type, op, g0);
+        t1.init(mN, m, type, op, g1);
+
         macoro::sync_wait(macoro::when_all_ready(
-            t0.upstream(s[0], c[0], op, type, comm[0], g0, prng, root[0], tvs[0]),
-            t1.upstream(s[1], c[1], op, type, comm[1], g1, prng, root[1], tvs[1])
+            g0.start(),
+            g1.start(),
+            t0.upstream(s[0], c[0], comm[0], prng, root[0], tvs[0]),
+            t1.upstream(s[1], c[1], comm[1], prng, root[1], tvs[1])
         ));
 
         if (tvs[0].size() != mLogn)
@@ -1176,10 +1183,13 @@ void AggTree_xor_downstream_Test(Op op, OpCir opCir, u64 mN, bool mock)
 
         //std::cout << tree.print(AggTree::Type::Prefix) << std::endl;
 
+        t[0].init(mN, m, type, opCir, g[0]);
+        t[1].init(mN, m, type, opCir, g[1]);
+
         std::array<Level, 2> root, root2;
         std::array<SplitLevel, 2> preSuf;
         std::array<std::vector<SplitLevel>, 2> upLevels, dwLevels;
-        auto mLogn = tree.mLogn;
+        auto mLogn = t[0].mDownGmw.size();
         upLevels[0].resize(mLogn);
         upLevels[1].resize(mLogn);
         dwLevels[0].resize(mLogn);
@@ -1188,17 +1198,27 @@ void AggTree_xor_downstream_Test(Op op, OpCir opCir, u64 mN, bool mock)
         //t[0].mDebug = true;
         //t[1].mDebug = true;
 
+
+        auto start = macoro::make_eager(macoro::when_all_ready(
+            g[0].start(),
+            g[1].start()
+        ));
+
         macoro::sync_wait(macoro::when_all_ready(
-            t[0].upstream(s[0], c[0], opCir, type, com[0], g[0], prng, root[0], upLevels[0]),
-            t[1].upstream(s[1], c[1], opCir, type, com[1], g[1], prng, root[1], upLevels[1])
+            t[0].upstream(s[0], c[0], com[0], prng, root[0], upLevels[0]),
+            t[1].upstream(s[1], c[1], com[1], prng, root[1], upLevels[1])
         ));
         root2[0] = root[0];
         root2[1] = root[1];
 
         macoro::sync_wait(macoro::when_all_ready(
-            t[0].downstream(s[0], opCir, root[0], upLevels[0], preSuf[0], type, com[0], g[0],prng, &dwLevels[0]),
-            t[1].downstream(s[1], opCir, root[1], upLevels[1], preSuf[1], type, com[1], g[1],prng, &dwLevels[1])
+            t[0].downstream(s[0], root[0], upLevels[0], preSuf[0], com[0], prng, &dwLevels[0]),
+            t[1].downstream(s[1], root[1], upLevels[1], preSuf[1], com[1], prng, &dwLevels[1])
         ));
+
+        g[0].abort();
+        g[1].abort();
+        macoro::sync_wait(std::move(start));
 
         std::vector<PLevel> levels(mLogn);
         for (u64 i = 0; i < levels.size(); ++i)
@@ -1284,8 +1304,8 @@ void AggTree_xor_downstream_Test(Op op, OpCir opCir, u64 mN, bool mock)
 
         for (u64 i = 0; i < mN; ++i)
         {
-            auto q = i < tree.mN0 ? 0 : 1;
-            auto w = i < tree.mN0 ? i : i - tree.mR;
+            auto q = i < tree.mLevelSizes[0] ? 0 : 1;
+            auto w = i < tree.mLevelSizes[0] ? i : i - tree.mR;
 
             if (type & AggTreeType::Prefix)
             {
@@ -1475,9 +1495,14 @@ void AggTree_full_Test(Op op, OpCir opCir, bool mock)
         auto c = tree.shareBits(prng);
         BinMatrix d0(mN, m), d1(mN, m);
 
+        t[0].init(mN, m, type, opCir, g[0]);
+        t[1].init(mN, m, type, opCir, g[1]);
+
         macoro::sync_wait(macoro::when_all_ready(
-            t[0].apply(s[0], c[0], opCir, type, com[0], g[0], prng, d0),
-            t[1].apply(s[1], c[1], opCir, type, com[1], g[1], prng, d1)
+            g[0].start(),
+            g[1].start(),
+            t[0].apply(s[0], c[0], com[0], prng, d0),
+            t[1].apply(s[1], c[1], com[1], prng, d1)
         ));
 
 

@@ -118,12 +118,29 @@ namespace secJoin
                 }
             }
         }
+
+        void abort()
+        {
+            u64 idx = mBatchStartIdx;
+            while (idx < mBatches.size())
+            {
+
+                bool s = mBatchStartIdx.compare_exchange_strong(idx, idx + 1);
+                if (s)
+                {
+                    mBatches[idx]->mAbort = true;
+                    mBatches[idx]->mStart.set();
+                    ++idx;
+                }
+            }
+        }
     };
 
     struct CorGenerator
     {
         std::shared_ptr<GenState> mGenState;
 
+        std::vector<std::weak_ptr<GenState>> mStarted;
 
         void init(
             coproto::Socket&& sock,
@@ -159,13 +176,22 @@ namespace secJoin
 
         macoro::task<> start()
         {
-           return std::exchange(mGenState, nullptr)->start();
+            mStarted.push_back(mGenState);
+            return std::exchange(mGenState, nullptr)->start();
         }
 
         void startBatch(Batch* b)
         {
             mGenState->startBatch(b);
         }
+
+        void abort()
+        {
+            for(auto& s : mStarted)
+                if(auto genState = s.lock())
+                    genState->abort();
+        }
+
 
     private:
 

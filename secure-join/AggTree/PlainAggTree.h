@@ -232,24 +232,19 @@ namespace secJoin
 			bitCount = s[0].size();
 			computeTreeSizes(s.size());
 
-			mLevels.resize(mLogn + 1);
+			mLevels.resize(mLevelSizes.size());
 			for (u64 j = 0; j < 2; ++j)
 			{
-				mLevels[0][j].resize(mN0);
-				if (mR)
-					mLevels[1][j].resize(1ull << mLogfn);
-
-				for (u64 i = mR ? 2 : 1; i < mLevels.size(); ++i)
+				for (u64 i = 0; i < mLevels.size(); ++i)
 				{
-					auto nn = mLevels[i - 1][j].size() / 2;
-					mLevels[i][j].resize(nn);
+					mLevels[i][j].resize(mLevelSizes[i]);
 				}
 			}
 
 			for (u64 i = 0; i < mN; ++i)
 			{
-				auto q = i < mN0 ? 0 : 1;
-				auto w = i < mN0 ? i : i - mR;
+				auto q = i < mLevelSizes[0] ? 0 : 1;
+				auto w = i < mLevelSizes[0] ? i : i - mR;
 
 				mLevels[q].mUp.mPreVal[w] = s[i];
 				mLevels[q].mUp.mSufVal[w] = s[i];
@@ -268,8 +263,8 @@ namespace secJoin
 
 			for (u64 i = mN; i < mN16; ++i)
 			{
-				auto q = i < mN0 ? 0 : 1;
-				auto w = i < mN0 ? i : i - mR;
+				auto q = i < mLevelSizes[0] ? 0 : 1;
+				auto w = i < mLevelSizes[0] ? i : i - mR;
 
 				mLevels[q].mUp.mPreVal[w].resize(bitCount);
 				mLevels[q].mUp.mSufVal[w].resize(bitCount);
@@ -379,8 +374,8 @@ namespace secJoin
 
 			for (u64 i = 0; i < mN; ++i)
 			{
-				auto q = i < mN0 ? 0 : 1;
-				auto w = i < mN0 ? i : i - mR;
+				auto q = i < mLevelSizes[0] ? 0 : 1;
+				auto w = i < mLevelSizes[0] ? i : i - mR;
 
 				auto& ll = mLevels[q].mDown;
 

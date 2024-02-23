@@ -225,16 +225,14 @@ namespace secJoin
 
             MC_AWAIT(mBatches[i]->mStart);
 
-            MC_AWAIT(mBatches[i]->getTask());
+            if(mBatches[i]->mAbort == false)
+                MC_AWAIT(mBatches[i]->getTask());
 
             mBatches[i] = {};
         }
 
 
-        //std::cout << (u64)this << " base set " << std::endl;
         mBatches = {};
-        //mBatchStartIdx = 0;
-        //mGenerationInProgress = false;
 
         MC_END();
     }

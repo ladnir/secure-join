@@ -182,6 +182,8 @@ namespace secJoin {
 
         // need to set sort ole.
         sort.init(ole.partyIdx(), keys.rows(), keys.bitsPerEntry(), ole);
+        addCir = getAddCircuit(offsets, oc::BetaLibrary::Optimized::Depth);
+        aggTree.init(data.rows(), data.bitsPerEntry(), AggTreeType::Suffix, addCir, ole);
 
         MC_AWAIT(sort.genPerm(keys, sPerm, sock, prng));
         concatColumns(groupByCol, avgCol, data, offsets, ole);
@@ -216,11 +218,8 @@ namespace secJoin {
             MC_AWAIT(OmJoin::print(data, controlBits, sock, ole.partyIdx(), "control", offsets));
             // MC_AWAIT(print(controlBits, sock, ole.partyIdx(), "controlbits"));
 
-        // oc::BetaLibrary::Optimized::Depth shouldn't be hardcoded 
-        addCir = getAddCircuit(offsets, op);
 
-
-        MC_AWAIT(aggTree.apply(data, controlBits, addCir, AggTreeType::Suffix, sock, ole, prng, temp));
+        MC_AWAIT(aggTree.apply(data, controlBits, sock, prng, temp));
         std::swap(data, temp);
 
         if (mInsecurePrint)
