@@ -59,5 +59,16 @@ namespace secJoin
             Perm perm,
             ComposedPerm& dst);
 
+
+        // generate the permutation correlation
+        macoro::task<> generate(
+            coproto::Socket& chl,
+            PRNG& prng,
+            u64 size,
+            ComposedPerm& dst)
+        {
+            return generate(chl, prng, Perm(size, prng), dst);
+        }
+
     };
 }

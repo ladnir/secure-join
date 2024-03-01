@@ -43,7 +43,7 @@ namespace secJoin
             oc::LinearCode code;
             code.random(prng, bits, compressesSize);
 
-            BinMatrix keys(rows0 + rows1, bits);
+            BinMatrix keys(rows0 + rows1, compressesSize);
 
             for (u64 i = 0; i < rows0; ++i)
                 code.encode(
@@ -153,45 +153,57 @@ namespace secJoin
 
     void OmJoin::concatColumns(
         BinMatrix& dst,
-        span<BinMatrix*> cols)
+        span<BinMatrix*> cols,
+        span<Offset> offsets)
     {
         auto m = cols.size();
         //auto n = cols[0]->rows();
         //auto d0 = dst.data();
         auto e0 = dst.data() + dst.size();
 
-        std::vector<u64>
-            offsets(m),
-            sizes(m),
-            srcSteps(m);
-        std::vector<u8*> srcs(m);
-        u64 rem = dst.cols();
-        for (u64 i = 0; i < m; ++i)
-        {
-            sizes[i] = oc::divCeil(cols[i]->bitsPerEntry(), 8);
-            if (i)
-                offsets[i] = offsets[i - 1] + sizes[i - 1];
+        //std::vector<u64>
+        //    offsets,
+        //    sizes,
+        //    srcSteps;
+        //std::vector<u8*> srcs;
+        //u64 rem = dst.cols();
+        //for (u64 i = 0; i < m; ++i)
+        //{
+        //    if (cols[i] == nullptr)
+        //        continue;
 
-            srcs[i] = cols[i]->data();
-            srcSteps[i] = cols[i]->mData.cols();
-        }
+        //    sizes.push_back(oc::divCeil(cols[i]->bitsPerEntry(), 8));
+        //    if (sizes.size())
+        //        offsets.push_back(offsets.back() + sizes.back());
+        //    else
+        //        offsets.push_back(0);
 
-        for (u64 j = 0; j < m; ++j)
+        //    srcs.push_back(cols[i]->data());
+        //    srcSteps.push_back(cols[i]->mData.cols());
+        //}
+
+        for (u64 j = 0; j < cols.size(); ++j)
         {
+            if (cols[j] == nullptr)
+                continue;
+
             auto n = cols[j]->rows();
             assert(n <= dst.rows());
-            auto d0 = dst.data() + offsets[j];
+            assert(offsets[j].mStart % 8 == 0);
 
-            auto src = srcs[j];
-            auto size = sizes[j];
-            auto step = srcSteps[j];
+            auto d0 = dst.data() + offsets[j].mStart / 8;
+
+            auto src = cols[j]->data();
+            auto size = cols[j]->bytesPerEntry();
+            assert(divCeil(offsets[j].mSize, 8) == size);
+            //auto step = cols[j]->bytesPerEntry();
             for (u64 i = 0; i < n; ++i)
             {
                 assert(d0 + size <= e0);
                 memcpy(d0, src, size);
 
-                src += step;
-                d0 += rem;
+                src += size;
+                d0 += dst.cols();
             }
         }
     }
@@ -223,17 +235,19 @@ namespace secJoin
             }
         }
 
+        left.emplace_back(nullptr);
         left.emplace_back(&keys);
 
         ret.resize(keys.rows(), mDataBitsPerEntry);
-        concatColumns(ret, left);
+        concatColumns(ret, left, mOffsets);
 
         if (role)
         {
-            auto flagBit = mDataBitsPerEntry - 1;;
+            //auto flagBit = mDataBitsPerEntry - 1;;
+            auto flagByte = mOffsets[mOffsets.size() - 2].mStart / 8;
             for (u64 i = 0; i < n0; ++i)
             {
-                *oc::BitIterator((u8*)ret.data(i), flagBit) = 1;
+                ret(i, flagByte) = 1;
             }
         }
     }
@@ -248,7 +262,7 @@ namespace secJoin
         BinMatrix& data,
         span<ColRef> selects,
         ColRef& left,
-        SharedTable& out,
+        Table& out,
         std::vector<Offset>& offsets)
     {
         u64 nL = left.mCol.rows();
@@ -288,7 +302,7 @@ namespace secJoin
         }
         assert(rightOffset == data.bytesPerEntry() - 1);
         assert(rightOffset * 8 == offsets[k].mStart);
-        assert(1 == offsets[k].mSize);
+        assert(8 == offsets[k].mSize);
         out.mIsActive.resize(nR);
         sizes.push_back(1);
         dsts.push_back(out.mIsActive.data());
@@ -394,40 +408,40 @@ namespace secJoin
         BinMatrix& data,
         BinMatrix& choice,
         BinMatrix& out,
-        CorGenerator& ole,
+        u64 flagBitIndex,
         PRNG& prng,
         coproto::Socket& sock)
     {
-        MC_BEGIN(macoro::task<>, &data, &choice, &out, &ole, &sock, &prng,
-            gmw = Gmw{},
-            cir = oc::BetaCircuit{},
+        MC_BEGIN(macoro::task<>, this, &data, &choice, &out, &sock, &prng, flagBitIndex,
             temp = BinMatrix{},
             offsets = std::vector<Offset>{},
             offset = u64{});
 
-        cir = *oc::BetaLibrary{}.int_int_bitwiseAnd(1, 1, 1);
-        gmw.init(data.rows(), cir, ole);
+        //cir = *oc::BetaLibrary{}.int_int_bitwiseAnd(1, 1, 1);
+        ////gmw.init(data.rows(), cir, ole);
 
-        if (data.bitsPerEntry() % 8 != 1)
-        {
-            std::cout << "logic error, need to fix. " << LOCATION << std::endl;
-            throw RTE_LOC;
-        }
-        offset = data.bitsPerEntry() / 8;
+        //if (data.bitsPerEntry() % 8 != 1)
+        //{
+        //    std::cout << "logic error, need to fix. " << LOCATION << std::endl;
+        //    throw RTE_LOC;
+        //}
+        assert(flagBitIndex % 8 == 0);
+        offset = flagBitIndex / 8;
 
         temp.resize(data.rows(), 1);
         for (u64 i = 0; i < data.rows(); ++i)
             temp(i) = data(i, offset);//*oc::BitIterator(data[i].data(), data.bitsPerEntry() - 1);
 
-        gmw.setInput(0, choice);
-        gmw.setInput(1, temp);
+        mUpdateActiveFlagGmw.setInput(0, choice);
+        mUpdateActiveFlagGmw.setInput(1, temp);
 
         offsets.emplace_back(Offset{ 0,1 });
         //MC_AWAIT(print(temp, choice, sock, ole.partyIdx(), "active", offsets));
 
-        MC_AWAIT(gmw.run(sock));
+        MC_AWAIT(mUpdateActiveFlagGmw.run(sock));
 
-        gmw.getOutput(0, temp);
+        mUpdateActiveFlagGmw.getOutput(0, temp);
+        mUpdateActiveFlagGmw = {};
 
         //MC_AWAIT(print(temp, choice, sock, ole.partyIdx(), "active out", offsets));
 
@@ -454,97 +468,92 @@ namespace secJoin
     }
 
     void OmJoin::init(
-        ColRef leftJoinCol,
-        ColRef rightJoinCol,
-        std::vector<ColRef> selects,
+        JoinQuerySchema schema,
         CorGenerator& ole)
     {
-        u64 rows0 = leftJoinCol.mCol.mData.rows();
-        u64 rows1 = rightJoinCol.mCol.mData.rows();
-        u64 rows = rows0 + rows1;
-        auto compressesSize = std::min<u64>(leftJoinCol.mCol.getBitCount(), mStatSecParam + log2(rows0) + log2(rows1));
-        bool hasKeyInSelects = false;
+        u64 rows = schema.mLeftSize + schema.mRightSize;
 
+        auto keySize = std::min<u64>(
+            schema.mKey.mBitCount, 
+            mStatSecParam + log2(schema.mLeftSize) + log2(schema.mRightSize));
+
+        mPartyIdx = ole.partyIdx();
         mKeyIndex = -1;
         mDataBitsPerEntry = 0;
 
         mOffsets.clear();
-        mOffsets.reserve(selects.size() + 1);
-        for (u64 i = 0; i < selects.size(); ++i)
+        mOffsets.reserve(schema.mSelect.size() + 1);
+        for (u64 i = 0; i < schema.mSelect.size(); ++i)
         {
             // copy all of the left columns except the key
-            if (&leftJoinCol.mTable == &selects[i].mTable)
+            if (schema.mSelect[i].mIsLeftColumn)
             {
-                auto bytes = oc::divCeil(selects[i].mCol.getBitCount(), 8);
-                assert(bytes == selects[i].mCol.getByteCount());
-                assert(selects[i].mCol.rows() == rows0);
-                mOffsets.emplace_back(Offset{ mDataBitsPerEntry / 8, selects[i].mCol.mData.bitsPerEntry(), selects[i].mCol.mName });
+                auto bytes = oc::divCeil(schema.mSelect[i].getBitCount(), 8);
+                assert(bytes == schema.mSelect[i].getByteCount());
+                mOffsets.emplace_back(
+                    Offset{ 
+                        mDataBitsPerEntry, 
+                        schema.mSelect[i].getBitCount(), 
+                        schema.mSelect[i].name() });
+
                 mDataBitsPerEntry += bytes * 8;
             }
-
-            hasKeyInSelects |= &leftJoinCol.mCol != &selects[i].mCol;
         }
 
-        mOffsets.emplace_back(Offset{ mDataBitsPerEntry / 8, compressesSize, "key*" });
-        mDataBitsPerEntry += leftJoinCol.mCol.getByteCount() * 8;
+        mOffsets.emplace_back(Offset{ mDataBitsPerEntry, 8, "LFlag" });
+        mDataBitsPerEntry += 8;
 
-        mOffsets.emplace_back(Offset{ mDataBitsPerEntry, 1, "LFlag" });
-        ++mDataBitsPerEntry;
+        mOffsets.emplace_back(Offset{ mDataBitsPerEntry, keySize, "key*" });
+        mDataBitsPerEntry += schema.mKey.getByteCount() * 8;
 
-        mSort.init(ole.partyIdx(), rows, compressesSize, ole);
+
+        mSort.init(mPartyIdx, rows, keySize, ole);
 
         // in the forward direction we will permute the keys, a flag, 
          // and all of the select columns of the left table. In the 
          // backwards direction, we will unpermute the left table select
          // columns. Therefore, in total we will permute:
-        u64 permForward = oc::divCeil(mDataBitsPerEntry, 8);
-        u64 permBackward = oc::divCeil(mDataBitsPerEntry - 1 - (hasKeyInSelects ? 0 : leftJoinCol.mCol.getByteCount() * 8), 8);
+        u64 permForward = oc::divCeil(mDataBitsPerEntry, 8) + sizeof(u32);
+        u64 permBackward = oc::divCeil(mDataBitsPerEntry - 1 - keySize, 8);
 
-        mPerm.init(ole.partyIdx(), rows, permForward + permBackward, ole);
+        mPerm.init(mPartyIdx, rows, permForward + permBackward, ole);
 
 
-        mControlBitGmw.init(rows, getControlBitsCircuit(leftJoinCol.mCol.getBitCount()), ole);
+        mControlBitGmw.init(rows, getControlBitsCircuit(keySize), ole);
 
         mAggTree.init(rows, mDataBitsPerEntry, AggTreeType::Prefix, getDupCircuit(), ole);
 
+        auto cir = *oc::BetaLibrary{}.int_int_bitwiseAnd(1, 1, 1);
+        mUpdateActiveFlagGmw.init(rows, cir, ole);
     }
 
     // leftJoinCol should be unique
     macoro::task<> OmJoin::join(
-        ColRef leftJoinCol,
-        ColRef rightJoinCol,
-        std::vector<ColRef> selects,
-        SharedTable& out,
+        JoinQuery query,
+        Table& out,
         PRNG& prng,
-        CorGenerator& ole,
         coproto::Socket& sock)
     {
-        MC_BEGIN(macoro::task<>, this, leftJoinCol, rightJoinCol, selects, &out, &prng, &ole, &sock,
+        MC_BEGIN(macoro::task<>, this, query, &out, &prng, &sock,
             keys = BinMatrix{},
             sPerm = AdditivePerm{},
             perm = ComposedPerm{},
             controlBits = BinMatrix{},
             data = BinMatrix{},
             temp = BinMatrix{},
-            //aggTree = AggTree{},
-            //sort = RadixSort{},
-            //keyOffset = u64{},
-            //dup = AggTree::Operator{},
             offsets_ = std::vector<Offset>{},
-            //bytesPermuted0 = u64{},
-            //bytesPermuted1 = u64{}, 
             prepro = macoro::eager_task<>{});
 
         setTimePoint("start");
 
         // left keys kL followed by the right keys kR
-        keys = loadKeys(leftJoinCol, rightJoinCol);
+        keys = loadKeys(query.mLeftKey, query.mRightKey);
         setTimePoint("load");
 
         if (mInsecurePrint)
         {
             offsets_ = { Offset{0,keys.bitsPerEntry(), "key"} };
-            MC_AWAIT(print(keys, controlBits, sock, ole.partyIdx(), "keys", offsets_));
+            MC_AWAIT(print(keys, controlBits, sock, mPartyIdx, "keys", offsets_));
         }
 
         mSort.preprocess();
@@ -554,28 +563,35 @@ namespace secJoin
         MC_AWAIT(mSort.genPerm(keys, sPerm, sock,prng));
         setTimePoint("sort");
 
+        MC_AWAIT(sPerm.validate(sock));
+
         mPerm.preprocess();
         MC_AWAIT(prepro);
-
-        if (mInsecurePrint)
-            MC_AWAIT(print(data, controlBits, sock, ole.partyIdx(), "preSort", mOffsets));
 
         // gather all of the columns from the left table and concatinate them
         // together. Append dummy rows after that. Then add the column of keys
         // to that. So it will look something like:
         //     L | kL | 1
         //     0 | kR | 0
-        concatColumns(leftJoinCol, selects, keys, data, ole.partyIdx());
+        concatColumns(query.mLeftKey, query.mSelect, keys, data, mPartyIdx);
         setTimePoint("concat");
         keys.mData = {};
+
+
+        if (mInsecurePrint)
+            MC_AWAIT(print(data, controlBits, sock, mPartyIdx, "preSort", mOffsets));
+
 
         // Apply the sortin permutation. What you end up with are the keys
         // in sorted order and the rows of L also in sorted order.
         temp.resize(data.numEntries(), data.bitsPerEntry() + 8);
         temp.resize(data.numEntries(), data.bitsPerEntry());
         
-        MC_AWAIT(mPerm.generate(sock, prng, sPerm.mShare, perm));
+        MC_AWAIT(mPerm.generate(sock, prng, data.rows(), perm));
         setTimePoint("perm cor gen");
+
+        MC_AWAIT(perm.validate(sock));
+        
 
         MC_AWAIT(perm.derandomize(sPerm, sock));
         setTimePoint("perm cor derand");
@@ -585,26 +601,23 @@ namespace secJoin
         setTimePoint("applyInv-sort");
 
         if (mInsecurePrint)
-            MC_AWAIT(print(data, controlBits, sock, ole.partyIdx(), "sort", mOffsets));
+            MC_AWAIT(print(data, controlBits, sock, mPartyIdx, "sort", mOffsets));
 
         // compare adjacent keys. controlBits[i] = 1 if k[i]==k[i-1].
         // put another way, controlBits[i] = 1 if keys[i] is from the
         // right table and has a matching key from the left table.
-        MC_AWAIT(getControlBits(data, mOffsets[mOffsets.size()-2].mStart, keys.bitsPerEntry(), sock, controlBits, prng));
+        MC_AWAIT(getControlBits(data, mOffsets[mOffsets.size()-1].mStart/8, keys.bitsPerEntry(), sock, controlBits, prng));
         setTimePoint("control");
         //std::cout << "controlBits done " << LOCATION << std::endl;
 
+        if (mInsecurePrint)
+            MC_AWAIT(print(data, controlBits, sock, mPartyIdx, "control", mOffsets));
+
+
         // reshape data so that the key at then end of each row are discarded.
         mOffsets.pop_back();
-        mOffsets.back() = Offset{ mOffsets.back().mStart, 1, "LFlag*" };
-        data.reshape(mOffsets.back().mStart * 8 + 1);
-        temp.reshape(mOffsets.back().mStart * 8 + 1);
-        for (u64 i = 0; i < data.rows(); ++i)
-            data(i, mOffsets.back().mStart) = *oc::BitIterator(data.data(i), mOffsets.back().mStart * 8 + keys.bitsPerEntry());
-
-        if (mInsecurePrint)
-            MC_AWAIT(print(data, controlBits, sock, ole.partyIdx(), "control", mOffsets));
-
+        data.reshape(mOffsets.back().mStart + mOffsets.back().mSize);
+        temp.reshape(mOffsets.back().mStart + mOffsets.back().mSize);
         // duplicate the rows in data that are from L into any matching
         // rows that correspond to R.
         
@@ -615,15 +628,15 @@ namespace secJoin
         //std::cout << "AggTree done " << LOCATION << std::endl;
 
         if (mInsecurePrint)
-            MC_AWAIT(print(data, controlBits, sock, ole.partyIdx(), "agg", mOffsets));
+            MC_AWAIT(print(data, controlBits, sock, mPartyIdx, "agg", mOffsets));
 
 
-        MC_AWAIT(updateActiveFlag(data, controlBits, temp, ole, prng, sock));
+        MC_AWAIT(updateActiveFlag(data, controlBits, temp, mOffsets.back().mStart, prng, sock));
         std::swap(data, temp);
         //std::cout << "Active done " << LOCATION << std::endl;
 
         if (mInsecurePrint)
-            MC_AWAIT(print(data, controlBits, sock, ole.partyIdx(), "isActive", mOffsets));
+            MC_AWAIT(print(data, controlBits, sock, mPartyIdx, "isActive", mOffsets));
 
 
         // appendChoiceBit(data, controlBits, temp);
@@ -647,13 +660,13 @@ namespace secJoin
 
 
         if (mInsecurePrint)
-            MC_AWAIT(print(data, controlBits, sock, ole.partyIdx(), "unsort", mOffsets));
+            MC_AWAIT(print(data, controlBits, sock, mPartyIdx, "unsort", mOffsets));
 
 
 
 
         // unpack L' in `data` and write the result to `out`.
-        getOutput(data, selects, leftJoinCol, out, mOffsets);
+        getOutput(data, query.mSelect, query.mLeftKey, out, mOffsets);
 
 
         MC_END();

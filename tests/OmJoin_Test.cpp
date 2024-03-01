@@ -79,13 +79,22 @@ void OmJoin_getControlBits_Test(const oc::CLP& cmd)
     ole0.init(sock[0].fork(), prng, 0, 1 << 18, cmd.getOr("mock", 1));
     ole1.init(sock[1].fork(), prng, 1, 1 << 18, cmd.getOr("mock", 1));
 
-    throw RTE_LOC;
-    //auto r = macoro::sync_wait(macoro::when_all_ready(
-    //    OmJoin::getControlBits(kk[0], offset, keyBitCount, sock[0], cc[0], ole0, prng),
-    //    OmJoin::getControlBits(kk[1], offset, keyBitCount, sock[1], cc[1], ole1, prng)));
+    OmJoin j[2];
 
-    //std::get<0>(r).result();
-    //std::get<1>(r).result();
+    j[0].mControlBitGmw.init(n, OmJoin::getControlBitsCircuit(keyBitCount), ole0);
+    j[1].mControlBitGmw.init(n, OmJoin::getControlBitsCircuit(keyBitCount), ole1);
+
+
+    auto r = macoro::sync_wait(macoro::when_all_ready(
+        ole0.start(),
+        ole1.start(),
+        j[0].getControlBits(kk[0], offset, keyBitCount, sock[0], cc[0], prng),
+        j[1].getControlBits(kk[1], offset, keyBitCount, sock[1], cc[1], prng)));
+
+    std::get<0>(r).result();
+    std::get<1>(r).result();
+    std::get<2>(r).result();
+    std::get<3>(r).result();
 
     auto c = reveal(cc[0], cc[1]);
 
@@ -139,8 +148,15 @@ void OmJoin_concatColumns_Test()
     u64 offset;
     std::vector<OmJoin::Offset> offsets;
 
-    throw RTE_LOC;
-    //OmJoin::concatColumns(t0[0], select, n1, keys, offset, y, 1, offsets);
+    OmJoin j{};
+    CorGenerator ole;
+    auto sock = coproto::LocalAsyncSocket::makePair();
+    ole.init(std::move(sock[0]), prng, 0);
+
+    JoinQuery query{ t0[0], t1[0], select };
+
+    j.init(query, ole);
+    j.concatColumns(t0[0], select, keys, y, 1);
 
     for (u64 i = 0; i < n0; ++i)
     {
@@ -164,6 +180,7 @@ void OmJoin_concatColumns_Test()
                 iter = iter + (8 - rem);
             }
         }
+        iter = iter + 8;
         auto expIter = oc::BitIterator(keys.mData[i].data());
         for (u64 k = 0; k < keys.bitsPerEntry(); ++k)
         {
@@ -173,11 +190,11 @@ void OmJoin_concatColumns_Test()
                 throw RTE_LOC;
         }
 
-        auto rem = keys.bitsPerEntry() % 8;
-        if (rem)
-        {
-            iter = iter + (8 - rem);
-        }
+        //auto rem = keys.bitsPerEntry() % 8;
+        //if (rem)
+        //{
+        //    iter = iter + (8 - rem);
+        //}
         // std::cout << std::endl;
     }
 }
@@ -214,19 +231,20 @@ void OmJoin_getOutput_Test()
         oc::roundUpTo(L[2].mCol.getBitCount(), 8) + 8;
     BinMatrix data(nL + nR, bitCount);
 
-    BinMatrix isActive(nL + nR, 1);
+    BinMatrix isActive(nL + nR, 8);
     prng.get(isActive.data(), isActive.size());
     isActive.trim();
 
     std::vector<BinMatrix*> cat{ &L.mColumns[0].mData,&L.mColumns[1].mData,&L.mColumns[2].mData, &isActive };
     std::vector<OmJoin::Offset> offsets;
-    OmJoin::concatColumns(data, cat);
-
     for (u64 i = 0, p = 0; i < cat.size(); ++i)
     {
         offsets.emplace_back(OmJoin::Offset{ p,cat[i]->bitsPerEntry(), "L" + std::to_string(i) });
         p += oc::roundUpTo(offsets.back().mSize, 8);
     }
+
+    OmJoin::concatColumns(data, cat, offsets);
+
     Table LL = L;
     for (u64 i = 0; i < LL.mColumns.size(); ++i)
         LL.mColumns[i].mData.resize(nL, LL.mColumns[i].mBitCount);
@@ -271,6 +289,7 @@ void OmJoin_join_Test(const oc::CLP& cmd)
     u64 keySize = cmd.getOr("keySize", 21);
     bool printSteps = cmd.isSet("print");
     bool mock = cmd.getOr("mock", 1);
+    bool debug = cmd.getOr("debug", 1);
 
     auto mod = 1ull << keySize;
     Table L, R;
@@ -316,7 +335,7 @@ void OmJoin_join_Test(const oc::CLP& cmd)
     share(R, Rs, prng);
 
     OmJoin join0, join1;
-
+    
     join0.mInsecurePrint = printSteps;
     join1.mInsecurePrint = printSteps;
 
@@ -338,11 +357,16 @@ void OmJoin_join_Test(const oc::CLP& cmd)
     join0.setTimer(timer);
     // join1.setTimer(timer);
 
-
+    JoinQuery query0{Ls[0][0], Rs[0][0], { Ls[0][0], Rs[0][1], Ls[0][1] }};
+    JoinQuery query1{Ls[1][0], Rs[1][0], { Ls[1][0], Rs[1][1], Ls[1][1] }};
+    join0.init(query0, ole0);
+    join1.init(query1, ole1);
 
     auto r = macoro::sync_wait(macoro::when_all_ready(
-        join0.join(Ls[0][0], Rs[0][0], { Ls[0][0], Rs[0][1], Ls[0][1] }, out[0], prng0, ole0, sock[0]),
-        join1.join(Ls[1][0], Rs[1][0], { Ls[1][0], Rs[1][1], Ls[1][1] }, out[1], prng1, ole1, sock[1])
+        ole0.start(),
+        ole1.start(),
+        join0.join(query0, out[0], prng0, sock[0]),
+        join1.join(query1, out[1], prng1, sock[1])
     ));
     std::get<0>(r).result();
     std::get<1>(r).result();
@@ -447,10 +471,16 @@ void OmJoin_join_BigKey_Test(const oc::CLP& cmd)
     // join1.setTimer(timer);
 
 
+    JoinQuery query0{ Ls[0][0], Rs[0][0], { Ls[0][0], Rs[0][1], Ls[0][1] } };
+    JoinQuery query1{ Ls[1][0], Rs[1][0], { Ls[1][0], Rs[1][1], Ls[1][1] } };
+    join0.init(query0, ole0);
+    join1.init(query1, ole1);
 
     auto r = macoro::sync_wait(macoro::when_all_ready(
-        join0.join(Ls[0][0], Rs[0][0], { Ls[0][0], Rs[0][1], Ls[0][1] }, out[0], prng0, ole0, sock[0]),
-        join1.join(Ls[1][0], Rs[1][0], { Ls[1][0], Rs[1][1], Ls[1][1] }, out[1], prng1, ole1, sock[1])
+        ole0.start(),
+        ole1.start(),
+        join0.join(query0, out[0], prng0, sock[0]),
+        join1.join(query1, out[1], prng1, sock[1])
     ));
     std::get<0>(r).result();
     std::get<1>(r).result();
@@ -545,10 +575,16 @@ void OmJoin_join_Reveal_Test(const oc::CLP& cmd)
     join0.setTimer(timer);
     // join1.setTimer(timer);
 
+    JoinQuery query0{ L[0], RP[0], { L[0], RP[1], L[1] } };
+    JoinQuery query1{ LP[0], R[0], { LP[0], R[1], LP[1] } };
+    join0.init(query0, ole0);
+    join1.init(query1, ole1);
 
     auto r = macoro::sync_wait(macoro::when_all_ready(
-        join0.join(L[0], RP[0], { L[0], RP[1], L[1] }, out[0], prng0, ole0, sock[0]),
-        join1.join(LP[0], R[0], { LP[0], R[1], LP[1] }, out[1], prng1, ole1, sock[1])
+        ole0.start(),
+        ole1.start(),
+        join0.join(query0, out[0], prng0, sock[0]),
+        join1.join(query1, out[1], prng1, sock[1])
     ));
     std::get<0>(r).result();
     std::get<1>(r).result();
@@ -690,8 +726,8 @@ auto communicate(
 
 void OmJoin_join_round_Test(const oc::CLP& cmd)
 {
-    u64 nL = 2000,
-        nR = 999;
+    u64 nL = cmd.getOr("L", 2000),
+        nR = cmd.getOr("R", 999);
     bool printSteps = cmd.isSet("print");
     bool mock = cmd.getOr("mock", 1);
     auto verbose = cmd.isSet("v");
@@ -738,8 +774,10 @@ void OmJoin_join_round_Test(const oc::CLP& cmd)
 
     CorGenerator ole0, ole1;
     std::array<coproto::BufferingSocket, 2> sock;
-    ole0.init(sock[0].fork(), prng, 0, 1 << 18, mock);
-    ole1.init(sock[1].fork(), prng, 1, 1 << 18, mock);
+
+    auto ss = coproto::LocalAsyncSocket::makePair();
+    ole0.init(ss[0].fork(), prng, 0, 1 << 18, mock);
+    ole1.init(ss[1].fork(), prng, 1, 1 << 18, mock);
 
 
     PRNG prng0(oc::ZeroBlock);
@@ -753,18 +791,34 @@ void OmJoin_join_round_Test(const oc::CLP& cmd)
     // join1.setTimer(timer);
 
 
+    JoinQuery query0{ Ls[0][0], Rs[0][0], { Ls[0][0], Rs[0][1], Ls[0][1] } };
+    JoinQuery query1{ Ls[1][0], Rs[1][0], { Ls[1][0], Rs[1][1], Ls[1][1] } };
+    join0.init(query0, ole0);
+    join1.init(query1, ole1);
 
-    auto proto0 = join0.join(Ls[0][0], Rs[0][0], { Ls[0][0], Rs[0][1], Ls[0][1] }, out[0], prng0, ole0, sock[0])
+    auto proto0 = join0.join(query0, out[0], prng0, sock[0])
         | macoro::make_eager();
-    auto proto1 = join1.join(Ls[1][0], Rs[1][0], { Ls[1][0], Rs[1][1], Ls[1][1] }, out[1], prng1, ole1, sock[1])
+    auto proto1 = join1.join(query1, out[1], prng1, sock[1])
         | macoro::make_eager();
 
 
+    auto t0 = ole0.start() | macoro::make_eager();
+    auto t1 = ole1.start() | macoro::make_eager();
 
-    auto f = std::async([&] { communicate(proto0, true, sock[0], verbose); });
-    communicate(proto1, false, sock[1], false);
+    coproto::BufferingSocket::exchangeMessages(sock[0], sock[1]);
 
-    f.get();
+
+
+    //auto f = std::async([&] { communicate(proto0, true, sock[0], verbose); });
+    //communicate(proto1, false, sock[1], false);
+    //f.get();
+
+    macoro::sync_wait(macoro::when_all_ready(
+        std::move(t0),
+        std::move(t1),
+        std::move(proto0),
+        std::move(proto1)
+    ));
 
     auto res = reveal(out[0], out[1]);
 
@@ -849,10 +903,16 @@ void OmJoin_join_csv_Test(const oc::CLP& cmd)
     // join1.setTimer(timer);
 
 
+    JoinQuery query0{ Ls[0][0], Rs[0][0], { Ls[0][0], Rs[0][1], Ls[0][1] } };
+    JoinQuery query1{ Ls[1][0], Rs[1][0], { Ls[1][0], Rs[1][1], Ls[1][1] } };
+    join0.init(query0, ole0);
+    join1.init(query1, ole1);
 
     auto r = macoro::sync_wait(macoro::when_all_ready(
-        join0.join(Ls[0][0], Rs[0][1], { Ls[0][0], Rs[0][2], Ls[0][1] }, out[0], prng0, ole0, sock[0]),
-        join1.join(Ls[1][0], Rs[1][1], { Ls[1][0], Rs[1][2], Ls[1][1] }, out[1], prng1, ole1, sock[1])
+        ole0.start(),
+        ole1.start(),
+        join0.join(query0, out[0], prng0, sock[0]),
+        join1.join(query1, out[1], prng1, sock[1])
     ));
     std::get<0>(r).result();
     std::get<1>(r).result();

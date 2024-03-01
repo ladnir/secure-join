@@ -51,7 +51,8 @@ namespace secJoin {
         avg.emplace_back(&ones);
 
         ret.resize(n0, (rowSize + sizeof(oc::u64)) * 8);
-        OmJoin::concatColumns(ret, avg);
+
+        concatColumns(ret, avg);
 
     }
 
@@ -128,8 +129,9 @@ namespace secJoin {
         keyOffsets = { OmJoin::Offset{0, offset * 8, "key"},
             OmJoin::Offset{offset * 8, 1, "ActFlag"} };
 
+        throw RTE_LOC; // add this back, need to define offsets
         // key size will become of 8 after the concatColumn operation
-        OmJoin::concatColumns(ret, temp);
+        //OmJoin::concatColumns(ret, temp);
 
         for (u64 i = 0; i < keys.rows(); ++i)
             *oc::BitIterator((u8*)ret.data(i), offset * 8) = actFlagVec[i];

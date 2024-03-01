@@ -1202,7 +1202,7 @@ namespace secJoin
 
         for (i = 1; i < ll; ++i)
         {
-            std::cout << "genPerm i=" << i << std::endl;
+            std::cout << "genPerm " << i <<" / " <<ll << std::endl;
 
             // get the next L bits of the key.
             sk = extract(kIdx, mL, k); kIdx += mL;
@@ -1211,7 +1211,7 @@ namespace secJoin
             // make sure the preprocessed random perm
             // is ready to be derandomized
             MC_AWAIT(*mRounds[i - 1].mPrePermReady);
-            std::cout << "prePermReady i=" << i << std::endl; 
+            //std::cout << "prePermReady i=" << i << std::endl; 
 
             // mPerm is currently random. Lets derandomize
             // it to equal the current round sorting perm.
@@ -1481,10 +1481,10 @@ namespace secJoin
         // the last perm wont need prepro.
         if (mPermBytes)
         {
-            std::cout << "perm setup " << (u64)&mPerm << std::endl;
+            //std::cout << "perm setup " << (u64)&mPerm << std::endl;
             randPerm.randomize(mSize, prng);
             MC_AWAIT(mPrePermGen.generate(sock, prng, std::move(randPerm), mPerm));
-            std::cout << "perm setup done " << std::endl;
+            //std::cout << "perm setup done " << std::endl;
         }
 
         // notify the main protocol that this perm is ready

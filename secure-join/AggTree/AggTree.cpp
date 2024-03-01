@@ -692,6 +692,8 @@ namespace secJoin
             {
                 auto bitsPerEntry = src.bitsPerEntry();
                 assert(dst.bitsPerEntry() == bitsPerEntry);
+                assert(dstStart + size <= dst.bytesPerRow());
+                assert(srcStart + size <= src.bytesPerRow());
                 for (u64 k = 0; k < bitsPerEntry; ++k)
                 {
                     for (u64 j = 0; j < 2; ++j)
@@ -719,27 +721,39 @@ namespace secJoin
                 newVals[1].resize(mN16 / 2, mBitsPerEntry, mType);
             }
 
-            // if we have a partial level, then we need to copy 
-            // the initial leaf values to vals that are on the 
-            // second to last level. We will effectively do the
-            // same for preSuf by shifting the bytes down.
+            // we have a tree like
+            // root           |            *
+            //                |      *           *
+            // first partial  |   *     *     *     *
+            // second partial |  * *   * *  
+            //                |
+            // newVals        |  * *   * *    *     *
+            //                                ^     ^ 
+            // we need to copy the leaves from the first partial
+            // level to the newVals vector.
             for (u64 j = 0; j < 2 * firstPartial; ++j)
             {
+                auto srcStart = mR / 16;
+                auto dstStart = mLevelSizes[0] / 16;
+                auto size = (mLevelSizes[1] - mR) / 16;
+                assert(mR * 2 == mLevelSizes[0]);
                 if (mType & Type::Prefix)
                 {
                     // shift the preSuf values down.
-                    copyBytes(temp[j].mPreVal, newVals[j].mPreVal, mR / 16, mLevelSizes[0] / 16, mLevelSizes[1] / 16);
+                    copyBytes(temp[j].mPreVal, newVals[j].mPreVal, srcStart, dstStart, size);
                 }
 
                 if (mType & Type::Suffix)
                 {
                     // shift the preSuf values down.                     
                     //shiftBytes(preSuf[j].mSufVal, mR/16, mN0/16, mN1/16);   
-                    copyBytes(temp[j].mSufVal, newVals[j].mSufVal, mR / 16, mLevelSizes[0] / 16, mLevelSizes[1] / 16);
+                    copyBytes(temp[j].mSufVal, newVals[j].mSufVal, srcStart, dstStart, size);
                 }
             }
 
-            // copy the leaf values that are on the last (partial) level
+
+            // we need to copy the leaves from the second partial
+            // level to the newVals vector.
             for (u64 j = 0; j < 2 * secondPartial; ++j)
             {
                 if (mType & Type::Prefix)

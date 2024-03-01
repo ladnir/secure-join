@@ -25,18 +25,22 @@ namespace secJoin
             t1 = macoro::task<>{}
         );
 
+#ifndef NDEBUG
+        p.validate();
+#endif
+
         chl2 = chl.fork();
         dst.mPartyIdx = mPartyIdx;
 
         if (mPartyIdx)
         {
-            t0 = mPermSender.generate(p, prng, chl, dst.mPermSender);
+            t0 = mPermSender.generate(std::move(p), prng, chl, dst.mPermSender);
             t1 = mPermReceiver.generate(prng2, chl2, dst.mPermReceiver);
         }
         else
         {
             t0 = mPermReceiver.generate(prng2, chl, dst.mPermReceiver);
-            t1 = mPermSender.generate(p, prng, chl2, dst.mPermSender);
+            t1 = mPermSender.generate(std::move(p), prng, chl2, dst.mPermSender);
         }
 
         MC_AWAIT(macoro::when_all_ready(std::move(t0), std::move(t1)));

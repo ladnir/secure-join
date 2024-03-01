@@ -88,6 +88,24 @@ namespace secJoin
         macoro::task<> derandomize(
             AdditivePerm& newPerm,
             coproto::Socket& chl);
+
+        macoro::task<> validate(coproto::Socket& sock)
+        {
+            MC_BEGIN(macoro::task<>, this, &sock);
+
+            if (mPartyIdx)
+            {
+                MC_AWAIT(mPermSender.validate(sock));
+                MC_AWAIT(mPermReceiver.validate(sock));
+            }
+            else
+            {
+                MC_AWAIT(mPermReceiver.validate(sock));
+                MC_AWAIT(mPermSender.validate(sock));
+            }
+
+            MC_END();
+        }
     };
 
 

@@ -259,10 +259,18 @@ namespace secJoin
         oc::Timer timer;
         join0.setTimer(timer);
 
+
+        JoinQuery 
+            query0(Ls[0][0], Rs[0][0], { Ls[0][0], Rs[0][1], Ls[0][1] }),
+            query1(Ls[1][0], Rs[1][0], { Ls[1][0], Rs[1][1], Ls[1][1] });
+
+        join0.init(query0, ole0);
+        join1.init(query1, ole1);
+
         auto begin = timer.setTimePoint("begin");
         auto r = macoro::sync_wait(macoro::when_all_ready(
-            join0.join(Ls[0][0], Rs[0][0], { Ls[0][0], Rs[0][1], Ls[0][1] }, out[0], prng0, ole0, sock[0]),
-            join1.join(Ls[1][0], Rs[1][0], { Ls[1][0], Rs[1][1], Ls[1][1] }, out[1], prng1, ole1, sock[1])
+            join0.join(query0, out[0], prng0, sock[0]),
+            join1.join(query1, out[1], prng1, sock[1])
         ));
         auto end = timer.setTimePoint("end");
 

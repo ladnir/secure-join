@@ -107,6 +107,8 @@ void Average_getControlBits_Test(const oc::CLP& cmd)
     ole1.init(sock[1].fork(), prng, 1, 1 << 16, mock);
 
     auto r = macoro::sync_wait(macoro::when_all_ready(
+        ole0.start(),
+        ole1.start(),
         Average::getControlBits( kk[0], sock[0] ,cc[0], ole0),
         Average::getControlBits( kk[1], sock[1] ,cc[1], ole1)));
 
@@ -175,6 +177,8 @@ void Average_avg_Test(const oc::CLP& cmd)
     // crashes.
     throw RTE_LOC;
     auto r = macoro::sync_wait(macoro::when_all_ready(
+        ole0.start(),
+        ole1.start(),
         avg1.avg(tb[0], { tb[1], tb[2] }, out[0], prng0, ole0, sock[0]),
         avg2.avg(tbShare[0], { tbShare[1], tbShare[2] }, out[1], prng1, ole1, sock[1])
     ));
@@ -264,10 +268,17 @@ void Average_avg_csv_Test(const oc::CLP& cmd)
     // join0.setTimer(timer);
     // join1.setTimer(timer);
 
+    auto query0 = JoinQuery(Ls[0][0], Rs[0][1], { Ls[0][0], Rs[0][2], Ls[0][1] });
+    auto query1 = JoinQuery(Ls[1][0], Rs[1][1], { Ls[1][0], Rs[1][2], Ls[1][1] });
+
+    join0.init(query0, ole0);
+    join1.init(query1, ole1);
 
     auto r = macoro::sync_wait(macoro::when_all_ready(
-        join0.join(Ls[0][0], Rs[0][1], { Ls[0][0], Rs[0][2], Ls[0][1] }, tempOut[0], prng0, ole0, sock[0]),
-        join1.join(Ls[1][0], Rs[1][1], { Ls[1][0], Rs[1][2], Ls[1][1] }, tempOut[1], prng1, ole1, sock[1])
+        ole0.start(),
+        ole1.start(),
+        join0.join(query0, tempOut[0], prng0, sock[0]),
+        join1.join(query1, tempOut[1], prng1, sock[1])
     ));
     std::get<0>(r).result();
     std::get<1>(r).result();

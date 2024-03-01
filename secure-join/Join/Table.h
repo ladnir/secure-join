@@ -17,9 +17,37 @@ namespace secJoin
         IntID = 0,
         StringID = 1
     };
-    using ColumnInfo = std::tuple<std::string, TypeID, u64>;
+    struct ColumnInfo
+    {
+        ColumnInfo () = default;
+        ColumnInfo(std::string name, TypeID type, u64 size)
+            : mName(std::move(name))
+            , mType(type)
+            , mBitCount(size)
+        {
+            if (mType == TypeID::StringID && mBitCount % 8)
+                throw std::runtime_error("String type must have a multiple of 8 bits. " LOCATION);
+        }
 
-    class Column
+        u64 getBitCount() const { return mBitCount; }
+        u64 getByteCount() const { return oc::divCeil(mBitCount,8); }
+
+        std::string mName;
+        TypeID mType;
+        u64 mBitCount = 0;
+
+
+        bool operator==(const ColumnInfo& o) const
+        {
+            return mName == o.mName && mType == o.mType && mBitCount == o.mBitCount;
+        }
+        bool operator!=(const ColumnInfo& o) const
+        {
+            return !(*this == o);
+        }
+    };
+
+    class Column : public ColumnInfo
     {
     public:
         Column() = default;
@@ -29,15 +57,8 @@ namespace secJoin
         Column& operator=(Column&&) = default;
 
         Column(std::string name, TypeID type, u64 size)
-            : mType(type), mBitCount(size), mName(std::move(name))
-        {
-            if (mType == TypeID::StringID && mBitCount % 8)
-                throw std::runtime_error("String type must have a multiple of 8 bits. " LOCATION);
-        }
-
-        TypeID mType;
-        u64 mBitCount = 0;
-        std::string mName;
+            : ColumnInfo(std::move(name), type, size)
+        {}
 
         u64 getByteCount() const { return (getBitCount() + 7) / 8; }
         u64 getBitCount() const { return mBitCount; }
@@ -87,6 +108,8 @@ namespace secJoin
         ColRef(const ColRef&) = default;
         ColRef(ColRef&&) = default;
     };
+
+
     class Table
     {
     public:
@@ -112,11 +135,11 @@ namespace secJoin
             for (u64 i = 0; i < columns.size(); ++i)
             {
                 mColumns.emplace_back(
-                    std::get<0>(columns[i]),
-                    std::get<1>(columns[i]),
-                    std::get<2>(columns[i]));
+                    columns[i].mName,
+                    columns[i].mType,
+                    columns[i].mBitCount);
                 // auto size = (std::get<2>(columns[i]) + 7) / 8;
-                mColumns.back().mData.resize(rows, std::get<2>(columns[i]));
+                mColumns.back().mData.resize(rows, columns[i].mBitCount);
             }
         }
 
@@ -180,8 +203,63 @@ namespace secJoin
 
     std::ostream& operator<<(std::ostream& o, const Table& t);
 
+    struct JoinQuerySchema
+    {
+        struct SelectCol
+        {
+            ColumnInfo mCol;
+            bool mIsLeftColumn;
+            u64 getBitCount() const { return mCol.getBitCount(); }
+            u64 getByteCount() const { return mCol.getByteCount(); }
+            std::string name() const { return mCol.mName; }
+        };
+        u64 mLeftSize = 0, mRightSize = 0;
+        ColumnInfo mKey;
+        std::vector<SelectCol> mSelect;
+    };
+
+    struct JoinQuery
+    {
+        // the unique join key.
+        ColRef mLeftKey;
+
+        // the join key with duplicates.
+        ColRef mRightKey;
+
+        // the columns to be selected.
+        std::vector<ColRef> mSelect;
+
+
+        JoinQuery(const ColRef& leftKey, const ColRef& rightKey, std::vector<ColRef> select)
+            : mLeftKey(leftKey)
+            , mRightKey(rightKey)
+            , mSelect(std::move(select))
+        {
+            for (auto& c : mSelect)
+            {
+                if (&c.mTable != &mLeftKey.mTable &&
+                    &c.mTable != &mRightKey.mTable)
+                    throw RTE_LOC;
+            }
+        }
+
+        operator JoinQuerySchema()
+        {
+            JoinQuerySchema ret;
+            ret.mLeftSize = mLeftKey.mTable.rows();
+            ret.mRightSize = mRightKey.mTable.rows();
+            ret.mKey = mLeftKey.mCol.getColumnInfo();
+            for (auto& c : mSelect)
+            {
+                ret.mSelect.push_back({ c.mCol.getColumnInfo(), &c.mTable == &mLeftKey.mTable });
+            }
+            return ret;
+        }
+    };
+
     macoro::task<> revealLocal(const Table& share, coproto::Socket& sock, Table& out);
     macoro::task<> revealRemote(const Table& share, coproto::Socket& sock);
+
     void populateTable(Table& tb, std::string& fileName, oc::u64 rowCount);
     void populateTable(Table& tb, std::istream& in, oc::u64 rowCount);
     void share(Table& table, std::array<Table, 2>& shares,

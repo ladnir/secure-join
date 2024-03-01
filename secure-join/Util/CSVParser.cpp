@@ -109,20 +109,20 @@ namespace secJoin
             std::cout << "Printing " << fileName << " Meta Data" << std::endl;
             for (u64 i = 0; i < columnInfo.size(); i++)
             {
-                if (std::get<1>(columnInfo[i]) == TypeID::IntID)
+                if (columnInfo[i].mType == TypeID::IntID)
                 {
                     std::cout
-                        << std::get<0>(columnInfo[i]) << " "
+                        << columnInfo[i].mName << " "
                         << "Integer "
-                        << std::get<2>(columnInfo[i]) << " "
+                        << columnInfo[i].mBitCount << " "
                         << std::endl;
                 }
                 else
                 {
                     std::cout
-                        << std::get<0>(columnInfo[i]) << " "
+                        << columnInfo[i].mName << " "
                         << "String "
-                        << std::get<2>(columnInfo[i]) << " "
+                        << columnInfo[i].mBitCount << " "
                         << std::endl;
                 }
             }
@@ -132,15 +132,11 @@ namespace secJoin
     void getFileInfo(std::string &fileName, std::vector<ColumnInfo> &columnInfo, 
         u64 &rowCount, u64& colCount)
     {
-
         std::fstream file(fileName, std::ios::in);
-        std::istream in(file.rdbuf());
-
         if (!file.is_open())
             throw std::runtime_error("Could not open the file " + fileName + "\n" LOCATION);
 
-        getFileInfo(fileName, in, columnInfo, rowCount, colCount);
-        file.close();
+        getFileInfo(fileName, file, columnInfo, rowCount, colCount);
     }
 
 

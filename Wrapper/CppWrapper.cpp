@@ -91,9 +91,12 @@ namespace secJoin
             cState->mOle.init(cState->mSock.fork(), cState->mPrng, 1, 1<<18, mock);
             //cState->mOle.mock(CorGenerator::Role::Receiver);
 
+        JoinQuery query(lJoinCol, rJoinCol, selectCols);
+        cState->mJoin.init(query, cState->mOle);
+
         cState->mProtocol =
-            cState->mJoin.join(lJoinCol, rJoinCol, selectCols,
-                cState->mJoinTable, cState->mPrng, cState->mOle, cState->mSock) | macoro::make_eager();
+            cState->mJoin.join(query,
+                cState->mJoinTable, cState->mPrng, cState->mSock) | macoro::make_eager();
 
         
         return cState.release();

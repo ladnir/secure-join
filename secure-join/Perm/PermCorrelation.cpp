@@ -3,7 +3,7 @@
 
 namespace secJoin
 {
-    macoro::task<> PermCorReceiver::validateShares(coproto::Socket& sock)
+    macoro::task<> PermCorReceiver::validate(coproto::Socket& sock)
     {
         //assert(hasSetup());
         MC_BEGIN(macoro::task<>, this, &sock);
@@ -14,24 +14,26 @@ namespace secJoin
         MC_END();
     }
 
-    macoro::task<> PermCorSender::validateShares(coproto::Socket& sock, Perm p)
+    macoro::task<> PermCorSender::validate(coproto::Socket& sock)
     {
         //assert(hasSetup());
-        MC_BEGIN(macoro::task<>, this, &sock, p,
+        MC_BEGIN(macoro::task<>, this, &sock,
             A = oc::Matrix<oc::block>{},
             B = oc::Matrix<oc::block>{}
         );
+
+        mPerm.validate();
 
         A.resize(mDelta.rows(), mDelta.cols());
         B.resize(mDelta.rows(), mDelta.cols());
         MC_AWAIT(sock.recv(A));
         MC_AWAIT(sock.recv(B));
 
-        for (u64 i = 0; i < p.size(); ++i)
+        for (u64 i = 0; i < mPerm.size(); ++i)
         {
             for (u64 j = 0; j < A.cols(); ++j)
             {
-                if ((B(i, j) ^ mDelta(i, j)) != A(p[i], j))
+                if ((B(i, j) ^ mDelta(i, j)) != A(mPerm[i], j))
                     throw RTE_LOC;
             }
         }

@@ -1420,7 +1420,7 @@ void AggTree_dup_downstream_Test(const oc::CLP& cmd)
     {
         return left;
     };
-    AggTree_xor_downstream_Test(op, opCir, 256, cmd.getOr("mock", 1));
+    AggTree_xor_downstream_Test(op, opCir, cmd.getOr("n", 2343), cmd.getOr("mock", 1));
 }
 
 
@@ -1442,7 +1442,7 @@ void AggTree_xor_full_downstream_Test(const oc::CLP& cmd)
     {
         return left ^ right;
     };
-    AggTree_xor_downstream_Test(op, opCir, 128, cmd.getOr("mock", 1));
+    AggTree_xor_downstream_Test(op, opCir, cmd.getOr("n", 2343), cmd.getOr("mock", 1));
 }
 void AggTree_xor_Partial_downstream_Test(const oc::CLP& cmd)
 {
@@ -1462,20 +1462,19 @@ void AggTree_xor_Partial_downstream_Test(const oc::CLP& cmd)
     {
         return left ^ right;
     };
-    AggTree_xor_downstream_Test(op, opCir, 5, cmd.getOr("mock", 1));
-    AggTree_xor_downstream_Test(op, opCir, 91, cmd.getOr("mock", 1));
+    AggTree_xor_downstream_Test(op, opCir, cmd.getOr("n", 2343), cmd.getOr("mock", 1));
+    AggTree_xor_downstream_Test(op, opCir, cmd.getOr("n", 2343), cmd.getOr("mock", 1));
 }
 
 
 template<typename Op, typename OpCir>
-void AggTree_full_Test(Op op, OpCir opCir, bool mock)
+void AggTree_full_Test(Op op, OpCir opCir,u64 mN, bool mock)
 {
 
     for (auto type : { AggTree::Type::Prefix, AggTree::Type::Suffix,AggTree::Type::Full })
     {
         auto com = coproto::LocalAsyncSocket::makePair();
 
-        u64 mN = 311;
         u64 m = 32;
 
         std::array<CorGenerator, 2> g;
@@ -1561,7 +1560,7 @@ void AggTree_dup_pre_full_Test(const oc::CLP& cmd)
         return left;
     };
 
-    AggTree_full_Test(op, opCir, cmd.getOr("mock", 1));
+    AggTree_full_Test(op, opCir, cmd.getOr("n", 2343), cmd.getOr("mock", 1));
 }
 
 
@@ -1584,5 +1583,5 @@ void AggTree_xor_pre_full_Test(const oc::CLP& cmd)
         return left ^ right;
     };
 
-    AggTree_full_Test(op, opCir, cmd.getOr("mock",1));
+    AggTree_full_Test(op, opCir, cmd.getOr("n", 2343), cmd.getOr("mock",1));
 }

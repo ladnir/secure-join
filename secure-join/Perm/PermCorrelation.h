@@ -79,7 +79,7 @@ namespace secJoin
         }
 
         // for debugging, check that the correlated randomness is correct.
-        macoro::task<> validateShares(coproto::Socket& sock, Perm p);
+        macoro::task<> validate(coproto::Socket& sock);
 
     };
 
@@ -111,7 +111,7 @@ namespace secJoin
         );
 
         // For debugging. Check that the correlated randomness is correct.
-        macoro::task<> validateShares(coproto::Socket& sock);
+        macoro::task<> validate(coproto::Socket& sock);
 
         // change the permutation correlation to
         // hold for `newPerm`. This will reveal the difference
