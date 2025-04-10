@@ -155,14 +155,14 @@ namespace secJoin
 		mOleBatch = {};
 
 		// make base OT requests
-		reqs.reserve(mBatches.size());
-		for (auto i = 0ull; i < mBatches.size();++i)
-		{
-			auto& batch = *mBatches[i];
-			if (!batch.mSize)
-				std::terminate();
-			reqs.push_back(batch.getBaseRequest());
-		}
+		//reqs.reserve(mBatches.size());
+		//for (auto i = 0ull; i < mBatches.size();++i)
+		//{
+		//	auto& batch = *mBatches[i];
+		//	if (!batch.mSize)
+		//		std::terminate();
+		//	reqs.push_back(batch.getBaseRequest());
+		//}
 
 		if (mDebug)
 		{
@@ -219,7 +219,7 @@ namespace secJoin
 
 		}
 
-		req = BaseRequest(reqs);
+		//req = BaseRequest(reqs);
 
 		//socks[0] = mSock;
 		//socks[1] = mSock.fork();
@@ -270,18 +270,19 @@ namespace secJoin
 			}
 		}
 
-		for (auto i = 0ull; i < protos.size(); ++i)
-		{
-			if (mPool)
-				tasks.emplace_back(std::move(protos[i]) | macoro::start_on(*mPool));
-			else
-				tasks.emplace_back(std::move(protos[i]) | macoro::make_eager());
+		//for (auto i = 0ull; i < protos.size(); ++i)
+		//{
+		//	if (mPool)
+		//		tasks.emplace_back(std::move(protos[i]) | macoro::start_on(*mPool));
+		//	else
+		//		tasks.emplace_back(std::move(protos[i]) | macoro::make_eager());
 
-			//co_await tasks.back());
-		}
+		//	//co_await tasks.back());
+		//}
 
-		for (auto i = 0ull; i < tasks.size(); ++i)
-			co_await tasks[i];
+		//for (auto i = 0ull; i < tasks.size(); ++i)
+		//	co_await tasks[i];
+
 
 		setTimePoint("GenState::base");
 
@@ -298,6 +299,17 @@ namespace secJoin
 				if (mBatches[i]->mAbort == false)
 				{
 					auto& batch = *mBatches[i];
+					auto req = batch.getBaseRequest();
+					//Base
+					BaseCor base;
+					base.mOtRecvChoice = req.mChoice;
+					base.mOtRecvMsg.resize(req.mChoice.size(),oc::AllocType::Zeroed);
+					base.mOtSendMsg.resize(req.mSendSize, oc::AllocType::Zeroed);
+					base.mVoleA.resize(req.mVoleChoice.size(), oc::AllocType::Zeroed);
+					base.mVoleChoice = req.mVoleChoice;
+					base.mVoleDelta = oc::ZeroBlock;
+					base.mVoleB.resize(req.mSendVoleSize, oc::AllocType::Zeroed);
+					
 					batch.setBase(base);
 
 					setTimePoint("GenState::batch.begin " + std::to_string(i));

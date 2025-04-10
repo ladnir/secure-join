@@ -92,9 +92,11 @@ namespace secJoin
         block mVoleDelta;
 
         // mVoleA = mVoleB + mVoleChoice * mVoleDelta
+		// (mVoleA, mVoleChoice), (mVoleB, mVoleDelta)
         oc::AlignedUnVector<F4> mVoleChoice;
 
         // mVoleA = mVoleB + mVoleChoice * mVoleDelta
+        // (mVoleA, mVoleChoice), (mVoleB, mVoleDelta)
         oc::AlignedUnVector<block> mVoleB, mVoleA;
 
         template<typename T>
