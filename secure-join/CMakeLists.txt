@@ -35,6 +35,9 @@ set(SRCS
 
     "Sort/BitInjection.cpp"
     "Sort/RadixSort.cpp"
+    "Sort/BatcherMerge.cpp"
+    "Sort/PiLogStar.cpp"
+    "AggTree/BatchPrefix.cpp"
     
     "AggTree/AggTree.cpp"
     "AggTree/Level.cpp"

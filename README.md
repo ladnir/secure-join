@@ -1,5 +1,10 @@
 # Secure Join
 
+The experimental two-party semi-honest **Pi-logstar merge** implementation and
+its real-crypto benchmark are described in [docs/pi-logstar.md](docs/pi-logstar.md).
+Measured scaling, parameter choices, and network results are in
+[docs/logstar-results.md](docs/logstar-results.md).
+
 Secure Join implements oblivious two party database joins on secret shared table. It include the permutation protocols of [iacr/2024/547](https://eprint.iacr.org/2024/547) and the Alternating Moduli secret shared PRF protocols of [iacr/2024/582](https://eprint.iacr.org/2024/582).
 
 ### Build

@@ -15,6 +15,7 @@
 #include "CSVParser_Test.h"
 
 #include "AggTree_Tests.h"
+#include "BatchPrefix_Tests.h"
 #include "OmJoin_Test.h"
 #include "CorGenerator_Test.h"
 #include "GroupBy_Test.h"
@@ -28,6 +29,8 @@ namespace secJoin_Tests
     oc::TestCollection Tests(
         [](oc::TestCollection& t)
         {
+
+            t.add("BatchPrefix_Test                             ", BatchPrefix_Test);
 
 
             t.add("F4Vole_Silent_paramSweep_test                 ", F4Vole_Silent_paramSweep_test);

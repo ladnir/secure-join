@@ -22,6 +22,9 @@ add_subdirectory(tests)
 # link the executable.
 add_subdirectory(frontend)
 
+enable_testing()
+add_test(NAME pi_logstar_real_crypto COMMAND logstar --self-test)
+
 # setup the install
 include(cmake/install.cmake)
 
