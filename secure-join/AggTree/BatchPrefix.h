@@ -21,7 +21,9 @@ namespace secJoin
 
         // Register all GMW correlations before starting cor. leaves must be a
         // positive power of two. Each initialized instance can execute once.
-        void init(u64 batches, u64 leaves, u64 valueBits, CorGenerator& cor);
+        // coreGroup=0 uses Brent--Kung. A positive power of two first reduces
+        // groups of that size, scans their endpoints with Sklansky, then expands.
+        void init(u64 batches, u64 leaves, u64 valueBits, CorGenerator& cor, u64 coreGroup = 0);
         void preprocess();
 
         // values has batches*leaves rows of valueBits bits; controls has the
@@ -31,7 +33,7 @@ namespace secJoin
             BinMatrix& output, coproto::Socket& sock);
 
         // Interactive AND layers, excluding correlation generation. For
-        // leaves > 1 this is 2*log2(leaves)-1, independently of batches.
+        // default coreGroup and leaves > 1: 2*log2(leaves)-1, independently of batches.
         u64 numRounds() const { return mNumRounds; }
 
         // AND-equivalent gates including the GMW backend's 128-lane padding.
@@ -45,6 +47,7 @@ namespace secJoin
             u64 perBatch = 0;
             bool upward = true;
             bool flat = false;
+            std::vector<std::pair<u64, u64>> nodes;
             std::unique_ptr<Gmw> gmw;
         };
         u64 mBatches = 0;

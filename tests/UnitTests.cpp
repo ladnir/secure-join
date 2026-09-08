@@ -31,6 +31,7 @@ namespace secJoin_Tests
         {
 
             t.add("BatchPrefix_Test                             ", BatchPrefix_Test);
+            t.add("StableSecretExtract_Test                     ", StableSecretExtract_Test);
 
 
             t.add("F4Vole_Silent_paramSweep_test                 ", F4Vole_Silent_paramSweep_test);

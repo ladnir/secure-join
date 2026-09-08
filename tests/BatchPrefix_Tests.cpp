@@ -52,10 +52,11 @@ namespace secJoin_Tests
             generators[party].init(sockets[party].fork(), protocolRandom[party], party, 1, 1 << 18, false);
 
         std::vector<std::unique_ptr<PrefixCase>> cases;
+        for (u64 group : {0, 1, 2, 8, 16})
         for (auto dimensions : {std::array<u64, 3>{1, 1, 1}, {7, 2, 7},
             {129, 8, 13}, {4, 16, 257}, {3, 64, 67}, {1, 128, 896},
             {127, 2, 65}, {128, 2, 65}, {129, 2, 65},
-            {127, 4, 1}, {128, 4, 1}, {129, 4, 1}})
+            {127, 4, 1}, {128, 4, 1}, {129, 4, 1}, {4, 2048, 145}})
         {
             auto c = std::make_unique<PrefixCase>();
             c->batches = dimensions[0]; c->leaves = dimensions[1]; c->width = dimensions[2];
@@ -84,8 +85,11 @@ namespace secJoin_Tests
             for (auto n = c->leaves; n > 1; n /= 2) ++depth;
             for (u64 party = 0; party < 2; ++party)
             {
-                c->protocols[party].init(c->batches, c->leaves, c->width, generators[party]);
-                if (c->protocols[party].numRounds() != (depth ? 2 * depth - 1 : 0))
+                c->protocols[party].init(c->batches, c->leaves, c->width, generators[party], group);
+                u64 groupDepth = 0;
+                for (auto g = group; g > 1; g /= 2) ++groupDepth;
+                const auto expectedDepth = group && group < c->leaves ? depth + groupDepth : depth ? 2 * depth - 1 : 0;
+                if (c->protocols[party].numRounds() != expectedDepth)
                     throw std::runtime_error("BatchPrefix communication depth differs from tree depth");
                 c->protocols[party].preprocess();
             }

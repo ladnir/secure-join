@@ -13,6 +13,7 @@ namespace secJoin
         // Public tuning parameters. Zero blockSize chooses a power of two near log2(n).
         u64 baseCase = 16;
         u64 blockSize = 0; // Override at the outermost recursion only.
+        bool packed = true; // Exact one-partition specialization for power-of-two inputs.
     };
 
     struct PiLogStarStage
@@ -27,7 +28,7 @@ namespace secJoin
     // Two-party, semi-honest merge of equal-length, unsigned, sorted XOR-shared lists.
     // Output is an XOR-shared gather permutation: sorted[i] = (X || Y)[pi[i]].
     // Equal keys are ordered by original position (all equal X keys precede Y keys).
-    // No inputs, intermediate masks, or output indices are opened by this class.
+    // Only jointly shuffled extraction flags/ranks are opened; keys and indices stay shared.
     // Correlations and this instance are single-use; construct a fresh instance per merge.
     class PiLogStar
     {
@@ -56,8 +57,8 @@ namespace secJoin
         u64 paddedSize() const;
         u64 expandedSize() const;
         u64 gmwRounds() const;
-        // Online communication-depth upper bound: AND layers plus 5 one-way
-        // steps per derandomized permutation and 4 steps for bit/rank conversion.
+        // Online depth: AND layers plus 9 one-way steps for the packed path;
+        // general path: 5 per derandomized permutation plus 4 for rank conversion.
         // Excludes input sharing, preprocessing, transport setup, and output opening.
         u64 onlineRoundBound() const;
         u64 paddedAnds() const;

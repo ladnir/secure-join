@@ -10,6 +10,18 @@ using namespace secJoin;
 void plaintext_perm_test(const oc::CLP& cmd)
 {
     PRNG prng(oc::ZeroBlock);
+    for (u64 size : { 0ull, 1ull, 2ull, 3ull, 127ull, 128ull, 129ull, 4095ull, 4096ull, 4097ull })
+    {
+        Perm sampled(size, prng);
+        sampled.validate();
+        auto identity = sampled.compose(sampled.inverse());
+        for (u64 i = 0; i < size; ++i)
+            if (identity[i] != i) throw RTE_LOC;
+    }
+    bool capacityRejected = false;
+    try { Perm oversized(~u32(0), prng); }
+    catch (const std::invalid_argument&) { capacityRejected = true; }
+    if (!capacityRejected) throw RTE_LOC;
     u64 n = 100;
     Perm p0(n, prng), p1(n, prng);
 

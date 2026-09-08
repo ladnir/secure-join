@@ -66,7 +66,7 @@ namespace secJoin
     }
 
     void BatchPrefix::init(u64 batches, u64 leaves, u64 valueBits,
-        CorGenerator& cor)
+        CorGenerator& cor, u64 coreGroup)
     {
         if (!batches || !leaves || (leaves & (leaves - 1)))
             throw std::invalid_argument("BatchPrefix requires positive batches and power-of-two leaves");
@@ -74,6 +74,9 @@ namespace secJoin
             throw std::invalid_argument("BatchPrefix valueBits exceeds circuit limits");
         if (!cor.initialized() || cor.partyIdx() > 1)
             throw std::invalid_argument("BatchPrefix requires an initialized two-party CorGenerator");
+        if (coreGroup && (coreGroup & (coreGroup - 1)))
+            throw std::invalid_argument("BatchPrefix coreGroup must be zero or a power of two");
+        if (coreGroup >= leaves) coreGroup = 0;
         const auto rows = prefixProduct(batches, leaves);
         prefixProduct(rows, (valueBits + 7) / 8);
 
@@ -83,12 +86,22 @@ namespace secJoin
         auto upCir = combineCircuit(valueBits, true);
         auto downCir = combineCircuit(valueBits, false);
         auto andCir = scalarAndCircuit();
-        auto addStage = [&](u64 stride, bool upward)
+        auto addStage = [&](u64 stride, bool upward, bool core = false)
         {
             Stage stage;
             stage.stride = stride;
             stage.upward = upward;
-            stage.perBatch = leaves / (2 * stride) - (upward ? 0 : 1);
+            if (core)
+            {
+                for (u64 group = 0; group < leaves / coreGroup; ++group)
+                    if (group % (2 * stride) >= stride)
+                        stage.nodes.emplace_back((group / (2 * stride) * 2 * stride + stride) * coreGroup - 1,
+                            (group + 1) * coreGroup - 1);
+            }
+            else
+                for (u64 i = (upward ? 2 : 3) * stride - 1; i < leaves; i += 2 * stride)
+                    stage.nodes.emplace_back(i - stride, i);
+            stage.perBatch = stage.nodes.size();
             const auto pairs = prefixProduct(stage.perBatch, batches);
             if (pairs > std::numeric_limits<u64>::max() - 127)
                 throw std::overflow_error("BatchPrefix SIMD dimensions overflow");
@@ -117,12 +130,15 @@ namespace secJoin
         };
 
         // Brent-Kung reduction: retain summaries at right subtree endpoints.
-        for (u64 stride = 1; stride < leaves; stride *= 2)
+        for (u64 stride = 1; stride < (coreGroup ? coreGroup : leaves); stride *= 2)
             addStage(stride, true);
+        if (coreGroup)
+            for (u64 stride = 1; stride < leaves / coreGroup; stride *= 2)
+                addStage(stride, true, true);
         // Distribute inclusive prefixes to the remaining endpoints. The left
         // operand is now a prefix whose control product is public zero; only
         // the output value is needed, saving one AND per combine.
-        for (u64 stride = leaves / 4; stride; stride /= 2)
+        for (u64 stride = coreGroup ? coreGroup / 2 : leaves / 4; stride; stride /= 2)
             addStage(stride, false);
 
         mBatches = batches;
@@ -164,7 +180,6 @@ namespace secJoin
         for (auto& stage : mStages)
         {
             const auto lanes = stage.perBatch * mBatches;
-            const auto first = (stage.upward ? 2 : 3) * stage.stride - 1;
             if (stage.flat)
             {
                 const auto products = mValueBits + stage.upward;
@@ -194,11 +209,11 @@ namespace secJoin
                 const auto tailBits = mValueBits % 8;
                 u64 pair = 0;
                 for (u64 batch = 0; batch < mBatches; ++batch)
-                    for (u64 i = first; i < mLeaves; i += 2 * stage.stride, ++pair)
+                    for (const auto& node : stage.nodes)
                     {
-                        const auto r = batch * mLeaves + i;
-                        const auto l = r - stage.stride;
-                        const auto begin = pair * products;
+                        const auto r = batch * mLeaves + node.second;
+                        const auto l = batch * mLeaves + node.first;
+                        const auto begin = pair++ * products;
                         const auto control = bits(r, 0) & 1;
                         const auto controlByte = static_cast<u8>(0u - control);
                         for (u64 byte = 0; byte < fullBytes; ++byte)
@@ -226,10 +241,10 @@ namespace secJoin
                 co_await gmw.run(sock);
                 pair = 0;
                 for (u64 batch = 0; batch < mBatches; ++batch)
-                    for (u64 i = first; i < mLeaves; i += 2 * stage.stride, ++pair)
+                    for (const auto& node : stage.nodes)
                     {
-                        const auto r = batch * mLeaves + i;
-                        const auto begin = pair * products;
+                        const auto r = batch * mLeaves + node.second;
+                        const auto begin = pair++ * products;
                         for (u64 byte = 0; byte < fullBytes; ++byte)
                             work(r, byte) ^= get(masked.data(), begin + 8 * byte, 8);
                         if (tailBits)
@@ -250,15 +265,16 @@ namespace secJoin
             }
             u64 lane = 0;
             for (u64 batch = 0; batch < mBatches; ++batch)
-                for (u64 i = first; i < mLeaves; i += 2 * stage.stride, ++lane)
+                for (const auto& node : stage.nodes)
                 {
-                    const auto r = batch * mLeaves + i;
-                    const auto l = r - stage.stride;
+                    const auto r = batch * mLeaves + node.second;
+                    const auto l = batch * mLeaves + node.first;
                     std::copy(work[l].begin(), work[l].end(), left[lane].begin());
                     std::copy(work[r].begin(), work[r].end(), right[lane].begin());
                     rightControl(lane, 0) = bits(r, 0);
                     if (stage.upward)
                         leftControl(lane, 0) = bits(l, 0);
+                    ++lane;
                 }
             auto& gmw = *stage.gmw;
             gmw.setInput<u8>(0, left.mData);
@@ -272,12 +288,13 @@ namespace secJoin
                 gmw.getOutput<u8>(1, combinedControl.mData);
             lane = 0;
             for (u64 batch = 0; batch < mBatches; ++batch)
-                for (u64 i = first; i < mLeaves; i += 2 * stage.stride, ++lane)
+                for (const auto& node : stage.nodes)
                 {
-                    const auto r = batch * mLeaves + i;
+                    const auto r = batch * mLeaves + node.second;
                     std::copy(combined[lane].begin(), combined[lane].end(), work[r].begin());
                     if (stage.upward)
                         bits(r, 0) = combinedControl(lane, 0);
+                    ++lane;
                 }
             // Correlations are single-use; release the completed evaluator.
             stage.gmw.reset();

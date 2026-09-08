@@ -3,6 +3,8 @@
 #include <cryptoTools/Common/Matrix.h>
 #include <cryptoTools/Network/Channel.h>
 #include <cryptoTools/Crypto/PRNG.h>
+#include <algorithm>
+#include <stdexcept>
 
 
 #include <iostream>
@@ -52,16 +54,17 @@ namespace secJoin
 		// sample a random permutation of size n
 		void randomize(u64 n, PRNG& prng)
 		{
+			if (n >= ~u32(0))
+				throw std::invalid_argument("Perm::randomize exceeds 32-bit permutation capacity");
 			mPi.resize(n);
 			for (u64 i = 0; i < size(); i++)
 				mPi[i] = i;
 
-			assert(n < ~u32(0));
-			for (u64 i = 0; i < size(); i++)
-			{
-				auto idx = (prng.get<u32>() % (size() - i)) + i;
-				std::swap(mPi[i], mPi[idx]);
-			}
+			// PRNG implements the 64-bit UniformRandomBitGenerator interface.
+			// std::shuffle uses unbiased bounded sampling. Reducing a random
+			// u32 modulo the remaining size biases the permutation and is unsafe
+			// when the permutation hides positions that are subsequently opened.
+			std::shuffle(mPi.begin(), mPi.end(), prng);
 		}
 
 		// A.compose(B) computes the permutation AoB

@@ -1,0 +1,197 @@
+% BEGIN OPTIMIZED PACKED PI-LOGSTAR EVALUATION
+\subsection{Concrete Optimization of \ourprotocol}\label{sec:packed-eval}
+\input{plots/packed/packed-values.tex}
+
+We now evaluate an optimized implementation of the main construction.
+This subsection supplements the preceding development measurements.
+It uses a new executable and fresh experiments at every power of two from
+$n=2^{10}$ through $n=2^{20}$, where $n$ is the number of keys in each list.
+Both protocols return the same stable, XOR-shared gather permutation of $2n$
+inputs. The baseline is a Batcher bitonic merge network on the same GMW backend,
+with balanced comparisons and projection of the final layer onto required output bits.
+The optimized implementation reduces online communication by
+\packedSmallReduction\% at $2^{10}$ and \packedLargeReduction\% at $2^{20}$
+relative to Batcher. We report preprocessing separately throughout.
+
+\paragraph{Platform and measurement procedure.}
+The platform is the Lenovo 83DF laptop described above, with an Intel Core
+i9-14900HX and approximately $32$\,GiB of physical memory.
+Ubuntu under WSL2 exposes $32$ logical CPUs and approximately $15$\,GiB of RAM.
+We compile C++20 in Release mode with GCC 13.3 and CMake 3.28.3,
+using \texttt{-O3} and \texttt{-march=native}.
+Local experiments execute both parties as coroutines on one OS thread.
+Two concurrent correlation batches overlap coroutine work; they do not create
+two cryptographic worker threads. Each TCP party runs in a separate process
+with two inherited Boost.Asio I/O workers. CPU affinity and frequency are not fixed.
+
+Every local size has three fresh executions per protocol. We alternate which
+protocol runs first across repetitions. Both protocols use $32$-bit keys,
+$2^{20}$-entry correlation batches, and the same synthetic input seed within
+each paired trial. Private cryptographic randomness comes from independent
+OS-seeded PRNGs. All preprocessing uses the real inherited OT/OLE and permutation
+protocols; no dealer, mock, or idealized substitute is timed.
+We report medians and show observed minimum--maximum timing ranges.
+Setup, output opening, and correctness checks are excluded from phase timings.
+Each measured output is checked against an independent stable merge.
+Communication sums both parties' sent bytes once, includes coproto framing,
+and excludes TCP/IP headers.\footnote{Local Batcher execution charges a
+24-byte session registration per party to the online phase. TCP initializes
+that session in the excluded configuration handshake. We retain the measured
+transport counters without normalization.} MiB denotes $2^{20}$ bytes.
+We record peak process RSS and sample process swap every $0.5$ seconds.
+
+\paragraph{Implementation and public parameter selection.}
+The five protocol components and shared permutation header comprise
+\packedLibraryLoc\ physical lines of
+C++ source and headers, including comments and blank lines.
+The benchmark and focused C++ tests comprise another \packedTestLoc\ lines.
+These counts exclude inherited cryptographic dependencies and other repository
+components. The optimized path applies to power-of-two inputs with one partition
+and terminal block size at most $16$. General padded and deeper recursive schedules
+remain implemented separately.
+
+For each input size, we independently evaluate public circuit costs for
+$m\in\{2,4,8,16\}$. The objective is the padded GMW communication plus the
+block-dependent permutation payload. Terms common to all candidates are omitted
+from this selection objective. The minimizing block size is $m=4$ at every
+measured size; each base merge therefore combines two four-row blocks.
+These are public parameter choices, independent of the keys and timing outcomes.
+The artifact records all candidate costs and the selected schedule.
+This fixed one-partition specialization targets concrete costs; we make no
+new asymptotic claim for a fixed block size as $n$ grows.
+
+\paragraph{Compressed blocks and parallel base merges.}
+A block carries its keys and one original block identifier.
+Each row's original index is recovered from that identifier and its public
+offset, avoiding repeated indices during block permutation and broadcast.
+The representative merge also avoids a duplicate 32-bit payload index.
+The broadcast reduces groups of eight blocks, scans group endpoints with a
+Sklansky network, and distributes the resulting prefixes within groups.
+For $L>8$ blocks, its depth is $\log_2 L+3$, instead of $2\log_2 L-1$.
+This reduces depth at a modest increase in broadcast work.
+
+Each terminal merge compares all cross-pairs in parallel.
+The comparisons use the key and original source bit to resolve cross-list ties.
+Sortedness makes the comparison results monotone; adjacent XORs produce one-hot
+insertion positions. Public offsets and source choices are then accumulated
+with XORs, and validity bits require one product per candidate.
+This replaces repeated comparator/swap layers with one comparison batch.
+Copied rows with no predecessor from the original block are inactive, so the
+base merge also implements the lower interval mask.
+Upper masks compare keys and source bits, using the sorted block order to
+resolve equal same-source boundaries. We preserve each real row exactly once.
+
+\paragraph{Direct ranks and stable extraction.}
+An active row's global rank is the sum of the two within-list block-start
+indices and its position in the local merged block.
+The interval masks ensure that a later opposite-source block cannot contribute
+an earlier key. When the opposite predecessor is absent, its dummy start and
+cross-comparison contributions are zero. Two additions per block compute rank
+prefixes for the two halves of the output, avoiding per-row arithmetic conversion
+and extraction OTs.
+
+We correct the inherited permutation sampler before using it here.
+The previous sampler reduced 32-bit random words modulo the remaining length,
+introducing bias. We use \texttt{std::shuffle} with the cryptographic PRNG's
+64-bit generator interface and unbiased bounded sampling.
+The correction also applies to block permutations.
+The preceding development measurements predate this correction; all experiments
+in this subsection use the corrected sampler.
+
+We jointly shuffle the shared validity flags, ranks, and output indices using
+fresh permutation correlations. We then open the shuffled flags and only the
+ranks at valid positions, and place the still-shared indices at those ranks.
+For either semi-honest party, the other party's private random permutation hides
+the original positions. In the hybrid with ideal primitives and uniform randomness,
+the opened transcript is a uniform placement of the
+distinct labels $0,\ldots,2n-1$ among $4n$ positions; its distribution depends
+only on public dimensions. Inactive ranks and output indices remain shared.
+The artifact gives the corresponding simulation argument under the inherited
+primitive assumptions. Correlations are consumed once.
+
+These optimizations pass $8{,}642$ independent plaintext cases with direct-rank
+checks, $72$ additional real-cryptography cases with random XOR shares, and
+separate extraction, prefix, and permutation tests. Validation includes duplicate and maximum
+keys, wide keys, padding, deeper recursion, and rejection of correlation reuse.
+An exhaustive four-position example also checks the input independence of the
+shuffled-rank transcript; it supplements the argument rather than replacing it.
+
+\paragraph{Communication and local execution.}
+\Cref{fig:packed-communication} shows the complete sweep.
+The optimized protocol uses fewer online bytes already at the smallest sampled
+size, $2^{10}$: \packedSmallPi\ versus \packedSmallBatcher\,MiB.
+At $2^{20}$, it uses \packedLargePi\ versus \packedLargeBatcher\,MiB,
+a \packedLargeReduction\% reduction. Its online traffic is also
+\packedReductionOld\% below the previous implementation's $2{,}125.159$\,MiB.
+The first sampled size already favors the optimized protocol; we do not infer
+an exact break-even size below the evaluated range.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\linewidth]{plots/packed/packed-communication.pdf}
+\caption{Verified online communication at every power of two from $2^{10}$
+through $2^{20}$ keys per list. The right panel divides optimized
+\ourprotocol\ bytes by Batcher bytes; the dashed line denotes equality.
+Connecting lines guide the eye.}
+\label{fig:packed-communication}
+\end{figure}
+
+\input{plots/packed/packed-table.tex}
+
+At $2^{20}$, the local medians for \ourprotocol\ and Batcher are
+\packedLargeOnlinePi\ and \packedLargeOnlineBatcher\,s online, and
+\packedLargeOfflinePi\ and \packedLargeOfflineBatcher\,s preprocessing.
+Peak RSS is \packedLargeRssPi\ and \packedLargeRssBatcher\,GiB, respectively.
+\packedPagingStatement{}
+The online ranges overlap, so these medians do not establish a consistent
+local speed advantage.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\linewidth]{plots/packed/packed-time-depth.pdf}
+\caption{Local online time and preprocessing time, with both parties on one
+OS thread. Markers are three-run medians; error bars show observed ranges.}
+\label{fig:packed-runtime}
+\end{figure}
+
+\paragraph{Preprocessing and depth.}
+The byte savings above concern the online phase.
+At $2^{20}$, \ourprotocol\ preprocessing sends \packedLargeOfflineBytesPi\,MiB.
+Batcher sends \packedLargeOfflineBytesBatcher\,MiB.
+The corresponding online depth bounds are \packedLargeDepthPi\ and
+\packedLargeDepthBatcher. We count GMW AND layers and nine additional one-way
+steps for block permutation and shuffled extraction; preprocessing is excluded.
+These are dependency-depth bounds, not packet counts.
+The optimized construction uses more preprocessing bandwidth and greater online
+depth, even where it reduces online communication and execution time.
+
+\paragraph{Network sensitivity.}
+We use isolated Linux network namespaces connected by a virtual Ethernet pair.
+Each direction receives a \texttt{tc netem} rate limit and half the configured
+RTT. The profiles are LAN ($1$\,Gbit/s, $0.2$\,ms), WAN ($100$\,Mbit/s,
+$40$\,ms), and slow WAN ($10$\,Mbit/s, $40$\,ms).
+These are emulated links on one laptop. We take three paired trials per profile
+at $2^{12}$ and $2^{16}$, and one paired WAN trial at $2^{20}$.
+TCP phase time is the slower party's time.
+\input{plots/packed/packed-network-text.tex}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\linewidth]{plots/packed/packed-network.pdf}
+\caption{Measured TCP online time and offline-plus-online time.
+Bars at $2^{12}$ and $2^{16}$ are three-run medians with observed ranges;
+the $2^{20}$ WAN comparison is one execution per protocol.
+Rates are full-duplex limits per direction.}
+\label{fig:packed-network}
+\end{figure}
+
+\paragraph{Batch sensitivity and reproducibility.}
+A separate matched pilot compares correlation batches of $2^{20}$ and $2^{22}$
+at $2^{14}$ and $2^{16}$. \packedBatchStatement{}
+We retain $2^{20}$ for the main sweep
+and all network comparisons, identically for both protocols.
+Online byte counts do not depend on this preprocessing batch choice.
+The artifact contains source, all candidate schedules, raw paired JSONL records,
+memory measurements, plotting scripts, and the executable hash.
+\clearpage
+% END OPTIMIZED PACKED PI-LOGSTAR EVALUATION

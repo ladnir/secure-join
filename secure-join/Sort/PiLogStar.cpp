@@ -1,4 +1,5 @@
 #include "PiLogStar.h"
+#include "PackedLogStar.h"
 #include "BatcherMerge.h"
 #include "RadixSort.h"
 #include "secure-join/AggTree/BatchPrefix.h"
@@ -59,6 +60,7 @@ namespace secJoin
         u64 orderBytes = 0, rowBytes = 0, role = 0, expanded = 0;
         bool requested = false, preprocessed = false, prepareStarted = false, prepared = false, used = false;
         std::vector<std::unique_ptr<Level>> levels;
+        std::unique_ptr<PackedLogStar> packed;
         BatcherMerge base;
         RadixSort compact;
         AltModComposedPerm compactGen;
@@ -97,6 +99,18 @@ namespace secJoin
         m->orderBits = m->indexBits + keyBits + 1; // explicit +infinity bit
         m->orderBytes = oc::divCeil(m->orderBits, 8);
         m->rowBytes = m->orderBytes + 1; // separately byte-addressable real flag
+        const auto outerBlock = opts.blockSize ? opts.blockSize : pow2(std::max<u64>(1, ceilLog(m->padded)));
+        if (opts.packed && n == m->padded && n > opts.baseCase &&
+            outerBlock < n && outerBlock <= opts.baseCase && outerBlock <= 16)
+        {
+            m->packed = std::make_unique<PackedLogStar>();
+            m->packed->init(n, keyBits, outerBlock, cor);
+            m->expanded = 4 * n;
+            m->stats = m->packed->stats;
+            for (auto& s : m->stats) { m->totalRounds += s.gmwRounds; m->totalAnds += s.paddedAnds; }
+            m->requested = true;
+            return;
+        }
         u64 count = 1, size = m->padded;
         while (size > opts.baseCase)
         {
@@ -146,6 +160,7 @@ namespace secJoin
     void PiLogStar::preprocess()
     {
         if (!m->requested || m->preprocessed) throw std::logic_error("PiLogStar: invalid preprocess state");
+        if (m->packed) { m->packed->preprocess(); m->preprocessed = true; return; }
         for (auto& l : m->levels)
         { l->medians.preprocess(); l->permGen.preprocess(); l->prefix.preprocess(); l->mask.preprocess(); }
         m->base.preprocess();
@@ -157,6 +172,7 @@ namespace secJoin
     {
         if (!m->preprocessed || m->prepareStarted) throw std::logic_error("PiLogStar: invalid prepare state");
         m->prepareStarted = true; // Burn the invocation even if transport/preparation fails.
+        if (m->packed) { co_await m->packed->prepare(sock, prng); m->prepared = true; co_return; }
         for (auto& l : m->levels)
             co_await l->permGen.generate(sock, prng, l->blocks, l->perm);
         if (!m->levels.empty())
@@ -174,6 +190,12 @@ namespace secJoin
         if (x.rows() != m->n || y.rows() != m->n || x.bitsPerEntry() != m->keyBits || y.bitsPerEntry() != m->keyBits)
             throw std::invalid_argument("PiLogStar: input dimensions differ from public configuration");
         m->used = true;
+        if (m->packed)
+        {
+            co_await m->packed->merge(x, y, output, sock, prng);
+            m->stats = m->packed->stats;
+            co_return;
+        }
         BinMatrix rows(2 * m->padded, m->rowBytes * 8);
         for (u64 side = 0; side < 2; ++side)
             for (u64 j = 0; j < m->padded; ++j)
@@ -263,6 +285,7 @@ namespace secJoin
             l.mask.setInput(3, high); l.mask.setInput(4, flags);
             co_await l.mask.run(sock);
             l.mask.getOutput(0, active);
+            l.mask.clear();
             BinMatrix next(2 * total, m->rowBytes * 8);
             for (u64 i = 0; i < l.blocks; ++i)
                 for (u64 j = 0; j < l.block; ++j)
@@ -316,6 +339,6 @@ namespace secJoin
     u64 PiLogStar::expandedSize() const { return m->expanded; }
     u64 PiLogStar::gmwRounds() const { return m->totalRounds; }
     u64 PiLogStar::onlineRoundBound() const
-    { return m->totalRounds + (m->levels.empty() ? 0 : 5 * (m->levels.size() + 1) + 4); }
+    { return m->totalRounds + (m->packed ? 9 : m->levels.empty() ? 0 : 5 * (m->levels.size() + 1) + 4); }
     u64 PiLogStar::paddedAnds() const { return m->totalAnds; }
 }

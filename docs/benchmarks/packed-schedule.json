@@ -1,0 +1,632 @@
+{
+  "binary_sha256": "769ba0491bdd740616f500dcd0f1acab78dfdb944ed777cc3bbcf9953287c0b5",
+  "schedules": [
+    {
+      "n": 1024,
+      "bits": 32,
+      "block": 4,
+      "base": 4,
+      "batch_size": 1048576,
+      "candidates": [
+        {
+          "type": "public_schedule",
+          "n": 1024,
+          "key_bits": 32,
+          "base_case": 2,
+          "block_override": 2,
+          "padded_ands": 1910144,
+          "round_bound": 125,
+          "expanded_rows": 4096,
+          "path": "packed_partition",
+          "selection_cost_bytes": 987840
+        },
+        {
+          "type": "public_schedule",
+          "n": 1024,
+          "key_bits": 32,
+          "base_case": 4,
+          "block_override": 4,
+          "padded_ands": 1798912,
+          "round_bound": 115,
+          "expanded_rows": 4096,
+          "path": "packed_partition",
+          "selection_cost_bytes": 924032
+        },
+        {
+          "type": "public_schedule",
+          "n": 1024,
+          "key_bits": 32,
+          "base_case": 8,
+          "block_override": 8,
+          "padded_ands": 2380160,
+          "round_bound": 106,
+          "expanded_rows": 4096,
+          "path": "packed_partition",
+          "selection_cost_bytes": 1210560
+        },
+        {
+          "type": "public_schedule",
+          "n": 1024,
+          "key_bits": 32,
+          "base_case": 16,
+          "block_override": 16,
+          "padded_ands": 3976832,
+          "round_bound": 97,
+          "expanded_rows": 4096,
+          "path": "packed_partition",
+          "selection_cost_bytes": 2006592
+        }
+      ]
+    },
+    {
+      "n": 2048,
+      "bits": 32,
+      "block": 4,
+      "base": 4,
+      "batch_size": 1048576,
+      "candidates": [
+        {
+          "type": "public_schedule",
+          "n": 2048,
+          "key_bits": 32,
+          "base_case": 2,
+          "block_override": 2,
+          "padded_ands": 4074240,
+          "round_bound": 134,
+          "expanded_rows": 8192,
+          "path": "packed_partition",
+          "selection_cost_bytes": 2102656
+        },
+        {
+          "type": "public_schedule",
+          "n": 2048,
+          "key_bits": 32,
+          "base_case": 4,
+          "block_override": 4,
+          "padded_ands": 3724544,
+          "round_bound": 125,
+          "expanded_rows": 8192,
+          "path": "packed_partition",
+          "selection_cost_bytes": 1911424
+        },
+        {
+          "type": "public_schedule",
+          "n": 2048,
+          "key_bits": 32,
+          "base_case": 8,
+          "block_override": 8,
+          "padded_ands": 4833792,
+          "round_bound": 115,
+          "expanded_rows": 8192,
+          "path": "packed_partition",
+          "selection_cost_bytes": 2457856
+        },
+        {
+          "type": "public_schedule",
+          "n": 2048,
+          "key_bits": 32,
+          "base_case": 16,
+          "block_override": 16,
+          "padded_ands": 7863936,
+          "round_bound": 106,
+          "expanded_rows": 8192,
+          "path": "packed_partition",
+          "selection_cost_bytes": 3968832
+        }
+      ]
+    },
+    {
+      "n": 4096,
+      "bits": 32,
+      "block": 4,
+      "base": 4,
+      "batch_size": 1048576,
+      "candidates": [
+        {
+          "type": "public_schedule",
+          "n": 4096,
+          "key_bits": 32,
+          "base_case": 2,
+          "block_override": 2,
+          "padded_ands": 8673280,
+          "round_bound": 143,
+          "expanded_rows": 16384,
+          "path": "packed_partition",
+          "selection_cost_bytes": 4467712
+        },
+        {
+          "type": "public_schedule",
+          "n": 4096,
+          "key_bits": 32,
+          "base_case": 4,
+          "block_override": 4,
+          "padded_ands": 7719680,
+          "round_bound": 134,
+          "expanded_rows": 16384,
+          "path": "packed_partition",
+          "selection_cost_bytes": 3958144
+        },
+        {
+          "type": "public_schedule",
+          "n": 4096,
+          "key_bits": 32,
+          "base_case": 8,
+          "block_override": 8,
+          "padded_ands": 9811072,
+          "round_bound": 125,
+          "expanded_rows": 16384,
+          "path": "packed_partition",
+          "selection_cost_bytes": 4987456
+        },
+        {
+          "type": "public_schedule",
+          "n": 4096,
+          "key_bits": 32,
+          "base_case": 16,
+          "block_override": 16,
+          "padded_ands": 15818752,
+          "round_bound": 115,
+          "expanded_rows": 16384,
+          "path": "packed_partition",
+          "selection_cost_bytes": 7983104
+        }
+      ]
+    },
+    {
+      "n": 8192,
+      "bits": 32,
+      "block": 4,
+      "base": 4,
+      "batch_size": 1048576,
+      "candidates": [
+        {
+          "type": "public_schedule",
+          "n": 8192,
+          "key_bits": 32,
+          "base_case": 2,
+          "block_override": 2,
+          "padded_ands": 18462720,
+          "round_bound": 152,
+          "expanded_rows": 32768,
+          "path": "packed_partition",
+          "selection_cost_bytes": 9493504
+        },
+        {
+          "type": "public_schedule",
+          "n": 8192,
+          "key_bits": 32,
+          "base_case": 4,
+          "block_override": 4,
+          "padded_ands": 15996928,
+          "round_bound": 143,
+          "expanded_rows": 32768,
+          "path": "packed_partition",
+          "selection_cost_bytes": 8195072
+        },
+        {
+          "type": "public_schedule",
+          "n": 8192,
+          "key_bits": 32,
+          "base_case": 8,
+          "block_override": 8,
+          "padded_ands": 19925760,
+          "round_bound": 134,
+          "expanded_rows": 32768,
+          "path": "packed_partition",
+          "selection_cost_bytes": 10126720
+        },
+        {
+          "type": "public_schedule",
+          "n": 8192,
+          "key_bits": 32,
+          "base_case": 16,
+          "block_override": 16,
+          "padded_ands": 31814528,
+          "round_bound": 125,
+          "expanded_rows": 32768,
+          "path": "packed_partition",
+          "selection_cost_bytes": 16054720
+        }
+      ]
+    },
+    {
+      "n": 16384,
+      "bits": 32,
+      "block": 4,
+      "base": 4,
+      "batch_size": 1048576,
+      "candidates": [
+        {
+          "type": "public_schedule",
+          "n": 16384,
+          "key_bits": 32,
+          "base_case": 2,
+          "block_override": 2,
+          "padded_ands": 39159808,
+          "round_bound": 161,
+          "expanded_rows": 65536,
+          "path": "packed_partition",
+          "selection_cost_bytes": 20104192
+        },
+        {
+          "type": "public_schedule",
+          "n": 16384,
+          "key_bits": 32,
+          "base_case": 4,
+          "block_override": 4,
+          "padded_ands": 33175552,
+          "round_bound": 152,
+          "expanded_rows": 65536,
+          "path": "packed_partition",
+          "selection_cost_bytes": 16980992
+        },
+        {
+          "type": "public_schedule",
+          "n": 16384,
+          "key_bits": 32,
+          "base_case": 8,
+          "block_override": 8,
+          "padded_ands": 40474624,
+          "round_bound": 143,
+          "expanded_rows": 65536,
+          "path": "packed_partition",
+          "selection_cost_bytes": 20564992
+        },
+        {
+          "type": "public_schedule",
+          "n": 16384,
+          "key_bits": 32,
+          "base_case": 16,
+          "block_override": 16,
+          "padded_ands": 63998720,
+          "round_bound": 134,
+          "expanded_rows": 65536,
+          "path": "packed_partition",
+          "selection_cost_bytes": 32294272
+        }
+      ]
+    },
+    {
+      "n": 32768,
+      "bits": 32,
+      "block": 4,
+      "base": 4,
+      "batch_size": 1048576,
+      "candidates": [
+        {
+          "type": "public_schedule",
+          "n": 32768,
+          "key_bits": 32,
+          "base_case": 2,
+          "block_override": 2,
+          "padded_ands": 83054592,
+          "round_bound": 170,
+          "expanded_rows": 131072,
+          "path": "packed_partition",
+          "selection_cost_bytes": 42575872
+        },
+        {
+          "type": "public_schedule",
+          "n": 32768,
+          "key_bits": 32,
+          "base_case": 4,
+          "block_override": 4,
+          "padded_ands": 68716544,
+          "round_bound": 161,
+          "expanded_rows": 131072,
+          "path": "packed_partition",
+          "selection_cost_bytes": 35144704
+        },
+        {
+          "type": "public_schedule",
+          "n": 32768,
+          "key_bits": 32,
+          "base_case": 8,
+          "block_override": 8,
+          "padded_ands": 82262016,
+          "round_bound": 152,
+          "expanded_rows": 131072,
+          "path": "packed_partition",
+          "selection_cost_bytes": 41786368
+        },
+        {
+          "type": "public_schedule",
+          "n": 32768,
+          "key_bits": 32,
+          "base_case": 16,
+          "block_override": 16,
+          "padded_ands": 128751616,
+          "round_bound": 143,
+          "expanded_rows": 131072,
+          "path": "packed_partition",
+          "selection_cost_bytes": 64965632
+        }
+      ]
+    },
+    {
+      "n": 65536,
+      "bits": 32,
+      "block": 4,
+      "base": 4,
+      "batch_size": 1048576,
+      "candidates": [
+        {
+          "type": "public_schedule",
+          "n": 65536,
+          "key_bits": 32,
+          "base_case": 2,
+          "block_override": 2,
+          "padded_ands": 175849472,
+          "round_bound": 179,
+          "expanded_rows": 262144,
+          "path": "packed_partition",
+          "selection_cost_bytes": 90152960
+        },
+        {
+          "type": "public_schedule",
+          "n": 65536,
+          "key_bits": 32,
+          "base_case": 4,
+          "block_override": 4,
+          "padded_ands": 142430208,
+          "round_bound": 170,
+          "expanded_rows": 262144,
+          "path": "packed_partition",
+          "selection_cost_bytes": 72787968
+        },
+        {
+          "type": "public_schedule",
+          "n": 65536,
+          "key_bits": 32,
+          "base_case": 8,
+          "block_override": 8,
+          "padded_ands": 167151616,
+          "round_bound": 161,
+          "expanded_rows": 262144,
+          "path": "packed_partition",
+          "selection_cost_bytes": 84886528
+        },
+        {
+          "type": "public_schedule",
+          "n": 65536,
+          "key_bits": 32,
+          "base_case": 16,
+          "block_override": 16,
+          "padded_ands": 259078144,
+          "round_bound": 152,
+          "expanded_rows": 262144,
+          "path": "packed_partition",
+          "selection_cost_bytes": 130718720
+        }
+      ]
+    },
+    {
+      "n": 131072,
+      "bits": 32,
+      "block": 4,
+      "base": 4,
+      "batch_size": 1048576,
+      "candidates": [
+        {
+          "type": "public_schedule",
+          "n": 131072,
+          "key_bits": 32,
+          "base_case": 2,
+          "block_override": 2,
+          "padded_ands": 372244480,
+          "round_bound": 188,
+          "expanded_rows": 524288,
+          "path": "packed_partition",
+          "selection_cost_bytes": 190578688
+        },
+        {
+          "type": "public_schedule",
+          "n": 131072,
+          "key_bits": 32,
+          "base_case": 4,
+          "block_override": 4,
+          "padded_ands": 295124992,
+          "round_bound": 179,
+          "expanded_rows": 524288,
+          "path": "packed_partition",
+          "selection_cost_bytes": 150839296
+        },
+        {
+          "type": "public_schedule",
+          "n": 131072,
+          "key_bits": 32,
+          "base_case": 8,
+          "block_override": 8,
+          "padded_ands": 339824640,
+          "round_bound": 170,
+          "expanded_rows": 524288,
+          "path": "packed_partition",
+          "selection_cost_bytes": 172533760
+        },
+        {
+          "type": "public_schedule",
+          "n": 131072,
+          "key_bits": 32,
+          "base_case": 16,
+          "block_override": 16,
+          "padded_ands": 521308160,
+          "round_bound": 161,
+          "expanded_rows": 524288,
+          "path": "packed_partition",
+          "selection_cost_bytes": 263013376
+        }
+      ]
+    },
+    {
+      "n": 262144,
+      "bits": 32,
+      "block": 4,
+      "base": 4,
+      "batch_size": 1048576,
+      "candidates": [
+        {
+          "type": "public_schedule",
+          "n": 262144,
+          "key_bits": 32,
+          "base_case": 2,
+          "block_override": 2,
+          "padded_ands": 783515648,
+          "round_bound": 198,
+          "expanded_rows": 1048576,
+          "path": "packed_partition",
+          "selection_cost_bytes": 400670720
+        },
+        {
+          "type": "public_schedule",
+          "n": 262144,
+          "key_bits": 32,
+          "base_case": 4,
+          "block_override": 4,
+          "padded_ands": 611844096,
+          "round_bound": 188,
+          "expanded_rows": 1048576,
+          "path": "packed_partition",
+          "selection_cost_bytes": 312475648
+        },
+        {
+          "type": "public_schedule",
+          "n": 262144,
+          "key_bits": 32,
+          "base_case": 8,
+          "block_override": 8,
+          "padded_ands": 690962432,
+          "round_bound": 179,
+          "expanded_rows": 1048576,
+          "path": "packed_partition",
+          "selection_cost_bytes": 350855168
+        },
+        {
+          "type": "public_schedule",
+          "n": 262144,
+          "key_bits": 32,
+          "base_case": 16,
+          "block_override": 16,
+          "padded_ands": 1049186304,
+          "round_bound": 170,
+          "expanded_rows": 1048576,
+          "path": "packed_partition",
+          "selection_cost_bytes": 529311744
+        }
+      ]
+    },
+    {
+      "n": 524288,
+      "bits": 32,
+      "block": 4,
+      "base": 4,
+      "batch_size": 1048576,
+      "candidates": [
+        {
+          "type": "public_schedule",
+          "n": 524288,
+          "key_bits": 32,
+          "base_case": 2,
+          "block_override": 2,
+          "padded_ands": 1649344512,
+          "round_bound": 207,
+          "expanded_rows": 2097152,
+          "path": "packed_partition",
+          "selection_cost_bytes": 842498048
+        },
+        {
+          "type": "public_schedule",
+          "n": 524288,
+          "key_bits": 32,
+          "base_case": 4,
+          "block_override": 4,
+          "padded_ands": 1264812032,
+          "round_bound": 198,
+          "expanded_rows": 2097152,
+          "path": "packed_partition",
+          "selection_cost_bytes": 645513216
+        },
+        {
+          "type": "public_schedule",
+          "n": 524288,
+          "key_bits": 32,
+          "base_case": 8,
+          "block_override": 8,
+          "padded_ands": 1405616128,
+          "round_bound": 188,
+          "expanded_rows": 2097152,
+          "path": "packed_partition",
+          "selection_cost_bytes": 713555968
+        },
+        {
+          "type": "public_schedule",
+          "n": 524288,
+          "key_bits": 32,
+          "base_case": 16,
+          "block_override": 16,
+          "padded_ands": 2111782912,
+          "round_bound": 179,
+          "expanded_rows": 2097152,
+          "path": "packed_partition",
+          "selection_cost_bytes": 1065459712
+        }
+      ]
+    },
+    {
+      "n": 1048576,
+      "bits": 32,
+      "block": 4,
+      "base": 4,
+      "batch_size": 1048576,
+      "candidates": [
+        {
+          "type": "public_schedule",
+          "n": 1048576,
+          "key_bits": 32,
+          "base_case": 2,
+          "block_override": 2,
+          "padded_ands": 3467640832,
+          "round_bound": 216,
+          "expanded_rows": 4194304,
+          "path": "packed_partition",
+          "selection_cost_bytes": 1769472000
+        },
+        {
+          "type": "public_schedule",
+          "n": 1048576,
+          "key_bits": 32,
+          "base_case": 4,
+          "block_override": 4,
+          "padded_ands": 2616131584,
+          "round_bound": 207,
+          "expanded_rows": 4194304,
+          "path": "packed_partition",
+          "selection_cost_bytes": 1334280192
+        },
+        {
+          "type": "public_schedule",
+          "n": 1048576,
+          "key_bits": 32,
+          "base_case": 8,
+          "block_override": 8,
+          "padded_ands": 2856550400,
+          "round_bound": 198,
+          "expanded_rows": 4194304,
+          "path": "packed_partition",
+          "selection_cost_bytes": 1449771008
+        },
+        {
+          "type": "public_schedule",
+          "n": 1048576,
+          "key_bits": 32,
+          "base_case": 16,
+          "block_override": 16,
+          "padded_ands": 4251451392,
+          "round_bound": 188,
+          "expanded_rows": 4194304,
+          "path": "packed_partition",
+          "selection_cost_bytes": 2144862208
+        }
+      ]
+    }
+  ]
+}

@@ -53,6 +53,7 @@ set(SRCS
 	RadixSort_Test.cpp
 	AggTree_Tests.cpp
 	BatchPrefix_Tests.cpp
+    StableSecretExtract_Tests.cpp
 	AltModPerm_Test.cpp
 	CSVParser_Test.cpp
 	OmJoin_Test.cpp

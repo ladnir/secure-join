@@ -86,10 +86,36 @@ def records(stdout):
 
 def trial(exe, options, profile, timeout):
     if profile == "local":
-        p = subprocess.run([str(exe), *options], capture_output=True, text=True, timeout=timeout)
-        if p.returncode:
-            raise RuntimeError(p.stderr + p.stdout)
-        return records(p.stdout)
+        p = subprocess.Popen([str(exe), *options], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        deadline = time.monotonic() + timeout
+        peak_swap = peak_rss = samples = 0
+        try:
+            while True:
+                status = pathlib.Path(f"/proc/{p.pid}/status")
+                try:
+                    fields = dict(line.split(':', 1) for line in status.read_text().splitlines() if ':' in line)
+                    peak_swap = max(peak_swap, int(fields.get('VmSwap', '0 kB').split()[0]))
+                    peak_rss = max(peak_rss, int(fields.get('VmRSS', '0 kB').split()[0]))
+                    samples += 1
+                except FileNotFoundError:
+                    pass
+                if time.monotonic() >= deadline:
+                    raise subprocess.TimeoutExpired(p.args, timeout)
+                try:
+                    stdout, stderr = p.communicate(timeout=min(0.5, deadline - time.monotonic()))
+                    break
+                except subprocess.TimeoutExpired:
+                    continue
+            if p.returncode:
+                raise RuntimeError(stderr + stdout)
+            result = records(stdout)
+            for r in result:
+                r.update(peak_sampled_swap_kib=peak_swap, peak_sampled_rss_kib=peak_rss,
+                         memory_samples=samples, memory_sampling_interval_s=0.5)
+            return result
+        finally:
+            if p.poll() is None:
+                p.kill(); p.communicate()
     with link(profile) as names:
         processes = []
         try:
@@ -102,11 +128,38 @@ def trial(exe, options, profile, timeout):
                     time.sleep(0.15)
             all_records = []
             deadline = time.monotonic() + timeout
-            for p in processes:
+            memory = [dict(peak_sampled_swap_kib=0, peak_sampled_rss_kib=0,
+                           memory_samples=0, memory_sampling_interval_s=0.5) for _ in processes]
+            while True:
+                active = [p for p in processes if p.poll() is None]
+                if not active:
+                    break
+                for p, measured in zip(processes, memory):
+                    try:
+                        fields = dict(line.split(':', 1) for line in
+                                      pathlib.Path(f"/proc/{p.pid}/status").read_text().splitlines() if ':' in line)
+                        measured['peak_sampled_swap_kib'] = max(measured['peak_sampled_swap_kib'],
+                                                              int(fields.get('VmSwap', '0 kB').split()[0]))
+                        measured['peak_sampled_rss_kib'] = max(measured['peak_sampled_rss_kib'],
+                                                             int(fields.get('VmRSS', '0 kB').split()[0]))
+                        measured['memory_samples'] += 1
+                    except FileNotFoundError:
+                        pass
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise subprocess.TimeoutExpired(active[0].args, timeout)
+                try:
+                    active[0].communicate(timeout=min(0.5, remaining))
+                except subprocess.TimeoutExpired:
+                    pass
+            for p, measured in zip(processes, memory):
                 stdout, stderr = p.communicate(timeout=max(1, deadline - time.monotonic()))
                 if p.returncode:
                     raise RuntimeError(stderr + stdout)
-                all_records.extend(records(stdout))
+                result = records(stdout)
+                for r in result:
+                    r.update(measured)
+                all_records.extend(result)
             return all_records
         finally:
             for p in processes:

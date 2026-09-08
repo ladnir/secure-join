@@ -31,7 +31,7 @@ namespace
         u64 batchSize = 262144, concurrency = 2;
         int party = -1;
         std::string address = "127.0.0.1:12123", pattern = "random", seed = "1";
-        bool selfTest = false, help = false;
+        bool selfTest = false, help = false, packed = true, plan = false;
     };
 
     const std::array<std::string, 6> patterns = {
@@ -57,12 +57,14 @@ namespace
             const std::string option = argv[i];
             if (option == "--help" || option == "-h") { o.help = true; continue; }
             if (option == "--self-test") { o.selfTest = true; continue; }
+            if (option == "--plan") { o.plan = true; continue; }
             if (i + 1 == argc) throw std::invalid_argument("Missing value for " + option);
             const std::string value = argv[++i];
             if (option == "--n") o.n = number(value);
             else if (option == "--bits") o.bits = number(value);
             else if (option == "--base") o.base = number(value);
             else if (option == "--block") o.block = number(value);
+            else if (option == "--packed") { if (value != "0" && value != "1") throw std::invalid_argument("--packed must be 0 or 1"); o.packed = value == "1"; }
             else if (option == "--batch-size") o.batchSize = number(value);
             else if (option == "--concurrency") o.concurrency = number(value);
             else if (option == "--party")
@@ -205,6 +207,7 @@ namespace
             << ",\"real_crypto\":true,\"public_synthetic_inputs\":true,\"verified\":true"
             << ",\"n\":" << o.n << ",\"key_bits\":" << o.bits << ",\"base_case\":" << o.base
             << ",\"block_override\":" << o.block << ",\"batch_size\":" << o.batchSize
+            << ",\"packed_enabled\":" << (o.packed ? "true" : "false")
             << ",\"concurrency\":" << o.concurrency << ",\"pattern\":" << quoted(o.pattern)
             << ",\"public_seed\":" << quoted(o.seed) << ",\"padded_n\":" << protocol.paddedSize()
             << ",\"expanded_rows\":" << protocol.expandedSize()
@@ -267,7 +270,7 @@ namespace
         CorGenerator cor[2];
         PiLogStar protocol[2];
         AdditivePerm output[2];
-        PiLogStarOptions params{ o.base, o.block };
+        PiLogStarOptions params{ o.base, o.block, o.packed };
         Measurement m;
         auto wallStart = Clock::now();
         cor[0].init(socks[0].fork(), prng0, 0, o.concurrency, o.batchSize, false);
@@ -311,9 +314,9 @@ namespace
         auto sock = coproto::asioConnect(o.address, o.party == 0);
         // Match public configuration before consuming any protocol correlations.
         const auto pattern = std::find(patterns.begin(), patterns.end(), o.pattern) - patterns.begin();
-        const std::array<u64, 10> config = { 1, o.n, o.bits, o.base, o.block,
-            o.batchSize, o.concurrency, static_cast<u64>(pattern), publicSeed(o.seed), static_cast<u64>(o.party) };
-        std::array<u64, 10> peer{};
+        const std::array<u64, 11> config = { 2, o.n, o.bits, o.base, o.block,
+            o.batchSize, o.concurrency, static_cast<u64>(pattern), publicSeed(o.seed), static_cast<u64>(o.packed), static_cast<u64>(o.party) };
+        std::array<u64, 11> peer{};
         complete(sock.send(coproto::copy(config)), sock.recv(peer));
         peer.back() ^= 1;
         if (peer != config) throw std::runtime_error("The parties supplied different public configurations");
@@ -328,7 +331,7 @@ namespace
         Measurement m;
         auto wallStart = Clock::now();
         cor.init(sock.fork(), prng, o.party, o.concurrency, o.batchSize, false);
-        protocol.init(o.n, o.bits, cor, { o.base, o.block });
+        protocol.init(o.n, o.bits, cor, { o.base, o.block, o.packed });
         protocol.preprocess();
         auto offlineStart = Clock::now();
         auto before = count(sock);
@@ -479,9 +482,8 @@ namespace
             << (project ? "true" : "false") << ",\"passed\":true}" << std::endl;
     }
 
-    void wideKeyTest()
+    void wideKeyTest(u64 n = 17)
     {
-        constexpr u64 n = 17;
         std::mt19937_64 rng(582074);
         for (u64 bits : { 127, 256 })
         {
@@ -536,7 +538,7 @@ namespace
 
     void selfTest(Options o)
     {
-        rejectionTest(); comparatorTest(); batcherTest(); batcherTest(true); wideKeyTest();
+        rejectionTest(); comparatorTest(); batcherTest(); batcherTest(true); wideKeyTest(); wideKeyTest(32);
         struct Test { u64 n, bits, base, block; const char* pattern; };
         const std::array<Test, 11> cases = {{
             { 1, 1, 8, 0, "equal" }, { 2, 64, 8, 0, "max" },
@@ -551,8 +553,33 @@ namespace
             o.n = c.n; o.bits = c.bits; o.base = c.base; o.block = c.block; o.pattern = c.pattern;
             localRun(o, true);
         }
+        u64 packedCases = 0;
+        for (u64 block : { 2, 4, 8, 16 })
+            for (const auto& pattern : patterns)
+                for (u64 bits : { 1, 32, 64 })
+                {
+                    o.n = 64; o.bits = bits; o.base = block; o.block = block;
+                    o.pattern = pattern; o.packed = true;
+                    localRun(o, true); ++packedCases;
+                }
+        std::cout << "{\"type\":\"self_test\",\"test\":\"packed_logstar_random_shares\",\"cases\":"
+            << packedCases << ",\"passed\":true}" << std::endl;
         std::cout << "{\"type\":\"self_test\",\"test\":\"pi_logstar_real_crypto\",\"cases\":"
             << cases.size() << ",\"passed\":true}" << std::endl;
+    }
+
+    void plan(const Options& o)
+    {
+        auto socks = coproto::LocalAsyncSocket::makePair();
+        PRNG prng(oc::sysRandomSeed());
+        CorGenerator cor;
+        cor.init(socks[0].fork(), prng, 0, o.concurrency, o.batchSize, false);
+        PiLogStar protocol;
+        protocol.init(o.n, o.bits, cor, {o.base, o.block, o.packed});
+        std::cout << "{\"type\":\"public_schedule\",\"n\":" << o.n << ",\"key_bits\":" << o.bits
+            << ",\"base_case\":" << o.base << ",\"block_override\":" << o.block
+            << ",\"padded_ands\":" << protocol.paddedAnds() << ",\"round_bound\":" << protocol.onlineRoundBound()
+            << ",\"expanded_rows\":" << protocol.expandedSize() << ",\"path\":" << quoted(protocol.stages()[0].name) << "}" << std::endl;
     }
 }
 
@@ -566,7 +593,7 @@ int main(int argc, char** argv)
             std::cout << "Usage: logstar [--n 1024] [--bits 32] [--base 16] [--block 0]\n"
                 "  [--batch-size 262144] [--concurrency 2] [--seed public-seed]\n"
                 "  [--pattern random|equal|disjoint|interleaved|max|duplicates]\n"
-                "  [--party 0|1 --address 127.0.0.1:12123] [--self-test]\n\n"
+                "  [--party 0|1 --address 127.0.0.1:12123] [--packed 0|1] [--plan] [--self-test]\n\n"
                 "Default: both parties in one process using LocalAsyncSocket.\n"
                 "Synthetic CLI keys support 1..64 bits; the library API supports 1..256 bits.\n"
                 "TCP: run matching commands on two hosts; party 0 listens, party 1 connects.\n"
@@ -576,7 +603,8 @@ int main(int argc, char** argv)
                 "Communication counts are coproto bytes, including protocol framing but excluding TCP/IP headers.\n";
             return 0;
         }
-        if (o.selfTest) selfTest(o);
+        if (o.plan) plan(o);
+        else if (o.selfTest) selfTest(o);
         else if (o.party < 0) localRun(o);
         else networkRun(o);
         return 0;

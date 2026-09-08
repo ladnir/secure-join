@@ -7,17 +7,36 @@ keys and returns an XOR-shared **gather permutation**:
 sorted[i] = (X || Y)[permutation[i]]
 ```
 
-The protocol never reconstructs the keys, source tags, dummy flags, or permutation.
+The protocol never reconstructs the keys, source tags, or output permutation.
+The optimized path opens only jointly shuffled validity flags and active ranks,
+whose distribution is independent of the input given the public dimensions.
 The benchmark reconstructs its synthetic result **after** the measured protocol
 to check it against an independent stable merge. The library supports 1–256-bit
 keys; all meaningful key bits are little-endian within each `BinMatrix` row.
 The output uses the existing `AdditivePerm` type, which despite its name contains
 XOR shares of `u32` indices, not arithmetic shares.
 
-See [measured results](logstar-results.md) for scaling, parameter sweeps, Batcher
-comparisons, and emulated LAN/WAN experiments with raw records.
+See [optimized measurements](packed-results.md) for the complete size sweep,
+parameter selection, Batcher comparisons, and emulated LAN/WAN experiments.
+The [earlier measurements](logstar-results.md) remain archived separately.
 
-## Implemented construction
+## Optimized concrete path
+
+For unpadded power-of-two inputs with one partition and block size at most 16,
+the default `packed` option uses compressed block IDs, a hybrid prefix, batched
+all-pairs base merges, direct global ranks, and stable shuffled extraction.
+See [the complete optimization and security argument](packed-logstar.md).
+Set `--packed 0` to run the general construction below. `--plan` prints public
+circuit counts without claiming an executed or verified benchmark.
+The per-size evaluator considers blocks 2, 4, 8, and 16 independently; the
+32-bit online-byte objective selects block 4 throughout 2^10--2^20.
+Run that measured configuration with `--base 4 --block 4 --batch-size 1048576`.
+The library's automatic block heuristic remains the general construction's
+near-logarithmic choice; `packed=true` enables the specialization when its
+public schedule meets the conditions above. Use the explicit selected parameters
+to reproduce the optimized evaluation.
+
+## General construction
 
 This follows `constructionone.tex` in the accompanying paper: block merge,
 transition-block broadcast, interval masking, parallel recursion, and final
@@ -83,8 +102,10 @@ proof of the underlying cryptographic primitives.
 
 Public parameters are the two equal lengths, key width, padding, recursion
 schedule, cutoff, and block-size override. Inputs must already be sorted.
-All addressing, control flow, message lengths, and batch sizes depend on public
-parameters. Local comparisons of share values are never used to choose branches.
+All addressing, control flow, message lengths, and batch sizes before extraction
+depend on public parameters. Packed extraction also uses its input-independent
+opened shuffled flags and ranks. Local comparisons of secret share values are
+never used to choose branches.
 Every invocation needs fresh private randomness and fresh, single-use
 correlations. The public benchmark seed selects only the synthetic dataset;
 protocol PRNGs must use independent operating-system entropy.
@@ -97,7 +118,7 @@ PRNG prng(oc::sysRandomSeed());
 CorGenerator cor;
 cor.init(sock.fork(), prng, role, 2, 1 << 18, false);
 PiLogStar protocol;
-protocol.init(n, keyBits, cor, PiLogStarOptions{16, 0});
+protocol.init(n, keyBits, cor, PiLogStarOptions{4, 4});
 protocol.preprocess();
 auto ready = co_await macoro::when_all_ready(
     cor.start(), protocol.prepare(sock, prng));
@@ -115,13 +136,15 @@ open them.
 
 ## Communication and rounds
 
-The median merge has `log2(2*n/m)` comparator layers; all same-depth subproblems
+In the general construction, the median merge has `log2(2*n/m)` comparator layers; all same-depth subproblems
 share each layer. The broadcast has at most `2*log2(2*n/m)-1` AND layers, regardless
 of the number of subproblems. The base merge has `log2(2*m)` comparator layers.
 Comparisons use a balanced tree with logarithmic AND depth in the encoded key
 width, rather than a ripple comparator. Conditional swaps use one AND per row
 bit and local XORs for both outputs. The final median and base merge layers
 compute only the payload bits the caller needs, skipping swaps of discarded keys.
+The packed path replaces the terminal network with parallel all-pairs comparisons
+and uses the hybrid broadcast depth described in [the optimization notes](packed-logstar.md).
 
 The paper treats comparisons and fixed-word arithmetic as primitives. Actual
 GMW rounds include their bit-level depth, and the actual byte counts include
@@ -139,7 +162,9 @@ Reported measurements distinguish:
   Phase totals are recorded after flushing buffered sends. Per-stage attribution
   is approximate because sends may finish during the next stage.
 - **GMW rounds:** interactive AND layers, excluding local XOR-only levels.
-- **Online round bound:** GMW layers plus five one-way dependency steps per
+- **Online round bound:** The packed path adds nine one-way steps to its GMW
+  depth (block permutation and shuffled extraction). The general path adds
+  five one-way dependency steps per
   derandomized permutation and four for stable radix bit/rank conversion. This
   is a conservative protocol-depth accounting, not a count of TCP packets or
   socket `send()` calls. Preprocessing and verification are excluded.
@@ -158,8 +183,11 @@ cmake --build out/build/linux --target logstar secJoinfrontend -j4
 out/build/linux/frontend/logstar --self-test
 ctest --test-dir out/build/linux -R pi_logstar_real_crypto --output-on-failure
 out/build/linux/frontend/secJoinfrontend -u BatchPrefix_Test
+out/build/linux/frontend/secJoinfrontend -u StableSecretExtract_Test
+out/build/linux/frontend/secJoinfrontend -u plaintext_perm_test ComposedPerm_apply_test ComposedPerm_compose_test AltModPerm_setup_test AltModComposedPerm_setup_test
 python3 tests/logstar_reference.py
-out/build/linux/frontend/logstar --n 4096 --bits 32 --base 16
+python3 tests/packed_logstar_reference.py
+out/build/linux/frontend/logstar --n 4096 --bits 32 --base 4 --block 4 --batch-size 1048576
 ```
 
 Use `--base` equal to or larger than the padded list size for a pure Batcher

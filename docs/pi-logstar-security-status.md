@@ -8,12 +8,18 @@ ideal-functionality stub in the active execution path.
 | Component | Active implementation |
 |---|---|
 | Comparisons, conditional swaps, and interval masks | Boolean GMW with real binary OLE correlations |
-| Batched segmented broadcast | GMW implementation of a Brent–Kung prefix scan |
+| Batched segmented broadcast | GMW Brent–Kung scan; packed path uses a Sklansky core between groups of eight |
 | Block permutations | `AltModComposedPerm` and the repository's alternating-moduli PRF protocols |
-| Stable extraction | One-bit `RadixSort`, real bit injection/OTs, and a correlated permutation |
+| Stable extraction | Packed path: secret direct ranks, joint random shuffle, openings of shuffled flags and active ranks. General path: one-bit `RadixSort` and correlated permutation |
 | Preprocessing | `CorGenerator` with `mock=false`; real base OT and OT/OLE extension |
 | Private randomness | Independent `oc::sysRandomSeed()` seeds for protocol PRNGs |
 | Reuse protection | Single-use protocol state and correlations; lifecycle misuse is rejected |
+
+`Perm::randomize` uses `std::shuffle` with the cryptographic PRNG's 64-bit
+generator interface. This replaces the inherited biased 32-bit modulo sampler.
+The uniform private-permutation premise is needed for permutation masking and
+for the packed path's shuffled openings. Earlier benchmark builds predate this
+correction and remain archived as development measurements.
 
 `PiLogStar::init` rejects an uninitialized, mocked, or debug correlation generator.
 The private radix component's `mInsecureMock` and `mDebug` flags remain false.
@@ -24,8 +30,11 @@ used by this protocol.
 The security claim is for the library's stated functionality and the inherited
 semi-honest assumptions of its cryptographic components. The inputs are already
 sorted XOR-shared unsigned lists with matching public configuration; the result
-is an XOR-shared gather permutation. Secret key bits, masks, source tags, and the
-output permutation are not opened inside this API. This is not an independent
+is an XOR-shared gather permutation. Key bits, source tags, and output indices
+remain shared. The packed path opens shuffle-randomized validity flags and active
+ranks: their joint distribution depends only on the public dimensions. It never
+opens inactive ranks. See the [extraction argument and exact interface](packed-logstar.md).
+This is not an independent
 security audit or a claim of malicious security, implementation side-channel
 resistance, or bug-free dependencies.
 
