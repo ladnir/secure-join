@@ -1,0 +1,8 @@
+Increasing the batch size reduces \ourprotocol's preprocessing communication by 19.6\%.
+However, its median preprocessing time increases from 15.01 to 16.88\,s locally
+and from 23.16 to 26.27\,s on this WAN.
+Batcher saves 71.5\% of its preprocessing bytes but also takes longer in both settings.
+The larger batches require more peak memory.
+Online byte counts and dependency bounds are identical across the two batch sizes.
+No process swap was observed in the periodic samples.
+These measurements do not support using $2^{22}$-entry batches to improve elapsed time in these settings.

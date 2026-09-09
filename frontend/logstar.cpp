@@ -576,10 +576,15 @@ namespace
         cor.init(socks[0].fork(), prng, 0, o.concurrency, o.batchSize, false);
         PiLogStar protocol;
         protocol.init(o.n, o.bits, cor, {o.base, o.block, o.packed});
+        const auto& requests = *cor.mGenState;
         std::cout << "{\"type\":\"public_schedule\",\"n\":" << o.n << ",\"key_bits\":" << o.bits
             << ",\"base_case\":" << o.base << ",\"block_override\":" << o.block
             << ",\"padded_ands\":" << protocol.paddedAnds() << ",\"round_bound\":" << protocol.onlineRoundBound()
-            << ",\"expanded_rows\":" << protocol.expandedSize() << ",\"path\":" << quoted(protocol.stages()[0].name) << "}" << std::endl;
+            << ",\"expanded_rows\":" << protocol.expandedSize() << ",\"path\":" << quoted(protocol.stages()[0].name)
+            << ",\"offline_requests_per_party\":{\"binary_ole\":" << requests.mNumOle
+            << ",\"random_ot\":" << requests.mNumOt << ",\"f4_bit_ot\":" << requests.mNumF4BitOt
+            << ",\"trit_ot\":" << requests.mNumTritOt << ",\"batches\":" << requests.mBatches.size()
+            << "}}" << std::endl;
     }
 }
 

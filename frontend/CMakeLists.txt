@@ -10,3 +10,6 @@ target_link_libraries(secJoinfrontend secureJoin_Tests tests_cryptoTools)
 
 add_executable(logstar logstar.cpp)
 target_link_libraries(logstar secureJoin)
+
+add_executable(rootmerge rootmerge.cpp)
+target_link_libraries(rootmerge secureJoin)

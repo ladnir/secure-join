@@ -314,7 +314,14 @@ the preserved snapshot at `out/evaluation-before-packed.tex`.
         marker = b'% BEGIN OPTIMIZED PACKED PI-LOGSTAR EVALUATION'
         if current != original and not (current.startswith(original) and current[len(original):].lstrip().startswith(marker)):
             raise ValueError('The current evaluation contains unrelated edits; refusing to overwrite them')
-        path.write_bytes(original + b'\n\n' + template.encode())
+        # Preserve separately appended evaluation material after this section.
+        end_marker = b'% END OPTIMIZED PACKED PI-LOGSTAR EVALUATION'
+        suffix = b''
+        if current != original:
+            if current.count(end_marker) != 1:
+                raise ValueError('Missing or ambiguous end marker for the packed evaluation')
+            suffix = current.split(end_marker, 1)[1].lstrip(b'\r\n')
+        path.write_bytes(original + b'\n\n' + template.encode() + (b'\n' + suffix if suffix else b''))
         assert path.read_bytes()[:ORIGINAL_BYTES] == original
     print(json.dumps(dict(binary_sha256=summary['binary_sha256'], groups=len(rows),
                           local_trials=66, tcp_party_records=76, source_line_counts=counts,

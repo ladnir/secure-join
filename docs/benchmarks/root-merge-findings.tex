@@ -1,0 +1,6 @@
+At $n=2^{20}$, CubeRootMerge ($m=102$, $b=128$) sends 186.32\,MiB online versus 443.30\,MiB for matched Batcher, a 58.0\% reduction. Its local online median is 0.461\,s (range 0.415--0.466), versus 0.578\,s (0.573--0.608).
+On the emulated WAN, the online medians are 13.199 and 25.139\,s, respectively (1.90$\times$ speedup). Including preprocessing, the medians are 90.91 and 87.11\,s.
+
+At $n=2^{20}$, SquareRootMerge ($m=1024$, $b=512$) sends 275.25\,MiB online versus 622.44\,MiB for matched Batcher, a 55.8\% reduction. Its local online median is 0.724\,s (range 0.688--0.726), versus 0.886\,s (0.885--0.915).
+On the emulated WAN, the online medians are 20.018 and 33.836\,s, respectively (1.69$\times$ speedup). Including preprocessing, the medians are 118.66 and 120.57\,s.
+

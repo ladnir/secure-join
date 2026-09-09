@@ -1,0 +1,54 @@
+\subsection{Preprocessing costs and tuning}
+\label{sec:packed-offline}
+
+Our implementation effort focuses on the online phase.
+Preprocessing generates fresh GMW multiplication correlations and masked
+permutation correlations for block movement and final extraction.
+The correlation requirements depend on public dimensions and circuit parameters,
+so the parties can generate these objects before receiving their keys.
+Each merge consumes fresh correlations.
+
+The backend already uses batched OT/VOLE extension, SIMD kernels, and reused
+temporary buffers. Nevertheless, the required volume is substantial.
+At $n=2^{20}$ with 32-bit keys and block size four, each party requests
+approximately $5.23\cdot10^9$ binary OLE correlations for the padded GMW circuit.
+The permutation generators additionally request $2.68\cdot10^9$ instances
+of 1-out-of-4 OT of bits and 2,048 regular random OTs.
+These are logical correlation counts, not independent public-key operations.
+The two permutation generators perform $10n$ joint evaluations of the inherited
+alternating-moduli PRF; Batcher does not require these permutation correlations.
+
+\paragraph{Measured batch tradeoff.}
+We extend the batch pilot with three executions per protocol and configuration
+at $n=2^{16}$, using the same executable and experimental setting as above.
+We compare $2^{20}$-entry and $2^{22}$-entry batches locally and on the
+100\,Mbit/s, 40\,ms RTT WAN. Protocol order alternates between repetitions,
+and configuration order rotates. All executions verify their outputs.
+Table~\ref{tab:packed-offline-batches} reports medians.
+The artifact also records observed ranges and peak memory.
+
+\begin{table}[!htbp]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\input{plots/packed/packed-offline-table}
+\caption{Preprocessing batch sensitivity at $n=2^{16}$ keys per list.
+Each entry summarizes three executions. Total time includes preprocessing and
+online time; TCP phase times use the slower party. Communication sums both
+parties' sent bytes. The online circuit is identical across batch sizes.}
+\label{tab:packed-offline-batches}
+\end{table}
+
+\input{plots/packed/packed-offline-findings}
+
+\input{plots/packed/packed-offline-half-findings}
+
+\paragraph{Remaining optimization opportunities.}
+The PRF implementation identifies tiling large input sets for data locality as
+unfinished work. Reducing temporary matrix traffic and implementing robust
+parallel preprocessing are concrete engineering opportunities.
+A persistent service could also amortize supported base-OT setup across merges,
+while deriving fresh correlations for each merge.
+Such setup amortization does not remove correlation expansion or PRF evaluation.
+We do not quantify speedups from these unimplemented changes.
+\clearpage

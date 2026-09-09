@@ -38,6 +38,7 @@ set(SRCS
     "Sort/BatcherMerge.cpp"
     "Sort/PiLogStar.cpp"
     "Sort/PackedLogStar.cpp"
+    "Sort/RootMerge.cpp"
     "Sort/StableSecretExtract.cpp"
     "AggTree/BatchPrefix.cpp"
     
