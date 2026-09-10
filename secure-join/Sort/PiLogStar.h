@@ -14,6 +14,9 @@ namespace secJoin
         u64 baseCase = 16;
         u64 blockSize = 0; // Override at the outermost recursion only.
         bool packed = true; // Exact one-partition specialization for power-of-two inputs.
+        // Size-independent circuit/reuse optimizations, also applied to the
+        // Batcher baseline. False retains the archived implementation schedule.
+        bool optimized = true;
     };
 
     struct PiLogStarStage

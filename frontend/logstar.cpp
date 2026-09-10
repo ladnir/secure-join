@@ -31,7 +31,7 @@ namespace
         u64 batchSize = 262144, concurrency = 2;
         int party = -1;
         std::string address = "127.0.0.1:12123", pattern = "random", seed = "1";
-        bool selfTest = false, help = false, packed = true, plan = false;
+        bool selfTest = false, help = false, packed = true, plan = false, optimized = true;
     };
 
     const std::array<std::string, 6> patterns = {
@@ -65,6 +65,7 @@ namespace
             else if (option == "--base") o.base = number(value);
             else if (option == "--block") o.block = number(value);
             else if (option == "--packed") { if (value != "0" && value != "1") throw std::invalid_argument("--packed must be 0 or 1"); o.packed = value == "1"; }
+            else if (option == "--optimized") { if (value != "0" && value != "1") throw std::invalid_argument("--optimized must be 0 or 1"); o.optimized = value == "1"; }
             else if (option == "--batch-size") o.batchSize = number(value);
             else if (option == "--concurrency") o.concurrency = number(value);
             else if (option == "--party")
@@ -208,6 +209,7 @@ namespace
             << ",\"n\":" << o.n << ",\"key_bits\":" << o.bits << ",\"base_case\":" << o.base
             << ",\"block_override\":" << o.block << ",\"batch_size\":" << o.batchSize
             << ",\"packed_enabled\":" << (o.packed ? "true" : "false")
+            << ",\"optimized\":" << (o.optimized ? "true" : "false")
             << ",\"concurrency\":" << o.concurrency << ",\"pattern\":" << quoted(o.pattern)
             << ",\"public_seed\":" << quoted(o.seed) << ",\"padded_n\":" << protocol.paddedSize()
             << ",\"expanded_rows\":" << protocol.expandedSize()
@@ -270,7 +272,7 @@ namespace
         CorGenerator cor[2];
         PiLogStar protocol[2];
         AdditivePerm output[2];
-        PiLogStarOptions params{ o.base, o.block, o.packed };
+        PiLogStarOptions params{ o.base, o.block, o.packed, o.optimized };
         Measurement m;
         auto wallStart = Clock::now();
         cor[0].init(socks[0].fork(), prng0, 0, o.concurrency, o.batchSize, false);
@@ -314,9 +316,10 @@ namespace
         auto sock = coproto::asioConnect(o.address, o.party == 0);
         // Match public configuration before consuming any protocol correlations.
         const auto pattern = std::find(patterns.begin(), patterns.end(), o.pattern) - patterns.begin();
-        const std::array<u64, 11> config = { 2, o.n, o.bits, o.base, o.block,
-            o.batchSize, o.concurrency, static_cast<u64>(pattern), publicSeed(o.seed), static_cast<u64>(o.packed), static_cast<u64>(o.party) };
-        std::array<u64, 11> peer{};
+        const std::array<u64, 12> config = { 3, o.n, o.bits, o.base, o.block,
+            o.batchSize, o.concurrency, static_cast<u64>(pattern), publicSeed(o.seed), static_cast<u64>(o.packed),
+            static_cast<u64>(o.optimized), static_cast<u64>(o.party) };
+        std::array<u64, 12> peer{};
         complete(sock.send(coproto::copy(config)), sock.recv(peer));
         peer.back() ^= 1;
         if (peer != config) throw std::runtime_error("The parties supplied different public configurations");
@@ -331,7 +334,7 @@ namespace
         Measurement m;
         auto wallStart = Clock::now();
         cor.init(sock.fork(), prng, o.party, o.concurrency, o.batchSize, false);
-        protocol.init(o.n, o.bits, cor, { o.base, o.block, o.packed });
+        protocol.init(o.n, o.bits, cor, { o.base, o.block, o.packed, o.optimized });
         protocol.preprocess();
         auto offlineStart = Clock::now();
         auto before = count(sock);
@@ -374,12 +377,13 @@ namespace
     {
         std::mt19937_64 rng(192847);
         u64 cases = 0;
-        for (u64 width : { 1, 2, 3, 4, 5, 6, 7, 8, 9, 15, 16, 31, 32, 33, 63, 64, 65, 127 })
+        for (bool optimized : { false, true })
+        for (u64 width : { 1, 2, 3, 4, 5, 6, 7, 8, 9, 15, 16, 31, 32, 33, 63, 64, 65, 127, 256 })
         {
             BetaCircuit cir;
             BetaBundle a(width), b(width), z(1);
             cir.addInputBundle(a); cir.addInputBundle(b); cir.addOutputBundle(z);
-            cir.addCopy(logstarLessThan(cir, a, b), z[0]);
+            cir.addCopy(logstarLessThan(cir, a, b, optimized), z[0]);
             cir.levelByAndDepth();
             std::array<oc::BitVector, 2> inputs = { oc::BitVector(width), oc::BitVector(width) };
             std::array<oc::BitVector, 1> outputs = { oc::BitVector(1) };
@@ -575,16 +579,43 @@ namespace
         CorGenerator cor;
         cor.init(socks[0].fork(), prng, 0, o.concurrency, o.batchSize, false);
         PiLogStar protocol;
-        protocol.init(o.n, o.bits, cor, {o.base, o.block, o.packed});
+        protocol.init(o.n, o.bits, cor, {o.base, o.block, o.packed, o.optimized});
         const auto& requests = *cor.mGenState;
         std::cout << "{\"type\":\"public_schedule\",\"n\":" << o.n << ",\"key_bits\":" << o.bits
             << ",\"base_case\":" << o.base << ",\"block_override\":" << o.block
+            << ",\"optimized\":" << (o.optimized ? "true" : "false")
             << ",\"padded_ands\":" << protocol.paddedAnds() << ",\"round_bound\":" << protocol.onlineRoundBound()
-            << ",\"expanded_rows\":" << protocol.expandedSize() << ",\"path\":" << quoted(protocol.stages()[0].name)
-            << ",\"offline_requests_per_party\":{\"binary_ole\":" << requests.mNumOle
+            << ",\"expanded_rows\":" << protocol.expandedSize() << ",\"path\":" << quoted(protocol.stages()[0].name);
+        // A public wire-payload model, excluding transport/session framing.
+        // The general recursive radix path is intentionally not modeled here.
+        if (protocol.stages()[0].name == "packed_partition")
+        {
+            const auto block = protocol.stages()[0].blockSize;
+            const auto blocks = 2 * o.n / block;
+            u64 idBits = 0, rankBits = 0;
+            for (auto v = blocks; v > 1; v /= 2) ++idBits;
+            for (auto v = 2 * o.n; v > 1; v /= 2) ++rankBits;
+            const auto blockBytes = oc::divCeil(idBits + 1 + block * o.bits, 8);
+            const auto recordBytes = oc::divCeil(2 * rankBits + 1, 8);
+            const auto payload = protocol.paddedAnds() / 2 + blocks * (2 * blockBytes + 12)
+                + 8 * o.n * recordBytes + 2 * oc::divCeil(4 * o.n, 8) + 16 * o.n;
+            std::cout << ",\"online_payload_bytes\":" << payload;
+        }
+        else if (protocol.stages().size() == 1)
+            std::cout << ",\"online_payload_bytes\":" << protocol.paddedAnds() / 2;
+        std::cout << ",\"offline_requests_per_party\":{\"binary_ole\":" << requests.mNumOle
             << ",\"random_ot\":" << requests.mNumOt << ",\"f4_bit_ot\":" << requests.mNumF4BitOt
             << ",\"trit_ot\":" << requests.mNumTritOt << ",\"batches\":" << requests.mBatches.size()
-            << "}}" << std::endl;
+            << "},\"stages\":[";
+        bool first = true;
+        for (const auto& stage : protocol.stages())
+        {
+            if (!first) std::cout << ',';
+            first = false;
+            std::cout << "{\"name\":" << quoted(stage.name) << ",\"padded_ands\":" << stage.paddedAnds
+                << ",\"gmw_rounds\":" << stage.gmwRounds << '}';
+        }
+        std::cout << "]}" << std::endl;
     }
 }
 
@@ -598,7 +629,7 @@ int main(int argc, char** argv)
             std::cout << "Usage: logstar [--n 1024] [--bits 32] [--base 16] [--block 0]\n"
                 "  [--batch-size 262144] [--concurrency 2] [--seed public-seed]\n"
                 "  [--pattern random|equal|disjoint|interleaved|max|duplicates]\n"
-                "  [--party 0|1 --address 127.0.0.1:12123] [--packed 0|1] [--plan] [--self-test]\n\n"
+                "  [--party 0|1 --address 127.0.0.1:12123] [--packed 0|1] [--optimized 0|1] [--plan] [--self-test]\n\n"
                 "Default: both parties in one process using LocalAsyncSocket.\n"
                 "Synthetic CLI keys support 1..64 bits; the library API supports 1..256 bits.\n"
                 "TCP: run matching commands on two hosts; party 0 listens, party 1 connects.\n"

@@ -50,31 +50,75 @@ namespace secJoin
             return c;
         }
 
-        BetaCircuit allPairs(u64 m, u64 width)
+        BetaCircuit crossComparisons(u64 m, u64 width)
+        {
+            BetaCircuit c;
+            BetaBundle input(2 * m * width + 1), output(m * m);
+            c.addInputBundle(input); c.addOutputBundle(output);
+            const auto valid = input[input.size() - 1];
+            std::vector<BetaBundle> key(2 * m);
+            for (u64 i = 0; i < 2 * m; ++i)
+                key[i].mWires.assign(input.mWires.begin() + i * width,
+                    input.mWires.begin() + (i + 1) * width);
+            for (u64 j = 0; j < m; ++j)
+            {
+                // A present opposite predecessor has a strictly smaller
+                // (key,source) minimum than B[0], hence than every B[j].
+                c.addCopy(valid, output[j * m]);
+                for (u64 k = 1; k < m; ++k)
+                {
+                    auto less = logstarLessThan(c, key[m + k], key[j], true);
+                    c.addGate(less, valid, oc::GateType::And, output[j * m + k]);
+                }
+            }
+            c.levelByAndDepth();
+            return c;
+        }
+
+        BetaCircuit allPairs(u64 m, u64 width, bool reuse = false)
         {
             // Sorted runs make every row/column of cross comparisons monotone.
             // Adjacent XORs therefore give one-hot insertion positions, without
             // a popcount, rank adder, or key/payload swap network.
             const auto offsets = lg(m), payloadWidth = offsets + 2;
             BetaCircuit c;
-            BetaBundle input(2 * m * (width + 1) + 2), output(2 * m * payloadWidth);
+            // Reuse layout: current m*m comparisons, next block's first row,
+            // source transition, predecessor validity, public zero.
+            BetaBundle input(reuse ? m * m + m + 3 : 2 * m * (width + 1) + 2), output(2 * m * payloadWidth);
             c.addInputBundle(input); c.addOutputBundle(output);
             const auto valid = input[input.size() - 2];
             const auto zero = input[input.size() - 1]; // Public zero supplied by both parties.
             auto temp = [&]() { BetaBundle b(1); c.addTempWireBundle(b); return b[0]; };
             std::vector<BetaBundle> key(2 * m);
-            for (u64 i = 0; i < 2 * m; ++i)
+            if (!reuse) for (u64 i = 0; i < 2 * m; ++i)
                 key[i].mWires.assign(input.mWires.begin() + i * (width + 1),
                     input.mWires.begin() + i * (width + 1) + width);
             std::vector<std::vector<u32>> less(m, std::vector<u32>(m));
             for (u64 j = 0; j < m; ++j)
                 for (u64 k = 0; k < m; ++k)
                 {
+                    if (reuse) { less[j][k] = input[j * m + k]; continue; }
                     auto comparison = logstarLessThan(c, key[m + k], key[j]);
                     less[j][k] = temp();
                     // An absent opposite predecessor contributes zero keys;
                     // this also makes the direct global-rank formula valid.
                     c.addGate(comparison, valid, oc::GateType::And, less[j][k]);
+                }
+            std::vector<u32> upper(2 * m);
+            for (u64 side = 0; side < 2; ++side)
+                for (u64 j = 0; j < m; ++j)
+                {
+                    if (!reuse) { upper[side * m + j] = input[(side * m + j) * (width + 1) + width]; continue; }
+                    const auto transition = input[m * m + m];
+                    const auto next = input[m * m + j];
+                    // If the source changes, next.S is B, so next comparisons
+                    // bound B. Otherwise next.S is S, so they bound S.
+                    auto bound = temp();
+                    // GMW supports nb_Or; order inputs to avoid na_Or.
+                    c.addGate(next, transition, side ? oc::GateType::Or : oc::GateType::nb_Or, bound);
+                    if (side)
+                    { auto real = temp(); c.addGate(bound, valid, oc::GateType::And, real); bound = real; }
+                    upper[side * m + j] = bound;
                 }
             std::vector<std::vector<u32>> terms(output.size());
             for (u64 side = 0; side < 2; ++side)
@@ -103,7 +147,7 @@ namespace secJoin
                         if (!side || k)
                         {
                             auto real = temp();
-                            c.addGate(position, input[(side * m + j) * (width + 1) + width],
+                            c.addGate(position, upper[side * m + j],
                                 oc::GateType::And, real);
                             terms[r + offsets + 1].push_back(real);
                         }
@@ -156,35 +200,40 @@ namespace secJoin
         }
     }
 
-    void PackedLogStar::init(u64 n_, u64 keyBits, u64 block_, CorGenerator& cor)
+    void PackedLogStar::init(u64 n_, u64 keyBits, u64 block_, CorGenerator& cor, bool optimized_)
     {
+        optimized = optimized_;
         n = n_; bits = keyBits; block = block_; blocks = 2 * n / block;
         idBits = lg(blocks); offsetBits = lg(block); role = cor.partyIdx();
         blockBits = idBits + 1 + block * bits;
         orderBits = bits + 1 + offsetBits;
         std::vector<u64> ids;
         for (u64 i = 0; i < idBits; ++i) ids.push_back(i);
-        medians.init(1, n / block, bits + idBits, bits + idBits, cor, ids);
+        medians.init(1, n / block, bits + idBits, bits + idBits, cor, ids,
+            optimized, optimized, optimized);
         blockGen.init(role, blocks, oc::divCeil(blockBits, 8) + 4, cor);
-        prefix.init(1, blocks, blockBits, cor, 8);
-        mask.init(2 * n, interval(bits + 1), cor);
-        tinyMerge.init(blocks, allPairs(block, bits + 1), cor);
+        prefix.init(1, blocks, blockBits - (optimized ? bits : 0), cor, 8);
+        if (optimized) mask.init(blocks, crossComparisons(block, bits + 1), cor);
+        else mask.init(2 * n, interval(bits + 1), cor);
+        tinyMerge.init(blocks, allPairs(block, bits + 1, optimized), cor);
         recover.init(4 * n, selectId(idBits), cor);
-        blockRanks.init(blocks, sumBlockIds(idBits), cor);
+        if (!optimized) blockRanks.init(blocks, sumBlockIds(idBits), cor);
         compact.init(4 * n, 2 * n, lg(2 * n), cor, true);
         stats = {
             {"packed_partition", 1, n, block, medians.numRounds() + prefix.numRounds() + rounds(mask),
                 medians.numAnds() + prefix.numAnds() + ands(mask)},
             {"all_pairs_base_merge", blocks, block, 0, rounds(tinyMerge) + rounds(recover),
                 ands(tinyMerge) + ands(recover)},
-            {"shuffle_extraction", 1, 4 * n, 0, rounds(blockRanks), ands(blockRanks)}
+            {"shuffle_extraction", 1, 4 * n, 0, optimized ? 0 : rounds(blockRanks), optimized ? 0 : ands(blockRanks)}
         };
     }
 
     void PackedLogStar::preprocess()
     {
         medians.preprocess(); blockGen.preprocess(); prefix.preprocess(); mask.preprocess();
-        tinyMerge.preprocess(); recover.preprocess(); blockRanks.preprocess(); compact.preprocess();
+        tinyMerge.preprocess(); recover.preprocess();
+        if (!optimized) blockRanks.preprocess();
+        compact.preprocess();
     }
 
     macoro::task<> PackedLogStar::prepare(coproto::Socket& sock, PRNG& prng)
@@ -206,7 +255,8 @@ namespace secJoin
             stats[stage].receivedBytes = sock.bytesReceived() - received;
             start = now; sent = sock.bytesSent(); received = sock.bytesReceived();
         };
-        BinMatrix ordered, strays, active(2 * n, 2);
+        BinMatrix ordered, strays, active(optimized ? blocks : 2 * n, optimized ? block * block : 2);
+        BinMatrix sum, sumPlusOne;
         {
             BinMatrix med(blocks, idBits + bits), sortedMed, input(blocks, blockBits);
             for (u64 i = 0; i < blocks; ++i)
@@ -225,7 +275,7 @@ namespace secJoin
                     if (!j) copy(med.data(i), idBits, key, 0, bits);
                 }
             }
-            co_await medians.apply(med, sortedMed, sock);
+            co_await medians.applyOwned(std::move(med), sortedMed, sock);
             AdditivePerm gather;
             gather.mShare.resize(blocks);
             for (u64 i = 0; i < blocks; ++i) gather.mShare[i] = integer(sortedMed.data(i), 0, idBits);
@@ -234,16 +284,53 @@ namespace secJoin
             co_await blockPerm.apply<u8>(PermOp::Regular, input.mData, ordered.mData, sock);
         }
         {
-            BinMatrix shifted(blocks, blockBits), controls(blocks, 1);
+            const auto prefixBits = blockBits - (optimized ? bits : 0);
+            BinMatrix shifted(blocks, prefixBits), controls(blocks, 1), copied;
             for (u64 i = 0; i < blocks; ++i)
             {
-                copy(shifted.data(i), 0, ordered.data(i ? i - 1 : 0), 0, blockBits);
+                const auto src = ordered.data(i ? i - 1 : 0);
+                if (optimized)
+                {
+                    copy(shifted.data(i), 0, src, 0, idBits + 1);
+                    copy(shifted.data(i), idBits + 1, src, idBits + 1 + bits, (block - 1) * bits);
+                }
+                else copy(shifted.data(i), 0, src, 0, blockBits);
                 if (!i) shifted(i, idBits / 8) &= ~(u8(1) << (idBits % 8));
                 else controls(i, 0) = get(ordered.data(i), idBits - 1)
                     ^ get(ordered.data(i - 1), idBits - 1) ^ (role == 0);
             }
-            co_await prefix.apply(shifted, controls, strays, sock);
+            co_await prefix.apply(shifted, controls, copied, sock);
+            if (optimized)
+            {
+                strays.resize(blocks, blockBits);
+                for (u64 i = 0; i < blocks; ++i)
+                {
+                    copy(strays.data(i), 0, copied.data(i), 0, idBits + 1);
+                    copy(strays.data(i), idBits + 1 + bits, copied.data(i), idBits + 1, (block - 1) * bits);
+                }
+            }
+            else strays = std::move(copied);
         }
+        if (optimized)
+        {
+            BinMatrix input(blocks, 2 * block * (bits + 1) + 1);
+            for (u64 i = 0; i < blocks; ++i)
+            {
+                set(input.data(i), 2 * block * (bits + 1), get(strays.data(i), idBits));
+                for (u64 side = 0; side < 2; ++side)
+                    for (u64 j = 0; j < block; ++j)
+                    {
+                        const auto off = (side * block + j) * (bits + 1);
+                        const auto src = (side ? strays : ordered).data(i);
+                        set(input.data(i), off, get(src, idBits - 1));
+                        if (!side || j) copy(input.data(i), off + 1, src, idBits + 1 + j * bits, bits);
+                    }
+            }
+            mask.setInput(0, input);
+            co_await mask.run(sock);
+            mask.getOutput(0, active); mask.clear();
+        }
+        else
         {
             BinMatrix b(2 * n, bits + 1), s(2 * n, bits + 1);
             BinMatrix hi(2 * n, bits + 1), valid(2 * n, 1);
@@ -268,10 +355,25 @@ namespace secJoin
         oc::Matrix<u32> indices(4 * n, 1);
         {
             const auto payloadWidth = offsetBits + 2;
-            BinMatrix input(blocks, 2 * block * (bits + 2) + 2), merged(blocks, 2 * block * payloadWidth);
-            for (u64 i = 0; i < blocks; ++i)
+            BinMatrix input(blocks, optimized ? block * block + block + 3 : 2 * block * (bits + 2) + 2);
+            BinMatrix merged(blocks, 2 * block * payloadWidth);
+            if (optimized) for (u64 i = 0; i < blocks; ++i)
+            {
+                copy(input.data(i), 0, active.data(i), 0, block * block);
+                if (i + 1 < blocks)
+                {
+                    copy(input.data(i), block * block, active.data(i + 1), 0, block);
+                    set(input.data(i), block * block + block,
+                        get(ordered.data(i), idBits - 1) ^ get(ordered.data(i + 1), idBits - 1));
+                }
+                else if (!role) for (u64 j = 0; j < block; ++j) set(input.data(i), block * block + j, 1);
+                set(input.data(i), block * block + block + 1, get(strays.data(i), idBits));
+            }
+            else
+            {
+              for (u64 i = 0; i < blocks; ++i)
                 set(input.data(i), 2 * block * (bits + 2), get(strays.data(i), idBits));
-            for (u64 i = 0; i < blocks; ++i)
+              for (u64 i = 0; i < blocks; ++i)
                 for (u64 side = 0; side < 2; ++side)
                     for (u64 j = 0; j < block; ++j)
                     {
@@ -282,6 +384,7 @@ namespace secJoin
                         copy(d, off + 1, src, idBits + 1 + j * bits, bits);
                         set(d, off + bits + 1, (active(i * block + j, 0) >> side) & 1);
                     }
+            }
             tinyMerge.setInput(0, input);
             co_await tinyMerge.run(sock); tinyMerge.getOutput(0, merged); tinyMerge.clear();
             input = {}; active = {};
@@ -301,25 +404,45 @@ namespace secJoin
                     | integer(merged.data(i / (2 * block)), (i % (2 * block)) * payloadWidth, offsetBits);
         }
         record(1);
-        BinMatrix a(blocks, idBits), b(blocks, idBits), sum(blocks, idBits), sumPlusOne(blocks, idBits);
-        for (u64 i = 0; i < blocks; ++i)
+        if (!optimized)
         {
-            copy(a.data(i), 0, ordered.data(i), 0, idBits - 1);
-            copy(b.data(i), 0, strays.data(i), 0, idBits - 1);
+            BinMatrix a(blocks, idBits), b(blocks, idBits);
+            sum.resize(blocks, idBits); sumPlusOne.resize(blocks, idBits);
+            for (u64 i = 0; i < blocks; ++i)
+            {
+                copy(a.data(i), 0, ordered.data(i), 0, idBits - 1);
+                copy(b.data(i), 0, strays.data(i), 0, idBits - 1);
+            }
+            blockRanks.setInput(0, a); blockRanks.setInput(1, b);
+            co_await blockRanks.run(sock); blockRanks.getOutput(0, sum); blockRanks.getOutput(1, sumPlusOne);
+            blockRanks.clear();
         }
-        ordered = {}; strays = {};
-        blockRanks.setInput(0, a); blockRanks.setInput(1, b);
-        co_await blockRanks.run(sock); blockRanks.getOutput(0, sum); blockRanks.getOutput(1, sumPlusOne);
-        blockRanks.clear();
         BinMatrix ranks(4 * n, idBits + offsetBits);
         for (u64 i = 0; i < 4 * n; ++i)
         {
             const auto j = i % (2 * block), row = i / (2 * block);
-            u32 high = integer((j < block ? sum : sumPlusOne).data(row), 0, idBits);
-            if (j >= block && !role) high ^= (u32(1) << idBits) - 1;
+            u32 high;
+            if (optimized)
+            {
+                // There are row preceding block representatives. If S exists,
+                // these are a same-source blocks and b+1 opposite-source blocks;
+                // otherwise a=row,b=0. Thus a+b=row-valid, with no secret add.
+                // Select between two PUBLIC constants using XOR and local masks.
+                const u32 noPredecessor = row + (j >= block);
+                const u32 predecessor = noPredecessor - 1;
+                const u32 validShare = get(strays.data(row), idBits);
+                high = (role ? 0 : noPredecessor) ^ ((u32(0) - validShare) & (noPredecessor ^ predecessor));
+                high &= (u32(1) << idBits) - 1;
+            }
+            else
+            {
+                high = integer((j < block ? sum : sumPlusOne).data(row), 0, idBits);
+                if (j >= block && !role) high ^= (u32(1) << idBits) - 1;
+            }
             const u32 rank = (high << offsetBits) | (role ? 0 : j % block);
             std::memcpy(ranks.data(i), &rank, ranks.bytesPerEntry());
         }
+        ordered = {}; strays = {};
         co_await compact.applyRanked(real, ranks, indices, output, sock);
         record(2);
     }

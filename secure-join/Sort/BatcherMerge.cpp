@@ -35,13 +35,14 @@ namespace secJoin
     }
 
     u32 logstarLessThan(BetaCircuit& cir, const BetaBundle& left,
-        const BetaBundle& right)
+        const BetaBundle& right, bool optimized)
     {
         const auto orderBits = left.size();
         if (!orderBits || orderBits != right.size())
             throw std::invalid_argument("logstarLessThan requires equal positive input widths");
         if (orderBits > (std::numeric_limits<u32>::max() - cir.mWireCount) / 5)
             throw std::overflow_error("logstarLessThan exceeds circuit wire limits");
+        if (optimized) return compactLessThan(cir, left, right);
         // Segment summaries (equal, less) are combined in a balanced tree.
         // Higher bits dominate lower bits:
         //   less = lessHigh XOR (equalHigh AND lessLow).

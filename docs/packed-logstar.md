@@ -1,5 +1,12 @@
 # Concrete Pi-logstar optimization
 
+This document describes the first packed implementation and its archived
+evaluation. The current default adds the size-independent changes and proofs in
+[the development audit](logstar-optimization-audit.md). In particular, it reuses
+terminal comparisons for masks and replaces the two block-rank additions with
+local operations. `--optimized 0` retains the construction described below.
+The paper benchmark sweep has not been rerun for the new default.
+
 The `optimize-pi-logstar` branch specializes one partition of the main protocol
 for equal power-of-two input lengths. It preserves the stable XOR-shared gather
 permutation interface, with terminal block sizes at most 16. The general recursive implementation remains available

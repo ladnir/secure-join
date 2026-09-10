@@ -22,6 +22,13 @@ The [earlier measurements](logstar-results.md) remain archived separately.
 
 ## Optimized concrete path
 
+The current default also enables the size-independent improvements documented
+in [the development audit](logstar-optimization-audit.md): comparison reuse,
+omitted predecessor minima, local rank construction, and common comparator and
+network improvements for both Pi-logstar and Batcher. `--optimized 0` restores
+the archived circuit schedules. The existing paper measurements below describe
+that earlier implementation; they have not been regenerated for this follow-up.
+
 For unpadded power-of-two inputs with one partition and block size at most 16,
 the default `packed` option uses compressed block IDs, a hybrid prefix, batched
 all-pairs base merges, direct global ranks, and stable shuffled extraction.

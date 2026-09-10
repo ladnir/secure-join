@@ -11,18 +11,38 @@ def merge(x, y, m):
             for source, values in enumerate((x, y)) for j, v in enumerate(values)]
     blocks = [data[i:i + m] for i in range(0, 2 * n, m)]
     blocks.sort(key=lambda b: b[0])
+    predecessors = []
+    predecessor = None
+    for i, b in enumerate(blocks):
+        if i and blocks[i - 1][0][1] != b[0][1]:
+            predecessor = blocks[i - 1]
+        predecessors.append(predecessor)
+    comparisons = [[[int(s is not None and s[k][:2] < b[j][:2])
+                     for k in range(m)] for j in range(m)]
+                   for b, s in zip(blocks, predecessors)]
+    for i, s in enumerate(predecessors):
+        assert all(comparisons[i][j][0] == (s is not None) for j in range(m))
     previous_opposite = None
     result = []
     for i, b in enumerate(blocks):
         if i and blocks[i - 1][0][1] != b[0][1]:
             previous_opposite = blocks[i - 1]
         s = previous_opposite or blocks[0]
+        assert (b[0][3] % n) // m + (s[0][3] % n) // m == i - int(previous_opposite is not None)
         hi = blocks[i + 1][0][:2] if i + 1 < len(blocks) else (float('inf'), 1)
         lo = b[0][:2]
         records = []
         for origin, values in enumerate((b, s)):
             for offset, row in enumerate(values):
                 active = row[:2] <= hi and (not origin or (previous_opposite is not None and row[:2] >= lo))
+                # Reuse the NEXT block's comparisons for the upper mask.
+                last = i + 1 == len(blocks)
+                transition = not last and b[0][1] != blocks[i + 1][0][1]
+                next_less = 1 if last else comparisons[i + 1][0][offset]
+                upper = (transition or next_less) if origin else (not transition or next_less)
+                reused_active = upper and (not origin or
+                    (previous_opposite is not None and not comparisons[i][0][offset]))
+                assert active == bool(reused_active), (x, y, m, i, origin, offset)
                 # Local comparison carries only (key, original source, offset).
                 records.append((row[0], row[1], offset, origin, active))
         records.sort(key=(lambda r: r[:3]) if previous_opposite is not None else (lambda r: (r[3], r[2])))

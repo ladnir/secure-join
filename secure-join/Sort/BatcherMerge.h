@@ -10,7 +10,7 @@ namespace secJoin
     // must have the same positive width. Returns one temporary output wire;
     // AND depth is logarithmic in the width. Does not levelize the circuit.
     u32 logstarLessThan(BetaCircuit& cir, const BetaBundle& left,
-        const BetaBundle& right);
+        const BetaBundle& right, bool optimized = false);
 
     // Merge batches of two ascending, equally sized runs of XOR-shared rows.
     // The first orderBits bits of a row are an unsigned little-endian key;

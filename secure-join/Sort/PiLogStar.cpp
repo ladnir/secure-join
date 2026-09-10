@@ -27,16 +27,16 @@ namespace secJoin
         u64 ands(const Gmw& g) { return g.mCir.mNonlinearGateCount * oc::roundUpTo(g.mN, 128); }
 
         // All three interval comparisons execute in parallel. Keys are never changed.
-        BetaCircuit maskCircuit(u64 orderBits)
+        BetaCircuit maskCircuit(u64 orderBits, bool optimized)
         {
             BetaCircuit c;
             BetaBundle b(orderBits), s(orderBits), lo(orderBits), hi(orderBits);
             BetaBundle flags(2), out(2); // b.real, s.real
             c.addInputBundle(b); c.addInputBundle(s); c.addInputBundle(lo);
             c.addInputBundle(hi); c.addInputBundle(flags); c.addOutputBundle(out);
-            auto bHi = logstarLessThan(c, b, hi);
-            auto sLo = logstarLessThan(c, s, lo);
-            auto sHi = logstarLessThan(c, s, hi);
+            auto bHi = logstarLessThan(c, b, hi, optimized);
+            auto sLo = logstarLessThan(c, s, lo, optimized);
+            auto sHi = logstarLessThan(c, s, hi, optimized);
             BetaBundle t(1); c.addTempWireBundle(t);
             c.addGate(sLo, sHi, oc::GateType::na_And, t[0]);
             c.addGate(flags[0], bHi, oc::GateType::And, out[0]);
@@ -59,6 +59,7 @@ namespace secJoin
         u64 n = 0, padded = 0, keyBits = 0, indexBits = 0, orderBits = 0;
         u64 orderBytes = 0, rowBytes = 0, role = 0, expanded = 0;
         bool requested = false, preprocessed = false, prepareStarted = false, prepared = false, used = false;
+        bool minimalBase = false;
         std::vector<std::unique_ptr<Level>> levels;
         std::unique_ptr<PackedLogStar> packed;
         BatcherMerge base;
@@ -99,12 +100,21 @@ namespace secJoin
         m->orderBits = m->indexBits + keyBits + 1; // explicit +infinity bit
         m->orderBytes = oc::divCeil(m->orderBits, 8);
         m->rowBytes = m->orderBytes + 1; // separately byte-addressable real flag
+        // With no padding or partition, every row is real. Give the matched
+        // Batcher baseline the same tight representation as packed LogStar.
+        m->minimalBase = opts.optimized && n == m->padded && n <= opts.baseCase;
+        if (m->minimalBase)
+        {
+            m->orderBits = m->indexBits + keyBits;
+            m->orderBytes = oc::divCeil(m->orderBits, 8);
+            m->rowBytes = m->orderBytes;
+        }
         const auto outerBlock = opts.blockSize ? opts.blockSize : pow2(std::max<u64>(1, ceilLog(m->padded)));
         if (opts.packed && n == m->padded && n > opts.baseCase &&
             outerBlock < n && outerBlock <= opts.baseCase && outerBlock <= 16)
         {
             m->packed = std::make_unique<PackedLogStar>();
-            m->packed->init(n, keyBits, outerBlock, cor);
+            m->packed->init(n, keyBits, outerBlock, cor, opts.optimized);
             m->expanded = 4 * n;
             m->stats = m->packed->stats;
             for (auto& s : m->stats) { m->totalRounds += s.gmwRounds; m->totalAnds += s.paddedAnds; }
@@ -126,10 +136,11 @@ namespace secJoin
                 throw std::invalid_argument("PiLogStar: expanded schedule exceeds 32-bit permutation capacity");
             std::vector<u64> blockIndexBits(32);
             for (u64 i = 0; i < 32; ++i) blockIndexBits[i] = m->orderBytes * 8 + i;
-            l.medians.init(count, size / l.block, m->orderBits, (m->orderBytes + 4) * 8, cor, blockIndexBits);
+            l.medians.init(count, size / l.block, m->orderBits, (m->orderBytes + 4) * 8, cor, blockIndexBits,
+                opts.optimized, opts.optimized);
             l.permGen.init(m->role, l.blocks, l.block * m->rowBytes + 1 + 4, cor);
             l.prefix.init(count, l.blocksPerBatch, l.block * m->rowBytes * 8, cor);
-            l.mask.init(l.blocks * l.block, maskCircuit(m->orderBits), cor);
+            l.mask.init(l.blocks * l.block, maskCircuit(m->orderBits, opts.optimized), cor);
             m->stats.push_back({"partition", count, size, l.block,
                 l.medians.numRounds() + l.prefix.numRounds() + rounds(l.mask),
                 l.medians.numAnds() + l.prefix.numAnds() + ands(l.mask)});
@@ -139,8 +150,9 @@ namespace secJoin
         m->expanded = 2 * count * size;
         std::vector<u64> finalPayloadBits;
         for (u64 i = 0; i < m->indexBits; ++i) finalPayloadBits.push_back(i);
-        finalPayloadBits.push_back(m->orderBytes * 8); // isReal
-        m->base.init(count, size, m->orderBits, m->rowBytes * 8, cor, finalPayloadBits);
+        if (!m->minimalBase) finalPayloadBits.push_back(m->orderBytes * 8); // isReal
+        m->base.init(count, size, m->orderBits, m->minimalBase ? m->orderBits : m->rowBytes * 8,
+            cor, finalPayloadBits, opts.optimized, opts.optimized, m->minimalBase);
         m->stats.push_back({"base_merge", count, size, 0, m->base.numRounds(), m->base.numAnds()});
         if (!m->levels.empty())
         {
@@ -196,7 +208,7 @@ namespace secJoin
             m->stats = m->packed->stats;
             co_return;
         }
-        BinMatrix rows(2 * m->padded, m->rowBytes * 8);
+        BinMatrix rows(2 * m->padded, m->minimalBase ? m->orderBits : m->rowBytes * 8);
         for (u64 side = 0; side < 2; ++side)
             for (u64 j = 0; j < m->padded; ++j)
             {
@@ -208,7 +220,7 @@ namespace secJoin
                     {
                         auto idx = side * m->n + j;
                         for (u64 k = 0; k < m->indexBits; ++k) put(dst, k, (idx >> k) & 1);
-                        dst[m->orderBytes] = 1;
+                        if (!m->minimalBase) dst[m->orderBytes] = 1;
                     }
                 }
                 else if (!m->role)
