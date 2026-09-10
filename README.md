@@ -1,5 +1,10 @@
 # Secure Join
 
+The paper's recursive **Pi-median merge** is implemented with configurable
+per-level parameters, real two-party cryptography, and a public cost planner.
+See [docs/pi-median.md](docs/pi-median.md). Formal Pi-median paper benchmarks
+have not been run.
+
 The experimental two-party semi-honest **Pi-logstar merge** implementation and
 its real-crypto benchmark are described in [docs/pi-logstar.md](docs/pi-logstar.md).
 Measured scaling, parameter choices, and network results are in

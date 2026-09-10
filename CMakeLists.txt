@@ -25,6 +25,7 @@ add_subdirectory(frontend)
 enable_testing()
 add_test(NAME pi_logstar_real_crypto COMMAND logstar --self-test)
 add_test(NAME asymmetric_merge_real_crypto COMMAND rootmerge --self-test)
+add_test(NAME pi_median_real_crypto COMMAND pimedian --self-test)
 
 # setup the install
 include(cmake/install.cmake)

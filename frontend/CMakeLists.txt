@@ -13,3 +13,6 @@ target_link_libraries(logstar secureJoin)
 
 add_executable(rootmerge rootmerge.cpp)
 target_link_libraries(rootmerge secureJoin)
+
+add_executable(pimedian pimedian.cpp)
+target_link_libraries(pimedian secureJoin)
