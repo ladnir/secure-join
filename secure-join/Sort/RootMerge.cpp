@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstring>
+#include <functional>
 #include <limits>
 #include <numeric>
 #include <stdexcept>
@@ -64,6 +65,21 @@ namespace secJoin
             BetaBundle temp(u64 n) { BetaBundle b(n); c.addTempWireBundle(b); return b; }
             u32 gate(u32 a,u32 b,oc::GateType op) { auto w=temp(1)[0]; c.addGate(a,b,op,w); return w; }
             u32 neg(u32 a) { return gate(a,constants[1],oc::GateType::Xor); }
+            u32 knownAnd(u32 a,u32 b)
+            {
+                if(a==constants[0]||b==constants[0])return constants[0];
+                if(a==constants[1]||a==b)return b;
+                if(b==constants[1])return a;
+                return gate(a,b,oc::GateType::And);
+            }
+            u32 select(u32 control,u32 yes,u32 no)
+            {
+                if(yes==no)return yes;
+                if(yes==constants[1]&&no==constants[0])return control;
+                if(yes==constants[0]&&no==constants[1])return neg(control);
+                auto difference=gate(yes,no,oc::GateType::Xor);
+                return gate(no,knownAnd(control,difference),oc::GateType::Xor);
+            }
             u32 lessThan(const BetaBundle& a,const BetaBundle& b)
             {
                 // An unequal segment is ordered by its most significant
@@ -71,26 +87,23 @@ namespace secJoin
                 // arbitrary, except the least-significant segment must encode
                 // strict comparison. This removes the per-bit generate ANDs.
                 struct Segment { u32 equal,less; };
-                std::vector<Segment> level;
-                for(u64 i=0;i<a.size();++i)
-                    level.push_back({neg(gate(a[i],b[i],oc::GateType::Xor)),
-                        i?b[i]:gate(a[i],b[i],oc::GateType::na_And)});
-                while(level.size()>1)
+                // Split by actual width, rather than attaching a short high
+                // tail above a complete power-of-two tree. At 33 bits this
+                // trades one AND for one fewer layer; at 32 bits it is identical.
+                std::function<Segment(u64,u64)> build=[&](u64 begin,u64 size)->Segment
                 {
-                    std::vector<Segment> next;
-                    for(u64 i=0;i<level.size();i+=2)
+                    if(size==1)
                     {
-                        if(i+1==level.size()){next.push_back(level[i]);continue;}
-                        auto lo=level[i],hi=level[i+1];
-                        auto diff=gate(lo.less,hi.less,oc::GateType::Xor);
-                        auto value=gate(hi.less,gate(diff,hi.equal,oc::GateType::And),oc::GateType::Xor);
-                        // The leftmost summary is never a higher operand.
-                        auto equal=i?gate(lo.equal,hi.equal,oc::GateType::And):constants[0];
-                        next.push_back({equal,value});
+                        auto equal=neg(gate(a[begin],b[begin],oc::GateType::Xor));
+                        return {equal,begin?b[begin]:gate(a[begin],b[begin],oc::GateType::na_And)};
                     }
-                    level=std::move(next);
-                }
-                return level[0].less;
+                    auto lowSize=size/2;
+                    auto lo=build(begin,lowSize),hi=build(begin+lowSize,size-lowSize);
+                    auto value=select(hi.equal,lo.less,hi.less);
+                    auto equal=begin?knownAnd(lo.equal,hi.equal):constants[0];
+                    return {equal,value};
+                };
+                return build(0,a.size()).less;
             }
             void save(u32 a,u32 b)
             { if(a==constants[0])c.addCopy(a,b);else c.addGate(a,constants[0],oc::GateType::Xor,b); }
@@ -133,13 +146,26 @@ namespace secJoin
             g.clear();
         }
 
+        // Open exactly the requested low bits per row, including across byte
+        // boundaries. Compression changes only encoding, never what is opened.
+        macoro::task<std::vector<u8>> openPacked(const BinMatrix& values,u64 bits,coproto::Socket& sock)
+        {
+            auto bytes=oc::divCeil(product(values.rows(),bits),8);
+            std::vector<u8> mine(bytes),peer(bytes);
+            for(u64 i=0;i<values.rows();++i)copy(mine.data(),i*bits,values.data(i),0,bits);
+            auto exchanged=co_await macoro::when_all_ready(sock.send(coproto::copy(mine)),sock.recv(peer));
+            std::get<0>(exchanged).result();std::get<1>(exchanged).result();
+            for(u64 i=0;i<bytes;++i)mine[i]^=peer[i];
+            co_return mine;
+        }
+
         // Add a secret w-bit count to the PUBLIC row index. Initial carry
         // generate/propagate bits are local, and only the w low bits interact.
         // The carry into the public high word selects between public constants.
         struct PublicIndexAdd
         {
             std::unique_ptr<Gmw> g;
-            u64 rows=0,bits=0,outBits=0,role=0,numRounds=0,numAnds=0;
+            u64 rows=0,bits=0,outBits=0,role=0,numRounds=0,numAnds=0,period=0;
             void init(u64 n,u64 w,u64 r,CorGenerator& cor)
             {
                 rows=n;bits=w;outBits=r;role=cor.partyIdx();
@@ -156,25 +182,75 @@ namespace secJoin
                     }
                 }
                 for(u64 i=0;i<w;++i)c.save(carry[i],out[i]);
-                g=std::make_unique<Gmw>();g->init(n,c.finish(),cor);
+                auto chosen=c.finish();u64 lanes=n;
+                auto depth=[](const BetaCircuit& cir){return std::count_if(cir.mLevelAndCounts.begin(),cir.mLevelAndCounts.end(),[](auto v){return v!=0;});};
+                // Public-index residues specialize the carry circuit. Batch
+                // all residues in one circuit so they still run in parallel.
+                // Use it only when padded AND cost falls without added depth.
+                auto residues=u64(1)<<w;
+                if(residues<=2048&&residues<=n)
+                {
+                    Circuit specialized;auto input=specialized.input(residues*w),output=specialized.output(residues*w);
+                    for(u64 k=0;k<residues;++k)
+                    {
+                        std::vector<u32> propagate(w),value(w);
+                        for(u64 j=0;j<w;++j)
+                        {
+                            auto a=input[k*w+j];bool one=(k>>j)&1;
+                            propagate[j]=one?specialized.neg(a):a;
+                            // When a segment does not propagate, its carry is
+                            // the public index bit. Otherwise its value may be
+                            // arbitrary, except bit zero binds input carry zero.
+                            value[j]=j?specialized.constants[one]:(one?a:specialized.constants[0]);
+                        }
+                        for(u64 stride=1;stride<w;stride*=2)
+                        {
+                            auto oldP=propagate,oldV=value;
+                            for(u64 j=0;j<w;++j)if(j%(2*stride)>=stride)
+                            {
+                                auto left=j/(2*stride)*(2*stride)+stride-1;
+                                value[j]=specialized.select(oldP[j],oldV[left],oldV[j]);
+                                if(j>=2*stride)propagate[j]=specialized.knownAnd(oldP[j],oldP[left]);
+                            }
+                        }
+                        for(u64 j=0;j<w;++j)specialized.save(value[j],output[k*w+j]);
+                    }
+                    auto candidate=specialized.finish();auto candidateLanes=oc::divCeil(n,residues);
+                    if(product(candidate.mNonlinearGateCount,oc::roundUpTo(candidateLanes,128))<product(chosen.mNonlinearGateCount,oc::roundUpTo(n,128))
+                        &&depth(candidate)<=depth(chosen))
+                    {chosen=std::move(candidate);lanes=candidateLanes;period=residues;}
+                }
+                g=std::make_unique<Gmw>();g->init(lanes,chosen,cor);
                 numRounds=rounds(*g);numAnds=ands(*g);
             }
             void preprocess(){g->preprocess();}
             macoro::task<> apply(const BinMatrix& count,BinMatrix& output,coproto::Socket& sock)
             {
-                BinMatrix p(rows,bits),generate(rows,bits),carry(rows,bits);
-                for(u64 i=0;i<rows;++i)
+                BinMatrix carry(rows,bits);
+                if(period)
                 {
-                    auto value=integer(count.data(i),0,bits);
-                    integer(p.data(i),0,value^(role?0:i),bits);
-                    integer(generate.data(i),0,value&i,bits);
+                    BinMatrix input(g->mN,period*bits),groupCarry(g->mN,period*bits);
+                    for(u64 i=0;i<rows;++i)copy(input.data(i/period),(i%period)*bits,count.data(i),0,bits);
+                    co_await evaluate(*g,role,{&input},{&groupCarry},sock);
+                    for(u64 i=0;i<rows;++i)copy(carry.data(i),0,groupCarry.data(i/period),(i%period)*bits,bits);
                 }
-                co_await evaluate(*g,role,{&p,&generate},{&carry},sock);g.reset();
+                else
+                {
+                    BinMatrix p(rows,bits),generate(rows,bits);
+                    for(u64 i=0;i<rows;++i)
+                    {
+                        auto value=integer(count.data(i),0,bits);
+                        integer(p.data(i),0,value^(role?0:i),bits);
+                        integer(generate.data(i),0,value&i,bits);
+                    }
+                    co_await evaluate(*g,role,{&p,&generate},{&carry},sock);
+                }
+                g.reset();
                 output.resize(rows,outBits);
                 for(u64 i=0;i<rows;++i)
                 {
                     auto carries=integer(carry.data(i),0,bits),high=i>>bits;
-                    auto low=(integer(p.data(i),0,bits)^(carries<<1))&((u64(1)<<bits)-1);
+                    auto low=(integer(count.data(i),0,bits)^(role?0:i)^(carries<<1))&((u64(1)<<bits)-1);
                     high=(role?0:high)^((u64(0)-(carries>>(bits-1)))&(high^(high+1)));
                     integer(output.data(i),0,low|(high<<bits),outBits);
                 }
@@ -201,15 +277,14 @@ namespace secJoin
             }
             macoro::task<> apply(const BinMatrix& ranks,AdditivePerm& output,coproto::Socket& sock)
             {
-                BinMatrix shuffled(rows,bits),peer(rows,bits);
+                BinMatrix shuffled(rows,bits);
                 co_await permutation.apply<u8>(PermOp::Regular,
                     {ranks.data(),rows,ranks.bytesPerEntry()},shuffled.mData,sock);
-                auto opened=co_await macoro::when_all_ready(sock.send(coproto::copy(shuffled.mData)),sock.recv(peer.mData));
-                std::get<0>(opened).result();std::get<1>(opened).result();
+                auto opened=co_await openPacked(shuffled,bits,sock);
                 output.mShare.resize(rows);std::vector<bool> seen(rows);
                 for(u64 i=0;i<rows;++i)
                 {
-                    auto rank=integer(shuffled.data(i),0,bits)^integer(peer.data(i),0,bits);
+                    auto rank=integer(opened.data(),i*bits,bits);
                     if(rank>=rows||seen[rank])throw std::runtime_error("RootMerge invalid shuffled rank");
                     seen[rank]=true;output.mShare[rank]=integer(labels.data(i),0,bits);
                 }
@@ -530,14 +605,11 @@ namespace secJoin
                 }
             }
             co_await blockPerm.apply<u8>(PermOp::Regular,records.mData,shuffled.mData,sock);
-            std::vector<u32> mine(blocks+m),peer(blocks+m);
-            for(u64 j=0;j<blocks+m;++j)mine[j]=integer(shuffled.data(j),0,cw);
-            auto opened=co_await macoro::when_all_ready(sock.send(coproto::copy(mine)),sock.recv(peer));
-            std::get<0>(opened).result();std::get<1>(opened).result();
+            auto opened=co_await openPacked(shuffled,cw,sock);
             std::vector<bool> seen(m);
             for(u64 j=0;j<blocks+m;++j)
             {
-                auto tag=mine[j]^peer[j];
+                auto tag=integer(opened.data(),j*cw,cw);
                 if(!tag)continue;
                 if(tag>m||seen[tag-1])throw std::runtime_error("RootMerge invalid shuffled tags");
                 seen[tag-1]=true;positions[tag-1]=j;
@@ -664,4 +736,5 @@ namespace secJoin
     }
     u64 RootMerge::paddedAnds()const{u64 total=0;for(auto& s:mImpl->stats)total+=s.paddedAnds;return total;}
     u64 RootMerge::comparisons()const{return mImpl->comparisonCount;}
+    u64 RootMerge::rankAdderResidues()const{return mImpl->yRanks.period;}
 }

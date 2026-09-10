@@ -29,6 +29,8 @@ namespace secJoin
         u64 onlineRoundBound() const;
         u64 paddedAnds() const;
         u64 comparisons() const;
+        // Public Y-rank adder specialization; zero selects the generic circuit.
+        u64 rankAdderResidues() const;
     private:
         struct Impl;
         std::unique_ptr<Impl> mImpl;

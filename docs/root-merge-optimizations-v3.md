@@ -1,5 +1,10 @@
 # Second optimization checkpoint (implementation version 3)
 
+This is a historical checkpoint. The current implementation and latest focused
+checks are described in `root-merge-optimizations-v4.md`; the numbers below
+remain specific to version 3. Its executable is now preserved at
+`out/root-optimization-v3/rootmerge`.
+
 This pass follows the version-2 checkpoint in `root-merge-optimizations.md`.
 It changes the implementation and focused correctness checks only. No scaling
 sweep, network experiments, parameter retuning, or paper edits were performed.

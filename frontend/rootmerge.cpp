@@ -127,11 +127,11 @@ namespace
     struct Measurement{double setup=0,offline=0,online=0,wall=0;Counters off[2],on[2];};
     void schedule(const Options& o,const RootMerge& p,const CorGenerator* cor=nullptr)
     {
-        std::cout<<",\"implementation_version\":3,\"method\":"<<quote(o.method)<<",\"m\":"<<o.m<<",\"n\":"<<o.n
+        std::cout<<",\"implementation_version\":4,\"method\":"<<quote(o.method)<<",\"m\":"<<o.m<<",\"n\":"<<o.n
             <<",\"key_bits\":"<<o.bits<<",\"block_size\":"<<p.blockSize()<<",\"batch_size\":"<<o.batch
             <<",\"concurrency\":"<<o.concurrency<<",\"comparisons\":"<<p.comparisons()
             <<",\"online_gmw_ands_padded\":"<<p.paddedAnds()<<",\"online_gmw_rounds_partial\":"<<p.gmwRounds()
-            <<",\"online_round_bound\":"<<p.onlineRoundBound();
+            <<",\"online_round_bound\":"<<p.onlineRoundBound()<<",\"rank_adder_residues\":"<<p.rankAdderResidues();
         if(cor)
         {
             auto& g=*cor->mGenState;
@@ -246,7 +246,7 @@ namespace
     {
 #ifdef COPROTO_ENABLE_BOOST
         auto data=dataset(o);auto socket=coproto::asioConnect(o.address,o.party==0);
-        std::array<u64,12> config={0x524f4f540003ull,o.m,o.n,o.bits,o.block,o.batch,o.concurrency,
+        std::array<u64,12> config={0x524f4f540004ull,o.m,o.n,o.bits,o.block,o.batch,o.concurrency,
             u64(kind(o)),u64(std::find(patterns.begin(),patterns.end(),o.pattern)-patterns.begin()),seed(o.seed),0,u64(o.party)},peer{};
         complete(socket.send(coproto::copy(config)),socket.recv(peer));peer.back()^=1;
         if(config!=peer)throw std::runtime_error("Public configurations differ");
@@ -332,6 +332,14 @@ namespace
             Options o;o.method=method;o.pattern=pattern;o.bits=1;o.batch=1<<16;
             o.m=1024;o.n=1025;o.block=1;local(o,true);++count;
         }
+        // Complete public-residue groups and a partial final group, with
+        // sufficiently many SIMD lanes to select the specialized adder.
+        for(auto method:{"cube","sqrt"})for(auto pattern:{"random","duplicates"})
+            for(auto shape:std::array<std::tuple<u64,u64,u64>,3>{{{3,1023,4},{8,2047,8},{64,16383,16}}})
+            {
+                Options o;o.method=method;o.pattern=pattern;o.bits=32;o.batch=1<<16;
+                std::tie(o.m,o.n,o.block)=shape;local(o,true);++count;
+            }
         std::cout<<"{\"type\":\"self_test\",\"test\":\"asymmetric_random_shares\",\"cases\":"<<count<<",\"passed\":true}"<<std::endl;
     }
 }

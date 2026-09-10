@@ -1,10 +1,11 @@
 # CubeRootMerge and SquareRootMerge
 
-The current code is **implementation version 3**, with additional communication
+The current code is **implementation version 4**, with additional communication
 and depth optimizations. The committed benchmark tables, plots, and paper still
 describe version 1. They have not been rerun or regenerated. See
-`root-merge-optimizations-v3.md` for the latest focused checks and differences;
-`root-merge-optimizations.md` records the preceding version-2 checkpoint.
+`root-merge-optimizations-v4.md` for the latest focused checks and differences;
+`root-merge-optimizations-v3.md` and `root-merge-optimizations.md` record the
+preceding checkpoints.
 
 `secure-join/Sort/RootMerge.h` exposes `CubeRootMerge`, `SquareRootMerge`, and
 `BatcherUnequalMerge`. These merge two sorted, unsigned XOR-shared lists of
@@ -62,7 +63,9 @@ Finally, a separate fresh joint shuffle opens the scatter ranks and places
 the still-shared original indices at those positions. The public original
 indices are shuffled during preprocessing, and only ranks are shuffled online;
 these applications consume disjoint fresh mask bytes. All rows are active,
-so no flag-opening phase is needed. Rank shares are opened in byte-packed form.
+so no flag-opening phase is needed. Tag and rank openings pack consecutive
+values across byte boundaries, sending exactly the meaningful bits per value
+plus at most seven trailing padding bits per message.
 A correct stable merge
 has each rank `0..m+n-1` exactly once; the opened shuffled ranks are a uniform
 permutation independent of the keys. The output is a secret gather permutation.
@@ -86,14 +89,24 @@ fresh OS randomness. The public seed controls synthetic benchmark keys only.
 Rank addition exploits public row indices. Initial carry generate/propagate
 bits are computed locally; a Sklansky prefix circuit handles only the secret
 count width. Its final carry selects between two public high words locally.
+For count widths `w` up to 11 bits, the implementation also considers a circuit
+specialized for every public row-index residue modulo `2^w`.
+All residues run in one parallel circuit. This circuit is selected only if
+its AND count, including SIMD padding, is lower without increasing depth;
+otherwise the generic circuit remains in use. The public schedule reports
+the selected number of residues, or zero for the generic circuit.
 Counts of sorted comparison bits use local XOR boundary encoding; no popcount
 remains in either root. Tag generation combines one-hot map changes in one layer.
 SquareRootMerge's suffix operation uses a reversed eight-leaf grouped prefix
 broadcast, batched over Y positions. Every combine takes one AND layer. The
 forward broadcast uses the same grouped schedule. Small lane sets still incur
 GMW's 128-lane padding. Both roots and the unequal Batcher baseline use the
-same smaller strict-comparison circuit; 32-bit comparison costs 58 ANDs at
-depth six, down from 94 at depth six. Earlier Pi-logstar code is unchanged.
+same smaller strict-comparison circuit, now split by actual bit width.
+A 32-bit comparison still costs 58 ANDs at depth six, down from 94 at depth
+six in version 1. A 33-bit comparison costs 60 ANDs at depth six, trading
+one additional AND for one fewer layer relative to version 3. The same
+tradeoff also reduces the matched unequal Batcher baseline's depth.
+Earlier Pi-logstar code is unchanged.
 The code drops consumed GMW state and large temporary matrices between stages.
 
 The reported round bound is the longest dependency path, including eight
@@ -180,11 +193,13 @@ sudo python3 scripts/benchmark_root_merge.py --profiles wan --min-log 20 --max-l
   --parameters out/root-scaling.parameters.json --out out/root-wan-20.jsonl
 ```
 
-The current correctness suite includes 243 real-crypto runs with random XOR shares,
+The current correctness suite includes 255 real-crypto runs with random XOR shares,
 duplicates, both disjoint orders, maximum unsigned keys, irregular lengths,
 block overrides, and wide keys. It also checks invalid dimensions and insecure
 correlation modes. It includes a full 8-bit-domain merge, plus carries at and
-beyond the 11-bit count boundary. A separate plaintext oracle covers 40,512 root-protocol
+beyond the 11-bit count boundary. Additional cases exercise specialized adders
+with complete residue groups and a partial final group. A separate plaintext
+oracle covers 40,512 root-protocol
 cases, exhaustive unequal-Batcher binary inputs on the tested small sizes,
 and 33,410 unary counts split into random XOR shares.
 The measured large outputs are each checked against a stable plaintext merge.

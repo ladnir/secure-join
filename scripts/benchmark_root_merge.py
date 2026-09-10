@@ -39,8 +39,11 @@ def payload(plan):
     record = b * (plan['key_bits'] + 1) + 2*cw + 1
     if plan.get('implementation_version', 1) < 2:
         record += iw + (cw if plan['method'] == 'sqrt' else 0)
-    result += 2*(k+m)*((record+7)//8 + (b*cw+7)//8) + 8*(k+m)
-    if plan.get('implementation_version', 1) >= 3:
+    result += 2*(k+m)*((record+7)//8 + (b*cw+7)//8)
+    result += 2*((cw*(k+m)+7)//8) if plan.get('implementation_version', 1) >= 4 else 8*(k+m)
+    if plan.get('implementation_version', 1) >= 4:
+        result += 2*(m+n)*((rw+7)//8) + 2*((rw*(m+n)+7)//8)
+    elif plan.get('implementation_version', 1) >= 3:
         result += 4*(m+n)*((rw+7)//8)
     else:
         result += 2*(m+n)*((2*rw+1+7)//8) + 2*((m+n+7)//8) + 8*(m+n)
