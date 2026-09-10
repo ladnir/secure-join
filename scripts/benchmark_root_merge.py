@@ -36,11 +36,14 @@ def payload(plan):
     m, n, b = plan['m'], plan['n'], plan['block_size']
     k = (n + b - 1) // b
     cw, iw, rw = max(1, m.bit_length()), max(1, (k - 1).bit_length()), (m+n-1).bit_length()
-    record = b * (plan['key_bits'] + 1) + 2*cw + 1 + iw
-    if plan['method'] == 'sqrt':
-        record += cw
+    record = b * (plan['key_bits'] + 1) + 2*cw + 1
+    if plan.get('implementation_version', 1) < 2:
+        record += iw + (cw if plan['method'] == 'sqrt' else 0)
     result += 2*(k+m)*((record+7)//8 + (b*cw+7)//8) + 8*(k+m)
-    result += 2*(m+n)*((2*rw+1+7)//8) + 2*((m+n+7)//8) + 8*(m+n)
+    if plan.get('implementation_version', 1) >= 3:
+        result += 4*(m+n)*((rw+7)//8)
+    else:
+        result += 2*(m+n)*((2*rw+1+7)//8) + 2*((m+n+7)//8) + 8*(m+n)
     return result
 
 

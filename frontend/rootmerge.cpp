@@ -127,7 +127,7 @@ namespace
     struct Measurement{double setup=0,offline=0,online=0,wall=0;Counters off[2],on[2];};
     void schedule(const Options& o,const RootMerge& p,const CorGenerator* cor=nullptr)
     {
-        std::cout<<",\"method\":"<<quote(o.method)<<",\"m\":"<<o.m<<",\"n\":"<<o.n
+        std::cout<<",\"implementation_version\":3,\"method\":"<<quote(o.method)<<",\"m\":"<<o.m<<",\"n\":"<<o.n
             <<",\"key_bits\":"<<o.bits<<",\"block_size\":"<<p.blockSize()<<",\"batch_size\":"<<o.batch
             <<",\"concurrency\":"<<o.concurrency<<",\"comparisons\":"<<p.comparisons()
             <<",\"online_gmw_ands_padded\":"<<p.paddedAnds()<<",\"online_gmw_rounds_partial\":"<<p.gmwRounds()
@@ -246,7 +246,7 @@ namespace
     {
 #ifdef COPROTO_ENABLE_BOOST
         auto data=dataset(o);auto socket=coproto::asioConnect(o.address,o.party==0);
-        std::array<u64,12> config={0x524f4f540001ull,o.m,o.n,o.bits,o.block,o.batch,o.concurrency,
+        std::array<u64,12> config={0x524f4f540003ull,o.m,o.n,o.bits,o.block,o.batch,o.concurrency,
             u64(kind(o)),u64(std::find(patterns.begin(),patterns.end(),o.pattern)-patterns.begin()),seed(o.seed),0,u64(o.party)},peer{};
         complete(socket.send(coproto::copy(config)),socket.recv(peer));peer.back()^=1;
         if(config!=peer)throw std::runtime_error("Public configurations differ");
@@ -307,6 +307,30 @@ namespace
         {
             Options o;o.method=method;o.pattern="wide_random";o.bits=bits;o.m=7;o.n=33;o.batch=1<<14;
             wide(o);++count;
+        }
+        // Unary offsets and reversed suffix selection: one very large block,
+        // padded final blocks, all-X-after-Y, and duplicate group boundaries.
+        for(auto method:{"cube","sqrt"})for(auto pattern:{"random","duplicates","reverse-disjoint","equal"})
+            for(auto shape:std::array<std::tuple<u64,u64,u64>,5>{{{1,17,32},{5,17,32},{9,33,64},{17,65,8},{8,8,1}}})
+            {
+                Options o;o.method=method;o.pattern=pattern;o.bits=32;o.batch=1<<14;
+                std::tie(o.m,o.n,o.block)=shape;local(o,true);++count;
+            }
+        {
+            // With b=1, every Y block is selected. Exercise the full 8-bit
+            // domain through boundary and triangular detail comparisons.
+            Options o;o.method="cube";o.pattern="exhaustive_comparator";
+            o.m=o.n=256;o.block=1;o.bits=8;o.batch=1<<16;
+            std::vector<u64> keys(256);std::iota(keys.begin(),keys.end(),0);
+            std::vector<u32> expected;
+            for(u64 i=0;i<256;++i){expected.push_back(i);expected.push_back(256+i);}
+            auto values=encode(keys,o.bits);execute(o,values,values,expected,true);++count;
+        }
+        // Carry into and beyond the 11-bit count word, with random XOR shares.
+        for(auto method:{"cube","sqrt"})for(auto pattern:{"disjoint","reverse-disjoint"})
+        {
+            Options o;o.method=method;o.pattern=pattern;o.bits=1;o.batch=1<<16;
+            o.m=1024;o.n=1025;o.block=1;local(o,true);++count;
         }
         std::cout<<"{\"type\":\"self_test\",\"test\":\"asymmetric_random_shares\",\"cases\":"<<count<<",\"passed\":true}"<<std::endl;
     }

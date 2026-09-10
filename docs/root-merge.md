@@ -1,5 +1,11 @@
 # CubeRootMerge and SquareRootMerge
 
+The current code is **implementation version 3**, with additional communication
+and depth optimizations. The committed benchmark tables, plots, and paper still
+describe version 1. They have not been rerun or regenerated. See
+`root-merge-optimizations-v3.md` for the latest focused checks and differences;
+`root-merge-optimizations.md` records the preceding version-2 checkpoint.
+
 `secure-join/Sort/RootMerge.h` exposes `CubeRootMerge`, `SquareRootMerge`, and
 `BatcherUnequalMerge`. These merge two sorted, unsigned XOR-shared lists of
 lengths `m <= n` and return an XOR-shared **gather permutation** of `X || Y`.
@@ -29,29 +35,35 @@ zero tags, regardless of the data. A fresh joint shuffle hides their source
 positions before the tags are opened. This selects exactly one real or dummy
 block per X key without revealing the number of distinct selected blocks.
 
-* **CubeRootMerge** compares every X key with all selected real Y keys. Dummy
-  comparisons are gated off. It keeps dummy holes in the selected array instead
-  of compacting them. If `R_i` counts extracted real Y keys below `X_i`, `z_i`
-  is its block index, and `g_i` is the number of selected distinct blocks up to
-  that X key, its final scatter rank is `i + R_i + (z_i - g_i + 1) * b`.
-  The two passes perform `m*(K-1) + m*m*b` key comparisons.
+* **CubeRootMerge** compares `X_i` only against selected block slots `j <= i`.
+  Every later real slot is at or above `X_i`, and dummy slots are infinity,
+  so the omitted upper triangle is publicly false. At most one real block
+  contributes a partial offset; its low bits combine by XOR. The parity of
+  full-block flags and the parity of group starts identify the single possible
+  within-block overflow. Thus all offset counting is local, with no popcount.
+  The scatter rank is `i + z_i*b + offset_i`. The two passes perform
+  `m*(K-1) + m*(m+1)*b/2` key comparisons.
 * **SquareRootMerge** uses a secret segmented prefix broadcast to replace
   dummy entries by copies of the preceding real block. Each X key is compared
   with only its own copied block. Its scatter rank is `i + z_i*b + offset_i`.
-  A segmented suffix sum combines per-key Y insertion counts within each
+  A reversed segmented broadcast recovers Y insertion counts within each
   group of copied blocks. The two passes perform `m*(K-1) + m*b` comparisons.
 
 Y ranks are recovered by unshuffling **count corrections**, which are narrower
 than the 32-bit key blocks in this evaluation. A block's coarse count is the number of X keys
 at or below its maximum (the last block uses `m`). In a selected real block,
-the correction is its fine count minus this coarse count, modulo
-`2^ceil(log2(m+1))`. Unselected blocks receive zero corrections. Adding the
-restored count to each original Y index gives its final scatter rank. The
+the correction is its fine count **XOR** this coarse count. Unselected blocks
+receive zero corrections. XORing the restored correction with the original
+coarse count, then adding the original Y index, gives its scatter rank. The
 forced last-block count cancels for a selected last block. If the last block
 is unselected, all X keys precede it and its count is indeed `m`.
 
 Finally, a separate fresh joint shuffle opens the scatter ranks and places
-the still-shared original indices at those positions. A correct stable merge
+the still-shared original indices at those positions. The public original
+indices are shuffled during preprocessing, and only ranks are shuffled online;
+these applications consume disjoint fresh mask bytes. All rows are active,
+so no flag-opening phase is needed. Rank shares are opened in byte-packed form.
+A correct stable merge
 has each rank `0..m+n-1` exactly once; the opened shuffled ranks are a uniform
 permutation independent of the keys. The output is a secret gather permutation.
 The benchmark opens this output **after** all measured phases to check it.
@@ -71,20 +83,29 @@ but consume **disjoint fresh mask bytes**. A separate permutation hides final
 ranks. Private permutations use the backend's corrected uniform sampler and
 fresh OS randomness. The public seed controls synthetic benchmark keys only.
 
-Boolean addition uses parallel-prefix carry circuits. Popcounts use balanced
-trees with growing word widths. SquareRootMerge's suffix scan uses a Brent–Kung
-tree, flattened across `(edge, count word)` to avoid padding a whole wide block
-to 128 lanes at the top of the tree. The inherited prefix broadcast uses its
-eight-leaf grouped schedule. Small lane sets still incur GMW's 128-lane padding.
+Rank addition exploits public row indices. Initial carry generate/propagate
+bits are computed locally; a Sklansky prefix circuit handles only the secret
+count width. Its final carry selects between two public high words locally.
+Counts of sorted comparison bits use local XOR boundary encoding; no popcount
+remains in either root. Tag generation combines one-hot map changes in one layer.
+SquareRootMerge's suffix operation uses a reversed eight-leaf grouped prefix
+broadcast, batched over Y positions. Every combine takes one AND layer. The
+forward broadcast uses the same grouped schedule. Small lane sets still incur
+GMW's 128-lane padding. Both roots and the unequal Batcher baseline use the
+same smaller strict-comparison circuit; 32-bit comparison costs 58 ANDs at
+depth six, down from 94 at depth six. Earlier Pi-logstar code is unchanged.
 The code drops consumed GMW state and large temporary matrices between stages.
 
-The reported round bound sums executed GMW AND layers plus nine one-way steps
-for forward block shuffling, opening tags, inverse block routing, and final
-shuffled extraction. Word arithmetic is implemented by Boolean circuits;
-these concrete counts are not the paper's idealized primitive-round counts.
-The current implementation executes those stages sequentially. In particular,
-SquareRootMerge's Boolean suffix additions can make its depth greater than
-Batcher's even when it communicates fewer bytes.
+The reported round bound is the longest dependency path, including eight
+one-way shuffle/opening steps. X-rank addition overlaps suffix recovery,
+inverse block routing, and Y-rank addition on a separate logical channel.
+Specifically the bound is the sum of executed GMW layers plus eight, minus
+`min(X-add layers, suffix layers + Y-add layers + 2)` for that overlap.
+The separately reported GMW-layer sum and stage counters still count all
+executed circuits. These concrete Boolean-circuit bounds are distinct from
+the paper's idealized primitive-round counts. The archived version 1 executed
+the phases sequentially and used Boolean suffix additions; version 2 removed
+those suffix carry circuits, and version 3 adds this overlap.
 
 The baseline is Batcher's **odd-even merge network on the exact unequal list
 lengths**, with empty recursive branches removed publicly. It does not pad
@@ -105,7 +126,7 @@ candidate schedule and selected block size is saved. Selection uses no timing
 sample or secret key. The chosen parameters are held fixed across repetitions
 and network profiles.
 
-The scaling study includes every long-list size `2^10` through `2^20`, with
+The **archived version-1** scaling study includes every long-list size `2^10` through `2^20`, with
 three fresh runs per method and shape. Root and Batcher inputs have identical
 dimensions, 32-bit keys, and public input seed within each repetition. Protocol
 order alternates. Both use correlation batches of `2^20` and concurrency two.
@@ -159,11 +180,13 @@ sudo python3 scripts/benchmark_root_merge.py --profiles wan --min-log 20 --max-l
   --parameters out/root-scaling.parameters.json --out out/root-wan-20.jsonl
 ```
 
-The correctness suite includes 198 real-crypto runs with random XOR shares,
+The current correctness suite includes 243 real-crypto runs with random XOR shares,
 duplicates, both disjoint orders, maximum unsigned keys, irregular lengths,
 block overrides, and wide keys. It also checks invalid dimensions and insecure
-correlation modes. A separate plaintext oracle passes 13,504 root-protocol
-cases and exhaustive unequal-Batcher binary inputs on the tested small sizes.
+correlation modes. It includes a full 8-bit-domain merge, plus carries at and
+beyond the 11-bit count boundary. A separate plaintext oracle covers 40,512 root-protocol
+cases, exhaustive unequal-Batcher binary inputs on the tested small sizes,
+and 33,410 unary counts split into random XOR shares.
 The measured large outputs are each checked against a stable plaintext merge.
 
 See `benchmarks/root-merge-summary.md` for the measured comparison and
