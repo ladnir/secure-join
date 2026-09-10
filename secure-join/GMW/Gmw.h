@@ -116,6 +116,10 @@ namespace secJoin
             const BetaCircuit& cir,
             CorGenerator& gen);
 
+        // An adaptive batch using disjoint, already requested binary OLEs.
+        // Consumes the request; the caller must never reuse its correlations.
+        void init(u64 n, const BetaCircuit& cir, u64 role, BinOleRequest triples);
+
         // set the i'th input. There should be mN rows of `input`, each row holding
         // mCur.mInput[i].size() bits (rounded up to 8 * sizeof(T)).
         template<typename T>

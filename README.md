@@ -1,5 +1,11 @@
 # Secure Join
 
+The **shuffled quicksort** baseline now supports stable duplicate handling,
+batched comparisons, preprocessed correlation reserves, and an optional
+three-pivot mode. See [docs/shuffled-quicksort.md](docs/shuffled-quicksort.md).
+Development and correctness checks passed; formal quicksort paper benchmarks
+have not been run.
+
 The paper's recursive **Pi-median merge** is implemented with configurable
 per-level parameters, real two-party cryptography, and a public cost planner.
 See [docs/pi-median.md](docs/pi-median.md). Formal Pi-median paper benchmarks

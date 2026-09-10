@@ -16,3 +16,6 @@ target_link_libraries(rootmerge secureJoin)
 
 add_executable(pimedian pimedian.cpp)
 target_link_libraries(pimedian secureJoin)
+
+add_executable(shuffledquicksort shuffledquicksort.cpp)
+target_link_libraries(shuffledquicksort secureJoin)

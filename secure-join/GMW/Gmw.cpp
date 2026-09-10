@@ -16,6 +16,22 @@ namespace secJoin
 		const BetaCircuit& cir,
 		CorGenerator& gen)
 	{
+		auto triples = cir.mNonlinearGateCount
+			? gen.binOleRequest(2 * cir.mNonlinearGateCount * oc::roundUpTo(n, 128))
+			: BinOleRequest{};
+		init(n, cir, gen.partyIdx(), std::move(triples));
+	}
+
+	void Gmw::init(u64 n, const BetaCircuit& cir, u64 role, BinOleRequest triples)
+	{
+		if (role > 1)
+			throw std::invalid_argument("Gmw: invalid party");
+		auto expected = 2 * cir.mNonlinearGateCount * oc::roundUpTo(n, 128);
+		if (triples.size() != expected)
+			throw std::invalid_argument("Gmw: incorrect preallocated OLE count");
+		if (expected && (triples.mReqState->mType != CorType::Ole ||
+			triples.mReqState->mSender != bool(role) || triples.mReqState->mNextBatchIdx))
+			throw std::invalid_argument("Gmw: incompatible or consumed OLE request");
 		mN = n;
 
 		mCir = cir;
@@ -33,9 +49,8 @@ namespace secJoin
 		mPrint = mCir.mPrints.begin();
 
 
-		mRole = gen.partyIdx();
-		if (mCir.mNonlinearGateCount)
-			mTriples = gen.binOleRequest(2 * mCir.mNonlinearGateCount * oc::roundUpTo(mN, 128));
+		mRole = role;
+		mTriples = std::move(triples);
 	}
 
 
