@@ -1,0 +1,105 @@
+{
+  "utc": "2026-09-11T18:49:09.768703+00:00",
+  "status": "complete: all required runs, paper updates, PDF checks, and machine restoration finished",
+  "completed_timed_executions": 93,
+  "expected_timed_executions": 93,
+  "completed_audits": 13,
+  "expected_audits": 13,
+  "validated_configurations": 39,
+  "pending_n": null,
+  "pending_profiles": [],
+  "pending_audit": false,
+  "largest_attempt_stop": {
+    "active": true,
+    "children": [
+      {
+        "pid": 598,
+        "n": 1048576,
+        "rss_kib": 16100128,
+        "swap_kib": 0
+      }
+    ],
+    "stopped": true,
+    "linux_available_kib": 9614620,
+    "utc": "2026-09-11T17:21:30.542459+00:00",
+    "controller": 545,
+    "host_available_bytes": 1934520320,
+    "minimum_free_gib": 2,
+    "reason": "Host available physical memory below configured reserve; incomplete trial must not be published"
+  },
+  "publication_activated": true,
+  "validation_rejection": null,
+  "wslconfig_originally_absent": true,
+  "wslconfig_absence_restored": true,
+  "wsl_shutdown_completed": true,
+  "host_available_gib_after_restoration": 18.513225555419922,
+  "candidate_manifest": {
+    "directory": "median-retune-20260911",
+    "datasets": [
+      {
+        "measurements": "measurements.jsonl",
+        "parameters": "parameters.json"
+      },
+      {
+        "measurements": "memory-feasible/measurements.jsonl",
+        "parameters": "memory-feasible/parameters.json"
+      }
+    ],
+    "sha256": {
+      "measurements.jsonl": "e9b421b6e6367b68d918b2d13f6541aca643553ded6e438d8f4c644261ab9de0",
+      "parameters.json": "4a682c07d9c4151c3c3b4c7c47db118f73c68d70a58aa42c981c5055271cddf6",
+      "plans.jsonl": "7359e67e57c396005044c4c6101a4390791f46587da9adfed2d0a497fa2d9fd1",
+      "frontier.json": "14cdc9d2220a33d11d3b85d282374fa75ce1b1113fcd139b65ec332e725be92c",
+      "calibration.jsonl": "beccd9ccf64c5d0aa6e55b86a97caa3f160b98955d4e799e86c07eaf6d477f45",
+      "memory-feasible/measurements.jsonl": "10a775df33028af7af3bdd09b0836c60446121de6a1f8512400edbf8b31c7991",
+      "memory-feasible/parameters.json": "50f0c6a35e3142946fb402af64b8cd8b259f8126a358c92ebd450414433487e2",
+      "memory-feasible/host-memory-20-after-reboot.jsonl": "a36fb5c71df00c03967d2e53e6ef70e22366c74a8fa28213254641164010ac5a",
+      "memory-feasible/host-memory-20-timings.jsonl": "53dacd5beb3a8cfab5245066b34dee4474e61cd00079b4fbc839b921a6fef2d1",
+      "memory-feasible/host-memory-20-audit-final.jsonl": "c7b8397dbc93fc68c3d7cf7bff4701b45a5bc0e16604e717ba16474485ebc992"
+    },
+    "audit_paging_policy": "Explicitly marked paging permitted only for untimed round audits; all audit elapsed times excluded. Timed records require zero sampled Linux process swap."
+  },
+  "retry_after_reboot": {
+    "host_available_gib_initial": 18.45,
+    "wsl_memory_cap_gib": 26,
+    "parameters": "memory-feasible/parameters.json",
+    "monitor": "memory-feasible/host-memory-20-after-reboot.jsonl",
+    "automatic_host_reserve_stop": false,
+    "reason": "User requires a completed largest case; earlier host-reserve stops were preemptive, not OOM. Observe actual process swap and memory pressure."
+  },
+  "audit_paging_policy": "Permit explicitly marked paging in untimed audits only; all audit timings excluded; timed records still require zero sampled Linux process swap",
+  "completed_configurations": 39,
+  "artifacts": {
+    "main_llncs.pdf": {
+      "path": "C:\\Users\\stani\\OneDrive\\Documents\\LOGSTAR\\output\\pdf\\main_llncs.pdf",
+      "sha256": "dc6bcaab69f9289d5322b48d4227ec256e8e791be3887d9ec5210166f55bcd9d",
+      "pages": 51,
+      "changed_pages_rendered_and_visually_checked": true,
+      "all_fonts_embedded": false,
+      "existing_unembedded_fonts": "Three pre-existing TimesNewRomanPSMT instances in earlier manuscript figures; benchmark section fonts are embedded."
+    },
+    "benchmark-section.pdf": {
+      "path": "C:\\Users\\stani\\OneDrive\\Documents\\LOGSTAR\\output\\pdf\\benchmark-section.pdf",
+      "sha256": "0d56d569d3e3cfe51ef35574ce7377e747c58d25725a064511b1b2d4681a7d73",
+      "pages": 6,
+      "changed_pages_rendered_and_visually_checked": true,
+      "all_fonts_embedded": true
+    },
+    "benchmark-full-results.pdf": {
+      "path": "C:\\Users\\stani\\OneDrive\\Documents\\LOGSTAR\\output\\pdf\\benchmark-full-results.pdf",
+      "sha256": "3b3b0f47c481d9048bff48c96dc77396bd1a994c234866b13642da4b899dfc43",
+      "pages": 13,
+      "changed_pages_rendered_and_visually_checked": true,
+      "all_fonts_embedded": true
+    }
+  },
+  "machine_restoration": {
+    "verified_at": "2026-09-11T18:49:09.768703+00:00",
+    "original_wslconfig_absent_restored": true,
+    "wsl_shutdown_verified": true,
+    "benchmark_network_namespaces_removed": true,
+    "no_running_containers_before_shutdown": true,
+    "no_benchmark_or_observer_jobs_remaining": true,
+    "host_available_gib": 18.513225555419922
+  }
+}

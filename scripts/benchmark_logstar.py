@@ -107,7 +107,7 @@ def trial(exe, options, profile, timeout):
                 except subprocess.TimeoutExpired:
                     continue
             if p.returncode:
-                raise RuntimeError(stderr + stdout)
+                raise RuntimeError(f'Benchmark process exited with return code {p.returncode}: ' + stderr + stdout)
             result = records(stdout)
             for r in result:
                 r.update(peak_sampled_swap_kib=peak_swap, peak_sampled_rss_kib=peak_rss,
@@ -155,7 +155,7 @@ def trial(exe, options, profile, timeout):
             for p, measured in zip(processes, memory):
                 stdout, stderr = p.communicate(timeout=max(1, deadline - time.monotonic()))
                 if p.returncode:
-                    raise RuntimeError(stderr + stdout)
+                    raise RuntimeError(f'Benchmark process exited with return code {p.returncode}: ' + stderr + stdout)
                 result = records(stdout)
                 for r in result:
                     r.update(measured)

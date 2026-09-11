@@ -86,32 +86,67 @@ records actual online waves, for comparison with the online dependency bound.
 Its buffered-transport timings are not included in any timing table.
 
 Runs are serial. TCP peers execute simultaneously; different protocol trials
-never overlap. No observed process swapping is accepted. Large timings have
+never overlap. Timed records reject observed Linux process swapping. Explicitly
+marked untimed audits may page; their elapsed times are always excluded. Large timings have
 one sample, so no confidence interval or variability claim is made for them.
 The smaller-size CSV columns contain observed minima and maxima, not confidence
 intervals. These are laptop/WSL experiments, not measurements on remote hosts.
 
+## Revised presentation of network-independent costs
+
+The paper's `evaluation.tex` replaces its implementation/evaluation section
+and is included by both `main_llncs.tex` and `main_cic.tex`. The standalone
+`benchmark-section.tex` reads that same section, including the public
+parameter table; it is only a preview wrapper.
+
+Online communication uses a zero-based linear y axis. A second, also linear,
+panel reports Batcher bytes divided by each protocol's bytes; values above
+one indicate a communication reduction. Input size remains on a logarithmic
+axis. Online rounds have one common panel rather than separate network panels.
+
+For every deterministic method, all observed online bytes and dependency
+bounds are identical across transports and repeats. The summarizer now checks
+this invariant. Quicksort's fresh private shuffle changes its partition tree,
+comparison count, and depth between executions. The public input seed does not
+fix the private shuffle. Differences between its former network panels were
+independent-run variation, not a bandwidth or latency effect.
+
+`protocol-costs.json` and `protocol-costs.csv` pool the individual executions
+across all three transports: nine samples per point through `2^16`, three
+above. They contain medians and observed minima/maxima. Pooling is performed
+before summarization, never as a median of per-profile medians. Shading in the
+quicksort panels shows the observed range, not a confidence interval. Offline
+round counts still come from the separate fresh-cryptography audit.
+
+Network-specific runtimes and complete per-profile tables retain the observations
+for their respective transports. The active Median revision replaces only Median
+rows in `all-results.csv`, `summary.json`, and pooled costs. Main tables show
+common costs once and separate timing columns. The original raw experiment
+provenance is retained; `presentation-provenance.json` identifies the active
+Median manifest and authoring scripts.
+
 ## Public parameter tuning
 
-`parameters.json` records every candidate and selected configuration. The
-selection objective is online application payload plus **250,000 bytes per
+`parameters.json` records the original candidates and schedules. Logstar and
+the root methods retain their original objective: online payload plus **250,000 bytes per
 dependent step**, with ties broken by payload then depth. This is a fixed
 tradeoff weight, not a fitted runtime model. Parameters vary with public input
 size and are held fixed across network profiles and test seeds.
 
 - Logstar considers terminal blocks 2, 4, 8, and 16 and uses its exact packed
   one-partition specialization and direct-rank extraction.
-- Median considers one or two alignment levels, independent child and cube
-  block sizes, and all-pairs versus odd-even Batcher leaves. At least one
-  alignment is required: it cannot be relabeled pure Batcher. All per-size
-  deviations from the asymptotic recursion are public and saved.
+- The active Median revision screens up to four alignment levels and chooses
+  the fewest online rounds within max(3 times Batcher bytes, 8 MiB), breaking
+  ties by payload. The largest two sizes use one level to limit memory. Its
+  immutable schedules and exact public search are in `median-retune-20260911/`.
+  At least one alignment is required; the method cannot be relabeled pure Batcher.
 - Root methods consider five block scales around the corresponding root.
   Short-list sizes are computed with integer ceiling roots, not floating-point
   rounding. Baselines use the same actual unequal lengths.
 
 The public planners and actual executions both use correlation concurrency
 two. This field does not enter their online payload/depth calculations. The
-selected online circuits are unchanged. No claim of global optimality is made.
+non-Median online circuits are unchanged. No claim of global optimality is made.
 
 ## Files and reproduction
 
@@ -121,7 +156,9 @@ selected online circuits are unchanged. No claim of global optimality is made.
   and exact `tc` configuration/counters.
 - `calibration-26gb.jsonl`: recalibration after the memory change and before
   the TCP sweep (LAN mean RTT 0.264 ms, WAN mean RTT 40.197 ms).
-- `measurements.jsonl`: append-only raw records, executable hashes, and commands.
+- `measurements.jsonl`: frozen original raw records, executable hashes, and commands.
+- `active-median-revision.json`: validated manifest selecting the complete Median replacement.
+- `median-retune-20260911/`: revised Median parameters, raw observations, memory logs, and validation.
 - `resources.jsonl`: optional 15-second snapshots begun during the larger LAN
   cases, recording combined process RSS, Linux memory availability, swap use,
   and observed party thread counts. The main runner independently samples each
@@ -134,13 +171,17 @@ selected online circuits are unchanged. No claim of global optimality is made.
   work, and overview before aligning their old benchmark claims and references.
 - Paper `plots/benchmark/all-results.csv`: complete phase costs and ranges.
 - Paper `plots/benchmark/summary.json`: the same validated aggregate data.
-- Workspace `output/pdf/benchmark-section.pdf`: rewritten section and selected
-  parameters.
+- Workspace `output/pdf/main_llncs.pdf`: the actual paper with the replacement
+  implementation/evaluation section.
+- Workspace `output/pdf/benchmark-section.pdf`: preview of that same section
+  and its selected parameters.
 - Workspace `output/pdf/benchmark-full-results.pdf`: tables for every size/profile
   and runtime curves. Figures also have vector PDF and PNG versions in the paper's
   `plots/benchmark` directory.
 
-From the repository root in the configured Ubuntu/WSL environment:
+To reproduce the original sweep, use the commands below from the repository
+root in the configured Ubuntu/WSL environment. For the current Median schedules
+and composite paper regeneration, follow `median-retune-20260911/README.md`:
 
 ```sh
 cmake -S . -B out/build/linux -DCMAKE_BUILD_TYPE=Release \
@@ -163,3 +204,7 @@ Network namespaces and veth devices use fresh generated names and are removed
 after each trial, including on errors. Host interfaces and qdiscs are not
 modified. Repeating the sweep command resumes verified completed records only
 when the executable and parameter hashes match. Errors are retained separately.
+
+## Completed Median revision (2026-09-11)
+
+All 93 replacement Median timings and 13 audits are complete, including n = 2^20 on all three transports. The active manifest and strict validator select only this complete replacement. All original raw records, non-Median observations, root figures, and the BBDLO analytical subsection are preserved. See [the completed rerun](median-retune-20260911/README.md) for parameter selection, audit-only paging, and reproduction. The updated paper is 51 pages, the section preview 6 pages, and the full results 13 pages.

@@ -1,0 +1,26 @@
+{
+  "directory": "median-retune-20260911",
+  "datasets": [
+    {
+      "measurements": "measurements.jsonl",
+      "parameters": "parameters.json"
+    },
+    {
+      "measurements": "memory-feasible/measurements.jsonl",
+      "parameters": "memory-feasible/parameters.json"
+    }
+  ],
+  "sha256": {
+    "measurements.jsonl": "e9b421b6e6367b68d918b2d13f6541aca643553ded6e438d8f4c644261ab9de0",
+    "parameters.json": "4a682c07d9c4151c3c3b4c7c47db118f73c68d70a58aa42c981c5055271cddf6",
+    "plans.jsonl": "7359e67e57c396005044c4c6101a4390791f46587da9adfed2d0a497fa2d9fd1",
+    "frontier.json": "14cdc9d2220a33d11d3b85d282374fa75ce1b1113fcd139b65ec332e725be92c",
+    "calibration.jsonl": "beccd9ccf64c5d0aa6e55b86a97caa3f160b98955d4e799e86c07eaf6d477f45",
+    "memory-feasible/measurements.jsonl": "10a775df33028af7af3bdd09b0836c60446121de6a1f8512400edbf8b31c7991",
+    "memory-feasible/parameters.json": "50f0c6a35e3142946fb402af64b8cd8b259f8126a358c92ebd450414433487e2",
+    "memory-feasible/host-memory-20-after-reboot.jsonl": "a36fb5c71df00c03967d2e53e6ef70e22366c74a8fa28213254641164010ac5a",
+    "memory-feasible/host-memory-20-timings.jsonl": "53dacd5beb3a8cfab5245066b34dee4474e61cd00079b4fbc839b921a6fef2d1",
+    "memory-feasible/host-memory-20-audit-final.jsonl": "c7b8397dbc93fc68c3d7cf7bff4701b45a5bc0e16604e717ba16474485ebc992"
+  },
+  "audit_paging_policy": "Explicitly marked paging permitted only for untimed round audits; all audit elapsed times excluded. Timed records require zero sampled Linux process swap."
+}

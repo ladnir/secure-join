@@ -1,30 +1,130 @@
 {
+  "verified_at": "2026-09-11T18:45:50.704397+00:00",
   "artifacts": {
+    "main_llncs.pdf": {
+      "path": "C:\\Users\\stani\\OneDrive\\Documents\\LOGSTAR\\output\\pdf\\main_llncs.pdf",
+      "sha256": "dc6bcaab69f9289d5322b48d4227ec256e8e791be3887d9ec5210166f55bcd9d",
+      "pages": 51,
+      "changed_pages_rendered_and_visually_checked": true,
+      "all_fonts_embedded": false,
+      "existing_unembedded_fonts": "Three pre-existing TimesNewRomanPSMT instances in earlier manuscript figures; benchmark section fonts are embedded."
+    },
     "benchmark-section.pdf": {
-      "sha256": "325b034c4406cb6d6579903b5bf816fdea198f165c737e5885a0cab6584f400b",
-      "pages": 7,
-      "rendered_pages_visually_checked": true,
-      "all_fonts_embedded": true,
-      "path": "C:\\Users\\stani\\OneDrive\\Documents\\LOGSTAR\\output\\pdf\\benchmark-section.pdf"
+      "path": "C:\\Users\\stani\\OneDrive\\Documents\\LOGSTAR\\output\\pdf\\benchmark-section.pdf",
+      "sha256": "0d56d569d3e3cfe51ef35574ce7377e747c58d25725a064511b1b2d4681a7d73",
+      "pages": 6,
+      "changed_pages_rendered_and_visually_checked": true,
+      "all_fonts_embedded": true
     },
     "benchmark-full-results.pdf": {
-      "sha256": "550a04ed673f11e714753858f3355a5334b7f90ee7e886ba761bed8e42d6ad57",
+      "path": "C:\\Users\\stani\\OneDrive\\Documents\\LOGSTAR\\output\\pdf\\benchmark-full-results.pdf",
+      "sha256": "3b3b0f47c481d9048bff48c96dc77396bd1a994c234866b13642da4b899dfc43",
       "pages": 13,
-      "rendered_pages_visually_checked": true,
-      "all_fonts_embedded": true,
-      "path": "C:\\Users\\stani\\OneDrive\\Documents\\LOGSTAR\\output\\pdf\\benchmark-full-results.pdf"
+      "changed_pages_rendered_and_visually_checked": true,
+      "all_fonts_embedded": true
     }
   },
   "full_manuscript_compiles": true,
   "new_evaluation_has_no_overfull_boxes_or_unresolved_references": true,
-  "existing_theory_layout_and_font_warnings_unchanged": true,
   "configurations": 390,
   "timed_executions": 930,
   "fresh_crypto_round_audits": 130,
-  "restoration": {
-    "verified_at": "2026-09-11T06:28:19.788229-04:00",
+  "pooled_protocol_costs": 130,
+  "median_revised_timed_executions": 93,
+  "median_revised_audits": 13,
+  "original_raw_measurements_unchanged": true,
+  "non_median_profile_summaries_unchanged": true,
+  "non_median_pooled_costs_unchanged": true,
+  "root_artifacts_unchanged": true,
+  "bbdlo_subsection_unchanged": true,
+  "all_median_timed_sampled_linux_swap_zero": true,
+  "largest_audit_paging_excluded_from_timings": true,
+  "median_validation_sha256": "60bca0c571ad6ee5570c635730de30a79877c7c058c923a5b7c93e02814d4f4c",
+  "active_manifest_sha256": "a154529f9cb91fdb6d1e111f61c37ab6ead55bb4ce8affe546469da75ab57c4e",
+  "rendered_pages": {
+    "main_llncs": [
+      1,
+      5,
+      41,
+      42,
+      43,
+      44,
+      45,
+      46,
+      47,
+      48
+    ],
+    "benchmark-section": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "benchmark-full-results": [
+      1,
+      2,
+      3,
+      4,
+      11,
+      12,
+      13
+    ]
+  },
+  "paper_source_sha256": {
+    "main_llncs.tex": "eb6df914d33f2c07d617ed70ed2b86974671bcc9bca6a40de1ef4fd63ae90441",
+    "main_cic.tex": "1cad375d68f6c07e4a6ada0055d451a6dbcfcadb242f88bc23efa03bc2876b58",
+    "abstract.tex": "36e1d53ffbc535c6ba3c36a82e3f73b4f7a6dd48fd474b01e4325e8fa1bddb58",
+    "intro.tex": "3f5d061848f89ca7703b6884b6d33a4dc031b4f6d1dc12b3d65571d71d96cb8f",
+    "evaluation.tex": "4a1a8b09fb07d004545533a7638e539d58bde2b6ca5bba80766838da8a36e0f3",
+    "evaluation-new.tex": "4a1a8b09fb07d004545533a7638e539d58bde2b6ca5bba80766838da8a36e0f3",
+    "benchmark-section.tex": "aa04a8942c6d62e68262bf75a9dbe03ecbac794b61cda843ca5e91b4b27c9d36",
+    "benchmark-full-results.tex": "6575eea3e131f4146914904a1df2ce5d24a3478e2b2459561dbada577c7f194c"
+  },
+  "machine_restoration_pending": false,
+  "median_revision_machine_restoration": {
+    "verified_at": "2026-09-11T18:49:09.768703+00:00",
     "original_wslconfig_absent_restored": true,
     "wsl_shutdown_verified": true,
-    "benchmark_network_namespaces_removed": true
+    "benchmark_network_namespaces_removed": true,
+    "no_running_containers_before_shutdown": true,
+    "no_benchmark_or_observer_jobs_remaining": true,
+    "host_available_gib": 18.513225555419922
+  },
+  "git_diff_checks_pass": true,
+  "benchmark_artifact_sha256": {
+    "all-results.csv": "28a1d6bdbda0cb1e7f80d13c50811860eb269955696d6458bf2175517d1333dc",
+    "all-tables.tex": "f4b26a59145f21e5dafcb2d66590e4708d4ea30c8dd326d7e1a3b5c10c7b143a",
+    "balanced-discussion.tex": "5c0bb2bfc06b5c8c685941abb8d45b9871a6a7fb7b487b07cffc4a9f5b98f86b",
+    "balanced-lan-table.tex": "ef0846b90dc10439c1a0bbdf3885940493728a7f9da22910fd444d8aa9c1cc4b",
+    "balanced-local-table.tex": "2b21552a22cbb18eccb09b759edb31f207999159d98a1606e073b68f0db1a082",
+    "balanced-main-table.tex": "adc9785d3383b3fcf88203c4f997bb3120ef5f1ea6e039b82953711a366e4c23",
+    "balanced-online.pdf": "ccfdb3a9de08f847230119353e8291e65f6db82c572a54ea18339d9ed3504724",
+    "balanced-online.png": "9033197eb1494105a91804f516bf1359cecb4e5137b0785d03c41165855283f4",
+    "balanced-runtime.pdf": "bfbe724d59b140a08097591ee4de3fd5238b8eee2bdaa7d7680bc8cb320fb5ef",
+    "balanced-runtime.png": "07942ae1fecff0ba35d26c3d2b7a54049994af358c566382272e89a5af7e9f89",
+    "balanced-wan-table.tex": "188a720199f326e67547473579faed695bc5b5bf85253e399dace55a8972fc5b",
+    "cube-lan-table.tex": "480dc27bfd7bb3bca8027189f4b80836ff2dc768028494092d38a88f0d952b79",
+    "cube-local-table.tex": "c0bf3c9f858bc097596e5ee7edaa9bec1657346442ce9f71c2a45eb4a344cb0d",
+    "cube-main-table.tex": "836b718e771e290585c268dad8ac1eb31e6d5d7ab4d49980469cf3c561d17ad7",
+    "cube-online.pdf": "0d7fb83a2e8d94728aadd9e2552e67081abd7ba62e8c10154c69c2f79184bdb3",
+    "cube-online.png": "6c8509b4b7c0618cd00fa42868e43229230d33be1ab2f434614c99c020d87f7c",
+    "cube-runtime.pdf": "8e2239e635371fc54cac1022fb8d1c8b8ca98a9fe7e29bbad8ddd10500fc64e3",
+    "cube-runtime.png": "b249b05383bcd42deab4cdce505068f62768a1b88330cef831df253e53b9e6f7",
+    "cube-wan-table.tex": "d9c158f50c33a6081fd4713e3772622caf08e1df2552de32a263c89388bb6934",
+    "parameters-table.tex": "e11943e354ea73daeafc07b4d9e9039b6f4767de0b25fb9da17392115aefeabe",
+    "protocol-costs.csv": "bc58c76fb32234e197353b33212502e664f7755b2344b77d97ee72fce8c06a71",
+    "protocol-costs.json": "11b457d6dff656914b73beccbfff454f76990b72b901cbd021dce7abc6bb9264",
+    "roots-discussion.tex": "5aeaa2721fe79e80eb46da2c727f1190325a52c0f4172156226d8b2fb6edea2a",
+    "sqrt-lan-table.tex": "170053414893385dd5507242a670949e87ff29c306440dc2d8b7a72d864bdf75",
+    "sqrt-local-table.tex": "af529006cdf1f253c6910a8c42f4f27e5d23a9610fcccfdd38793ecb6d113e83",
+    "sqrt-main-table.tex": "1968dcf75922af987ea7e2ea5a4878ca9e65437a0c48dd5829eac82997cce718",
+    "sqrt-online.pdf": "7c263e6702b7886a4f948e2f656a0b12ab965f59e727b160d06ef36640a2b29e",
+    "sqrt-online.png": "9f395bb7c3c13364ecc595d39e4cd59ff539bb7aae47472ecb16680d85ef069e",
+    "sqrt-runtime.pdf": "1c04c5cf6785c6349e2d177896cdc6f0f4c19da9bed447e201018174da4c20dc",
+    "sqrt-runtime.png": "3a09e83e0dd5e6c7e126fb6a3039cab2f5ecc86e9cd425306e0ea027d9eb518a",
+    "sqrt-wan-table.tex": "add96439a373b293bfdfe44d64dde44bb0fc496f1341bca5eabe81ee70750ff6",
+    "summary.json": "2563aa2ea25fa67ffe05fb19b51bea3b2453ea86012d8960cabae56129388b64"
   }
 }

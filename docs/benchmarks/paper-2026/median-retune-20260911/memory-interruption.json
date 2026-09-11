@@ -1,0 +1,15 @@
+{
+  "utc": "2026-09-11T16:13:32.786247+00:00",
+  "case": {
+    "n": 1048576,
+    "profile": "local",
+    "method": "median",
+    "round_bound": 110
+  },
+  "status": "terminated before completion",
+  "reason": "Windows free physical RAM fell below 3 GiB while Median was still preprocessing; no completed timing from this attempt is accepted.",
+  "pid": 592,
+  "host_free_kib_observed": 2827664,
+  "wsl_working_set_gib_observed": 15.16,
+  "linux_swapping_observed": false
+}

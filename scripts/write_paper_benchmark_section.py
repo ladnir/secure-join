@@ -5,21 +5,33 @@ Requires the strict summarizer's complete 390-configuration output. Does not
 substitute planned values or partial measurements into the manuscript.
 """
 import argparse, hashlib, json, pathlib, re, shutil, subprocess
-from summarize_paper_benchmarks import summarize
+from summarize_paper_benchmarks import summarize, load_paper_study
 
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 PAPER=ROOT.parent/'64c0aeaf1c1f5473b45f1e06'
 RAW=ROOT/'docs/benchmarks/paper-2026'
 FIG=PAPER/'plots/benchmark'
 
+
+def write_text_if_changed(path, text):
+    text = text.rstrip() + '\n'
+    if not path.exists() or path.read_text() != text:
+        path.write_text(text)
+
+
 def main():
-    rows=summarize([RAW/'measurements.jsonl'],complete=True)
+    rows,costs,params,median_revision=load_paper_study()
+    if costs!=json.loads((FIG/'protocol-costs.json').read_text()):
+        raise RuntimeError('Regenerate the pooled protocol costs from the validated measurements')
     if rows!=json.loads((FIG/'summary.json').read_text()):
         raise RuntimeError('Regenerate the figures and tables from the complete validated measurements')
     if hashlib.sha256((ROOT/'out/build/linux/frontend/paper_benchmark').read_bytes()).hexdigest()!=rows[0]['executable_sha256']:
         raise RuntimeError('The benchmark executable changed after measurement')
     def get(shape,method,profile='wan',n=1<<20):
-        return next(r for r in rows if (r['shape'],r['method'],r['profile'],r['n'])==(shape,method,profile,n))
+        result=dict(next(r for r in rows if (r['shape'],r['method'],r['profile'],r['n'])==(shape,method,profile,n)))
+        common=next(r for r in costs if (r['shape'],r['method'],r['n'])==(shape,method,n))
+        for field in ['online_bytes','offline_bytes','online_rounds']:result[field]=common[field]
+        return result
     def f(v,d=2):return f'{v:,.{d}f}'.replace(',','{,}')
     def ratio(a,b,field):return a[field]/b[field]
     l,m,b,q=[get('balanced',x) for x in ['logstar','median','batcher','quick']]
@@ -27,31 +39,35 @@ def main():
     crossover=''
     if wins and wins==list(range(wins[0],21)):
         crossover=('With the selected parameters, Logstar first uses fewer online bytes than Batcher at $n=2^{'
-                   +str(wins[0])+r'}$ and retains this advantage at every larger tested size. '
-                   +'The changes of block size and leaf circuit account for the visible changes in the curves. ')
+                   +str(wins[0])+r'}$ and retains this advantage at every larger tested size. ')
     small_m,small_b=get('balanced','median',n=1<<11),get('balanced','batcher',n=1<<11)
     small_note=''
     if small_m['online_seconds']<small_b['online_seconds']:
-        small_note=('Median benefits more from latency at smaller sizes: at $n=2^{11}$ its WAN online time is '
-                    +f(small_m['online_seconds'])+r'\,s, versus '+f(small_b['online_seconds'])+r'\,s for Batcher. ')
+        small_note=('At $n=2^{11}$, Median uses '
+                    +f(small_m['online_rounds'],0)+' online rounds versus '+f(small_b['online_rounds'],0)+' for Batcher, with '
+                    +f(small_m['online_bytes']/2**20)+r'\,MiB versus '+f(small_b['online_bytes']/2**20)+r'\,MiB. '
+                    +'Its WAN online time is '+f(small_m['online_seconds'])+r'\,s versus '
+                    +f(small_b['online_seconds'])+r'\,s, a $'+f(small_b['online_seconds']/small_m['online_seconds'])+r'\times$ speedup. ')
     balanced=(r'\paragraph{Discussion.} At $n=2^{20}$, Logstar communicates '
         +f(l['online_bytes']/2**20,1)+r'\,MiB online, compared with '+f(b['online_bytes']/2**20,1)+r'\,MiB for Batcher and '
         +f(q['online_bytes']/2**20,1)+r'\,MiB for shuffled quicksort: reductions of $'+f(ratio(b,l,'online_bytes'))+r'\times$ and $'
         +f(ratio(q,l,'online_bytes'))+r'\times$, respectively. This saves bytes at the cost of '+f(l['online_rounds'],0)+' rounds, versus '+f(b['online_rounds'],0)+' for Batcher. Median uses '+f(m['online_rounds'],0)+' online rounds, versus '
-        +f(b['online_rounds'],0)+' for Batcher and '+f(q['online_rounds'],0)+' in the measured WAN quicksort execution. '
-        +'Its '+f(m['online_bytes']/2**20,1)+r'\,MiB online traffic makes the bandwidth cost of this depth tradeoff explicit. '
+        +f(b['online_rounds'],0)+' for Batcher and '+f(q['online_rounds'],0)+' for the pooled quicksort median. '
+        +'This is a '+f(100*(1-m['online_rounds']/b['online_rounds']),1)+r'\% reduction in rounds relative to Batcher. '
+        +'Its '+f(m['online_bytes']/2**20,1)+r'\,MiB online traffic is $'+f(m['online_bytes']/b['online_bytes'])+r'\times$ Batcher\textquotesingle s. '
         +crossover
         +small_note
+        +('At the largest input on the WAN, Median remains slower than Batcher despite its smaller round count. ' if m['online_seconds']>b['online_seconds'] else '')
         +'At $n=2^{20}$ on the WAN, Logstar completes the online merge in '+f(l['online_seconds'])+r'\,s, versus '
         +f(b['online_seconds'])+r'\,s for Batcher. Including fresh correlations, their offline-plus-online totals become '
         +f(l['total_seconds'])+' and '+f(b['total_seconds'])+r'\,s, respectively. '
         +('Batcher therefore has the lower measured fresh-correlation total at this size. ' if b['total_seconds']<l['total_seconds'] else '')
-        +'The large-size times are single executions; the artifact reports repeated measurements and observed ranges at the smaller sizes.\n')
-    (FIG/'balanced-discussion.tex').write_text(balanced)
+        +'\n')
+    write_text_if_changed(FIG/'balanced-discussion.tex', balanced)
     texts=[]
     for shape,name in [('cube','CubeRootMerge'),('sqrt','SquareRootMerge')]:
         r,b,q=[get(shape,x) for x in [shape,'batcher','quick']]
-        texts.append(name+' uses '+f(r['online_bytes']/2**20,1)+r'\,MiB online and uses '+f(r['online_rounds'],0)
+        texts.append(name+' communicates '+f(r['online_bytes']/2**20,1)+r'\,MiB online in '+f(r['online_rounds'],0)
             +' dependent rounds at $n=2^{20}$. Its communication is $'+f(ratio(b,r,'online_bytes'))+r'\times$ smaller than Batcher and $'
             +f(ratio(q,r,'online_bytes'))+r'\times$ smaller than shuffled quicksort on the same shape. '
             +'The WAN online times are '+', '.join(f(x['online_seconds']) for x in [r,b,q])+r'\,s, respectively. '
@@ -65,16 +81,19 @@ def main():
     fresh_note=('At $n=2^{20}$, including fresh preprocessing reverses the measured WAN timing comparison with Batcher for '
                 +' and '.join(reversals)+'. ' if reversals
                 else 'The complete tables include preprocessing costs for every size and transport. ')
-    (FIG/'roots-discussion.tex').write_text(r'\paragraph{Discussion.} '+''.join(texts)+range_note
+    write_text_if_changed(FIG/'roots-discussion.tex', r'\paragraph{Discussion.} '+''.join(texts)+range_note
         +'The shorter list reduces the work in both asymmetric protocols, whereas shuffled quicksort still sorts the concatenation. '
         +'Batcher also benefits from unequal lengths, so each reduction is against that smaller baseline. '
-        +fresh_note+'\n')
-    params=json.loads((RAW/'parameters.json').read_text())
-    lines=[r'\begin{tabular}{rrrrllrr}'+'\n'+r'\hline $\log_2 n$ & Logstar block & Median child & Cube block & Leaf & Depth & CubeRoot block & SquareRoot block\\\hline'+'\n']
-    for s in params['sizes']:
-        sel=s['selected'];p=sel['median'];levels=p['levels']
-        child='/'.join(str(l['child_size']) for l in levels);blocks='/'.join(str(l['cube_block']) for l in levels)
-        lines.append(f"{s['n'].bit_length()-1} & {sel['logstar']['block_override']} & {child} & {blocks} & {p['leaf']} & {len(levels)} & {sel['cube']['block_size']} & {sel['sqrt']['block_size']}"+r' \\'+'\n')
+        +fresh_note.rstrip()+'\n')
+    lines=[r'\begin{tabular}{rrrrlrr}'+'\n'
+           +r'\hline $\log_2 n$ & Logstar & \multicolumn{3}{c}{Median} & CubeRoot & SquareRoot\\'+'\n'
+           +r' & block & child & cube block & leaf & block & block\\\hline'+'\n']
+    for schedule in params['sizes']:
+        sel=schedule['selected'];p=sel['median'];levels=p['levels']
+        child='/'.join(str(level['child_size']) for level in levels)
+        blocks='/'.join(str(level['cube_block']) for level in levels)
+        leaf='all-pairs' if p['leaf']=='allpairs' else 'Batcher'
+        lines.append(f"{schedule['n'].bit_length()-1} & {sel['logstar']['block_override']} & {child} & {blocks} & {leaf} & {sel['cube']['block_size']} & {sel['sqrt']['block_size']}"+r' \\'+'\n')
     lines.append('\\hline\n\\end{tabular}\n');(FIG/'parameters-table.tex').write_text(''.join(lines))
     source_files=sorted((ROOT/'secure-join').rglob('*.h'))+sorted((ROOT/'secure-join').rglob('*.cpp'))+[ROOT/'frontend/paper_benchmark.cpp']
     metadata=dict(executable_sha256=rows[0]['executable_sha256'],compiler='GCC 13.3.0, -O3 -march=native -std=c++20',
@@ -100,7 +119,16 @@ def main():
         metadata['dependencies'][name]=r.stdout.strip() if not r.returncode else 'unavailable'
     metadata['sort_code_lines']=sum(sum(bool(l.strip()) for l in re.sub(r'/\*.*?\*/|//[^\n]*','',p.read_text(),flags=re.S).splitlines())
                                      for p in (ROOT/'secure-join/Sort').iterdir() if p.suffix in ['.h','.cpp'])
-    (RAW/'provenance.json').write_text(json.dumps(metadata,indent=2)+'\n')
+    if median_revision:metadata['median_revision']=median_revision
+    provenance=RAW/'provenance.json'
+    if provenance.exists():
+        original=json.loads(provenance.read_text())
+        if original['executable_sha256']!=metadata['executable_sha256'] or original['dataset_sha256']!=metadata['dataset_sha256']:
+            raise RuntimeError('Frozen experiment provenance does not match the current measurements')
+        metadata['experiment_provenance_sha256']=hashlib.sha256(provenance.read_bytes()).hexdigest()
+        metadata['cost_aggregation']='Median of all individual executions across transports; 9 samples through 2^16 and 3 above; observed min-max ranges; times remain per transport'
+        (RAW/'presentation-provenance.json').write_text(json.dumps(metadata,indent=2)+'\n')
+    else:provenance.write_text(json.dumps(metadata,indent=2)+'\n')
     # Keep the existing introductory benchmark summaries consistent with the
     # replaced evaluation. Other claims and the protocol analysis stay intact.
     intro_path=PAPER/'intro.tex';intro=intro_path.read_text()
@@ -119,6 +147,7 @@ def main():
         +f(ratio(cb,ci,'online_bytes'))+r'\times$ and $'+f(ratio(sb,sr,'online_bytes'))+r'\times$, respectively. '
         +r'\Cref{sec:eval} reports offline and online communication, rounds, and elapsed time on local, LAN, and WAN transports. The implementation uses per-size concrete parameters, rather than enforcing the asymptotic recursion schedules.'+'\n')
     begin=intro.find(r'\noindent We analytically benchmark our protocols')
+    if begin<0:begin=intro.find(r'\noindent We implement all four protocols')
     if begin>=0:
         end=intro.find('\n\\iffalse',begin)
         if end<0:raise RuntimeError('Cannot locate old introduction benchmark block')
@@ -127,6 +156,7 @@ def main():
     abstract_path=PAPER/'abstract.tex';abstract=abstract_path.read_text();old_abstract=RAW/'abstract-before-benchmark-rewrite.tex'
     if not old_abstract.exists():old_abstract.write_text(abstract)
     begin=abstract.find(r'\qquad We optimize our constructions for \emph{concrete efficiency}.')
+    if begin<0:begin=abstract.find(r'\qquad We implement our constructions and optimize their public parameters')
     if begin>=0:
         end=abstract.find('\n\n',begin)
         abstract=abstract[:begin]+(r'\qquad We implement our constructions and optimize their public parameters for concrete efficiency. In two-party experiments with $n=2^{20}$ keys per input list and 32-bit keys, \ourapproach\ uses $'
@@ -149,6 +179,45 @@ def main():
         if not original.exists():original.write_text(text)
         for before,after in replacements:text=text.replace(before,after)
         path.write_text(text)
+    if median_revision:
+        template = PAPER/'evaluation-new.tex'
+        evaluation = template.read_text()
+        begin = evaluation.index(r'\paragraph{Concrete parameters.}')
+        end = evaluation.index(r'\begin{figure}', begin)
+        description = r'''\paragraph{Concrete parameters.}
+We choose public parameters separately for each $n$ and reuse them on all
+three transports. Logstar uses one packed partition level, terminal block
+sizes from $\{2,4,8,16\}$, and direct-rank extraction; its recorded candidates
+are scored by online payload plus $250{,}000$ bytes per dependent step.
+For Median, we screen power-of-two recursion shapes with up to four alignment
+levels, then obtain exact public cost counts for shortlisted child sizes,
+internal cube-merge blocks, and all-pairs or Batcher leaves. We prioritize
+fewer online rounds subject to a payload budget of the larger of three times
+Batcher's online traffic and $8$\,MiB, breaking ties by payload. To limit peak
+memory, we restrict the two largest sizes to one alignment level. The selected
+schedules use one or two levels, as shown in \Cref{tab:benchmark-parameters}.
+These are concrete bandwidth--latency choices from the recorded candidate set,
+not asymptotic schedules or a claim of global optimality. Batcher exploits both
+sorted runs; quicksort jointly shuffles their concatenation and batches active
+partitions, with all-pairs leaves of at most eight rows. Its comparison
+correlations are reserved offline; any refill must be charged online.
+
+'''
+        evaluation = evaluation[:begin] + description + evaluation[end:]
+        evaluation = evaluation.replace('scale with the same selection rule as above.',
+                                        'scale using the same weighted payload--depth score as Logstar.')
+        evaluation = evaluation.replace('Median uses\none alignment level at every size. The cube-block column belongs to Median\'s',
+            'Slash-separated Median child and cube-block entries specify consecutive\nalignment levels. The cube-block column belongs to Median\'s')
+        revision_folder = RAW/median_revision['directory']
+        paged_audits = [r for spec in median_revision['datasets']
+                        for r in (json.loads(line) for line in (revision_folder/spec['measurements']).read_text().splitlines())
+                        if r.get('type') == 'round_audit' and r.get('peak_sampled_swap_kib', 0)]
+        if paged_audits and "audit uses swap to accommodate its buffering overhead" not in evaluation:
+            evaluation = evaluation.replace('Audit timings are excluded from the runtime results.',
+                'Audit timings are excluded from the runtime results. The largest Median\n'
+                'audit uses swap to accommodate its buffering overhead; timed trials with\n'
+                'observed Linux process swapping are rejected.')
+        template.write_text(evaluation)
     backup=RAW/'evaluation-before-rewrite.tex'
     if not backup.exists():shutil.copy2(PAPER/'evaluation.tex',backup)
     shutil.copy2(PAPER/'evaluation-new.tex',PAPER/'evaluation.tex')

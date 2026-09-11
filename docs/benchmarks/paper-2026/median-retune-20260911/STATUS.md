@@ -1,4 +1,4 @@
-# Study status: complete, with Median revision
+# Median revision: complete
 
 The paper uses a fully validated 390-configuration study: 930 timed executions and 130 fresh-cryptography round audits, covering every n = 2^8 through 2^20 on local, LAN, and WAN and all matched input shapes. The Median-only replacement contains 93 timed executions and 13 audits. All output checks passed; all accepted timed records have zero sampled Linux process swap. The largest untimed Median audit used explicitly recorded paging; none of its elapsed time is published.
 

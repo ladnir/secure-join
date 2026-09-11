@@ -34,7 +34,11 @@ def record_trial(config,profile,repeat,sha,timeout,audit=False):
     started=time.monotonic();rows=trial(EXE,opts,profile,timeout)
     for row in rows:
         if not row.get('verified') or not row.get('real_crypto'):raise RuntimeError('Unverified or mock run')
-        if row.get('peak_sampled_swap_kib',0):raise RuntimeError('Paging observed; reject timing')
+        if row.get('peak_sampled_swap_kib',0):
+            if not audit:raise RuntimeError('Paging observed; reject timing')
+            # Paging changes elapsed time, not transcript bytes or synchronous
+            # wave counts. Audit timings never enter the published results.
+            row['audit_paging_allowed']=True
         if row.get('refills',0):raise RuntimeError('QuickSort reserve exhausted; record separately before changing configuration')
         if row.get('os_threads')!=1:raise RuntimeError('Incorrect thread setting')
     tid=uuid.uuid4().hex
@@ -120,7 +124,8 @@ def main():
                     print('START',profile,exp,c['shape'],c['method'],repeat,flush=True)
                     try:rows,elapsed=record_trial(c,transport,repeat,sha,a.timeout,audit)
                     except Exception as error:
-                        write_row(a.out,dict(type='failure',executable_sha256=sha,shape=c['shape'],method=c['method'],n=c['n'],profile=transport,repeat=repeat,error=str(error)))
+                        write_row(a.out,dict(type='failure',executable_sha256=sha,shape=c['shape'],method=c['method'],n=c['n'],profile=transport,repeat=repeat,audit=audit,parameters_sha256=paramsha,
+                            utc=datetime.datetime.now(datetime.timezone.utc).isoformat(),error=str(error)))
                         raise
                     for r in rows:write_row(a.out,r)
                     print('DONE',profile,exp,c['shape'],c['method'],repeat,'elapsed_s',round(elapsed,2),
