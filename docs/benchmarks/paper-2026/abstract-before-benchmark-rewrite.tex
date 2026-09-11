@@ -1,0 +1,33 @@
+\begin{abstract}
+
+Secure merge considers the problem of combining two sorted lists into a single sorted secret-shared list. Merge is a fundamental building block for many real-world applications. For example, secure merge can implement a large number of SQL-like database joins, which are essential for almost any data processing task such as privacy-preserving fraud detection, ad conversion rates, data deduplication, and many more.
+
+
+\qquad We present two constructions with communication bandwidth and rounds tradeoff. \ourapproach, our bandwidth-optimized construction, takes inspiration from Falk and Ostrovsky (ITC, 2021) and runs in  $O(n\log^*n)$ time and communication with $O(\log n)$ rounds. In particular, for all conceivable $n$, the $\log^*n$ factor will be equal to the constant $2$, and therefore we achieve a near-linear running time.
+\ourapproachtwo, our rounds-optimized construction, builds on the classic parallel medians-based insecure merge approach of Valiant (SIAM J. Comput., 1975), later explored in the secure setting by Blunk et al. (2022), and requires $O(n \log^c n)$, $c \approx 1.71$, communication with $O(\log \log n)$ rounds. 
+
+\qquad We introduce two additional constructions that merge input lists of different sizes. \sqrtmerge\ merges lists of sizes $n^{\frac{1}{2}}$ and $n$ and runs in $O(n)$ time and communication with $O(\log n)$ rounds. \knmerge\ is closely inspired by Blunk et al.'s (2022) construction and merges lists of sizes $n^{\frac{1}{3}}$ and $n$. It runs in $O(n)$ time and communication with $O(1)$ rounds.
+
+
+\qquad We optimize our constructions for \emph{concrete efficiency}. Today, concretely efficient secure merge protocols rely on standard techniques such as Batcher's merging network or generic sorting. These approaches require an $O(n \log n)$ size circuit of $O(\log n)$ depth. Despite significant research thrust, no work has been able to reduce their concrete costs. Our constructions are the first to be more efficient by improving their asymptotics and maintaining small constants. We analytically benchmark against these constructions and show that \ourapproach\ reduces bandwidth costs $\approx2.0\times$ and \ourapproachtwo\ reduces rounds $\approx1.5\times$. 
+
+
+
+%\ourapproachtwo\ offers a tradeoff where we decrease rounds $\approx 2.43\times$ at the cost of increasing bandwidth $\approx3.95\times$. We estimate that \sqrtmerge\ reduces bandwidth $\approx7.2\times$ and rounds $\approx3.61\times$; \knmerge\ reduces bandwidth $\approx14.33\times$ and rounds $\approx5.82\times$. \stan{Srini please see the last sentence if we should include it}
+
+
+
+
+
+
+
+
+
+\iffalse
+We implemented our constructions and report their performance. For two lists of $2^{20}$ entries each of $64$ bits, we execute secure merge in \stan{X}s and communicate \stan{X}MB.
+\fi
+\if\submission1
+\else
+%\footnote{The authors grant IACR a non-exclusive and irrevocable license to distribute the article under the \href{CC BY-NC (creative commons attribution-noncommercial) license}{https://creativecommons.org/licenses/by-nc/3.0/}.}
+\fi 
+\end{abstract}

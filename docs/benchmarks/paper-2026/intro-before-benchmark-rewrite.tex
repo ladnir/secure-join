@@ -1,0 +1,123 @@
+\section{Introduction}\label{sec:intro}
+
+Secure Multi-Party Computation (MPC) is an area of cryptography that enables parties to compute on private data without revealing it to counterparties.
+Traditionally, MPC techniques first compile functions into Boolean or arithmetic circuits and then evaluate them gate by gate. 
+The advantage of these generic MPC techniques is that they can evaluate \emph{arbitrary} functions.
+Much research effort has been put into optimizing them.
+For example,  \cite{ICALP:KolSch08,EC:ZahRosEva15}  reduce the costs of individual circuit gates; \cite{AC:HeaKolPec20,PKC:HeaKolPec21} reduce costs in circuits with complex control flow.
+\cite{CCS:YPHK23} recently introduced a novel approach to generic MPC, which escapes the traditional circuit model, and further improves on programs with complex control flow.
+Despite these significant improvements, the techniques remain cost-prohibitive for many applications.
+
+Special-purpose MPC techniques address this trade-off by focusing on efficient evaluation of \emph{specific} functions.
+Many works, e.g. \cite{FC:BCGJPP18,EUROSP:APRSS24}, evaluate machine learning functions but also other functions such as secure sorting \cite{pinkasSort}. 
+These technique are tailored to a specific functionality or building block, but in turn are practically efficient.
+
+In this work, we consider a secure merge problem, where two sorted and secret-shared lists are combined to produce a sorted output. Secure merge has found many applications spanning database operations, joins, and more. We include a necessarily non-exhaustive list in \Cref{sec:motivation}. More efficient secure merge will lead to improvement in all such applications. Moreover, we believe that an efficient merge protocol will open up many new MPC-specific applications that were previously prohibitively expensive.
+Going even further,  we optimize the overall cost of the merge by proposing specialized protocols for various network settings, offering tradeoffs between bandwidth and latency.
+
+
+\paragraph{Our Setting.} Our protocols implement the functionality $\fmerge(\X,\Y)$ (see \Cref{fig:fmergefunctionality}), which takes as input two sorted secret-shared lists \lzero\ and \lone.
+The output is a secret-shared permutation $\pi$ such that applying $\pi$ to the concatenated lists $\pi(\X||\Y)$ results in the sorted list $\lzero \merge \lone$. It is worth noting that a protocol for non-secret-shared input lists can be easily obtained by first secret-sharing \X, \Y.
+We typically think of our protocols as being for 2 parties, but it naturally supports any number of parties. Our contribution can be viewed as a circuit for secure merge, whose gates can be traditional operations like addition, multiplication, but also more complex operations such as permutations, extraction, etc. Given $n$-party protocols for these gates, our techniques can be implemented in the $n$-party setting.
+
+\begin{figure}\hspace{-0cm}\small
+	\centering
+	\fbox{ \begin{minipage}{\textwidth}
+\textbf{\fmerge\ Functionality} \\[0.02in]
+\\
+\textsc{Input:} Two sorted secret-shared lists $\share{\lzero}$ and $\share{\lone}$.
+  \\
+  \textsc{Output:} Secret-shared permutation $\share{\pi}$ such that $\pi(\X||\Y)$ forms a sorted list $\lzero \merge \lone$.
+      
+      %$\share{\mergeddummies}$. 
+  %\\
+  
+    \end{minipage}}
+\vspace{.2cm}	
+\caption{%
+  \fmerge\ is the functionality that our protocols implement.%implements the \access\ functionality in \Cref{fig:ouroramaccess}.
+}\label{fig:fmergefunctionality}
+	\vspace{-0.4cm}
+\end{figure}
+
+\medskip
+
+\noindent 
+\textbf{Our goal is to optimize for concrete efficiency}.
+Today, concretely efficient secure merge techniques use generic MPC primitives.
+For example, evaluating Batcher's merging network \cite{AFIPS:Bat68} with GMW incurs $O(n\log\llength)$ time and communication with $O(\log\llength)$ rounds.
+Another technique relies on sorting. The idea of the state-of-the-art shuffle-then-sort paradigm \cite{ICISC:HKICT12} is that if the data is shuffled, then standard sorting
+algorithms can reveal the result of each secure comparison and move data based on the result without compromising security. This paradigm incurs the same asymptotics as evaluating Batcher's network with GMW.  Alternative efficient sorting techniques that do not rely on the initial shuffle are based on radix sort \cite{EPRINT:HICT14,EPRINT:CHIKKP19}. However, they outperform shuffle-then-sort only for some parameter regimes. 
+While these techniques have small constants, their runtime complexity is unsatisfactory as (insecure) merging is an easier problem than (insecure) sorting.
+It is well-known that sorting a list of length $\llength$ in plaintext requires $O(\llength\log\llength)$ comparisons, while merging two already sorted lists requires only $O(\llength)$.
+I.e., as \cite{EPRINT:BBDLO22} noted, by taking advantage of the ordering on the two lists, merge can outperform sorting by a $O(\log\llength)$ factor. Thus, our work hopes to find a secure merge that is not limited by the asymptotics of the generic techniques, but retains their small constants.
+
+Concretely, the most efficient secure merge prior to our work is attained by evaluating Batcher's network.
+Despite many works on secure merge, e.g. \cite{ITC:FalOst21,CSCML:FalNemOst22,EPRINT:BBDLO22}, none have managed to concretely outperform it.
+They have intriguing runtime asymptotics, but they are complex and incur large constants \cite{EPRINT:BBDLO22} or have (close to) linear round complexity \cite{ITC:FalOst21,CSCML:FalNemOst22}. Linear round complexity plainly precludes adoption for all but very small lists. \cite{EPRINT:BBDLO22} does not discuss concrete performance; we estimate their cost in \Cref{sec:eval} and show that their merge is concretely slower than existing techniques. Our main merging protocol reduces their bandwidth/rounds by $\approx8.3\times$/$\approx3.1\times$, respectively. 
+
+We introduce two symmetric constructions $(|\X|=|\Y|=n)$ with tradeoff between communication bandwidth and communication rounds. Both have better asymptotics than the generic techniques and small constants. Our first bandwidth optimized construction \ourapproach\ has almost linear bandwidth $O(n \log^* n)$ with $O(\log\llength)$ rounds. Note that $\log^*$ is a small constant for all feasible list lengths $n$ (e.g. for $n = 2^{65536}$, $\log^*\llength = 5$). Our second rounds optimized construction \ourapproachtwo\ incurs $O(\llength\log^c\llength)$, $c \approx1.71$, bandwidth but uses only $O(\log\log\llength)$ rounds. In both constructions, communication bandwidth and computation have the same asymptotics.
+
+Along the way, we modify and present in our notation \cite{EPRINT:BBDLO22}'s asymmetric merge ($|\X| \neq |\Y|$), which we call \knmerge. \knmerge\ is a subprotocol of \ourapproachtwo\ and merges lists of length $n^{\frac{1}{3}}$ and $n$. It runs in $O(n)$ time and communication and uses $O(1)$ rounds. 
+Separately, we design and present \sqrtmerge, which merges lists of length $n^{\frac{1}{2}}$ and $n$. It runs in $O(n)$ times and communication and uses $O(\log n)$ rounds. 
+\iffalse
+Our experiments demonstrate that we can merge two lists of $\llength=2^{30}$ in just \stan{X} seconds.
+\fi
+
+In \Cref{sec:motivation}, we provide the motivation for secure merge, and in \Cref{sec:contributions}, we summarize our contributions.
+
+\subsection{Applications of Secure Merge}\label{sec:motivation}
+%\noindent 
+%We now motivate secure merge.
+
+\paragraph{Secure Sort.}
+Secure sort reduces to secure merge when each party holds a private list (i.e. the list is not secret-shared).
+Each party separately invokes an insecure local sort algorithm on their list so that the more costly secure interactive operations are required only for merging the lists. 
+Note that merge is an easier problem than sort. Intuitively, this is because in merge the input lists are already sorted.
+In contrast, sort cannot make any assumptions on the input. In this paper, we show that our merge is more efficient than existing secure merge/sort protocols.
+
+\paragraph{Database Joins.}
+% PSI is one such application. 
+% PSI is often a first step to additional secure computation. In this case, the result of PSI has to be secret-shared so that secure computation can continue. One way to get this output is for the parties to sort their joint list before comparing adjacent entries in
+% a linear pass to remove singletons \cite{NDSS:HuaEvaKat12}. Replacing sort with our merge protocol yields immediate improvement.
+
+We can use our merge to reduce the costs of secure SQL-like database joins. State-of-the-art constructions \cite{CCS:BDGRR22,CCS:AHKNPT23} rely on secure sort although the inputs are sorted. For many applications, it is possible to replace sort with our merge for better efficiency.
+
+\paragraph{Database Queries.} In some applications, e.g. to query order statistics, databases need to be ordered. When inserting new entries, it is more efficient to securely merge them in with our protocols and maintain the database sorted rather than execute secure sort. %, which tears down the structure and resorts it. 
+
+\paragraph{GROUP BY Statement.}
+Recall the SQL GROUP BY statement groups database rows with the same values into summary rows. E.g., it can answer queries such as 'Find the number of clients by country'. It is often used in conjunction with aggregate functions such as COUNT, MAX, AVG to answer useful questions about the database. We can clearly use sort to order the database based on the row values. We then follow up with MPC to compute the aggregate functions. With our merge, we can replace the initial sort to reduce costs.
+
+
+%While at the time of writing this paper the state-of-the-art database joins use secure sort, the improvements in this paper make our merge the most suitable fit for this application.
+
+
+%\peter{A useful operation for MPC protocols. All the examples above are just what have been considered before but likely having an efficient merge will lead to more applications that are specific to the MPC setting. }
+%\stan{i added something like this earlier in intro where I am referencing the application section}
+
+\paragraph{Decision Trees.} Merge is a necessary tool to construct decision trees. Parties first sort their datasets. Once their datasets are sorted, they retrieve $k$ medians, which determine the predicate to use at each decision node. To improve performance, we can use our protocol instead of sort to merge their locally sorted datasets. % As state-of-the-art concretely efficient sort protocols run in $O(n \log n)$, we reduce cost to $O(n \log^* n)$.
+
+\subsection{Our Contributions}\label{sec:contributions}
+
+We design two highly efficient secure merge constructions:
+
+\begin{itemize}
+  \item \textbf{\ourapproach: Our Bandwidth-optimized Construction.} Our first construction uses $O(n \log^* n)$ communication and computation with $O(\log\llength)$ rounds. I.e., we reduce the \emph{bandwidth and work} of the state-of-the-art concretely efficient approaches from $O(\llength\log\llength)$ to almost linear $O(n \log^* n)$. This construction relies on some key ideas of \cite{ITC:FalOst21}
+  and to efficiently implement uses \cite{CCS:BDGRR22}'s so called aggregation trees.
+    \item \textbf{\ourapproachtwo: Our Rounds-optimized Construction.} Our second construction uses $O(\llength \log^c \llength)$, $c \approx1.71$, communication and computation with $O(\log\log\llength)$ rounds. I.e., we reduce the \emph{rounds} of the state-of-the-art concretely efficient approaches from $O(\log\llength)$ to $O(\log\log\llength)$. This construction relies on a medians-based approach first introduced by Valiant \cite{JC:Val75} in the insecure setting (see \Cref{sec:valinsecuremerge}) and then explored in \cite{EPRINT:BBDLO22} in the secure setting (see \Cref{sec:bbdlosecuremerge}). In our construction, we importantly rely on \cite{EPRINT:BBDLO22}'s block alignment lemma (see \Cref{sec:ourapproachtwoalignment}) and use some of their subprotocols. \\
+    \\
+    Along the way, we present \knmerge, which merges two lists of sizes $n^{\frac{1}{3}}$ and $n$. This protocol is closely inspired by \cite{EPRINT:BBDLO22}'s protocol, but is modified and expressed in our notation. As the original protocol, it runs in $O(n)$ time and communications and $O(1)$ rounds.
+\end{itemize}
+
+\noindent Additionally, we design \sqrtmerge, which merges two lists of length $\llength^{\frac{1}{2}}$ and $\llength$, respectively. We believe this technique to be of independent interest. It runs in $O(\llength)$ time and communication and $O(\log\llength)$ rounds. This approach also relies on \cite{JC:Val75,EPRINT:BBDLO22}'s medians-based technique and uses \cite{CCS:BDGRR22}'s aggregation trees. \\
+
+\noindent Note that all our protocols improve the asymptotics of the state-of-the-art concretely efficient approaches while maintaining their small constants, resulting in total concrete improvement. Also, our protocols work for any size inputs. The main concern is how the input size impacts the asymptotic running times. They simply get the best asymptotics for these sizes. \\
+
+\noindent We analytically benchmark our protocols against the state-of-the-art Batcher's network merge protocol (see \Cref{sec:relwork}). For $n=2^{20}$ and $\ell=128$-bit list elements, we estimate \ourapproach\ reduces bandwidth $\approx1.4\times$ without significantly increasing the number of rounds (i.e., \ourprotocol\ uses 155 rounds vs. state of the art uses 154). Note that for a larger input size of $n=2^{30}$, the improvement in bandwidth increases to $\approx2.0\times$, while the number of rounds increases to less than $1.1\times$ compared to the state of the art. \ourapproachtwo\ introduces a tradeoff between bandwidth and rounds; for $n=2^{20}$ and $\ell=128$-bit list elements, it reduces the number of rounds $\approx 1.3\times$ (and $\approx 1.5\times$ for $n=2^{30}$) at the cost of increasing bandwidth $\approx 2.5\times$ (and $\approx 2.2\times$ for $n=2^{30}$). Hence, \ourapproachtwo\ is useful on networks with high bandwidth but constrained latency. %\footnote{An immediate application of \ourapproachtwo\ lies in finance, for training trading models where privacy is mandated by regulators, high bandwidth is accessible, and low latency is critical. Secure merge would allow financial institutions to securely combine their databases and train models on the merged data.
+%} 
+For $n=2^{20}$ and $\ell=128$, \sqrtmerge\ reduces bandwidth $\approx2.5\times$ and rounds $\approx2.6\times$; \knmerge\ reduces bandwidth $\approx5.0\times$ and rounds $\approx4.3\times$. The $(n^{\frac{1}{3}},n)$-merge of \cite{EPRINT:BBDLO22} has similar performance, but they do not give concrete estimates. We do not consider the performance of \knmerge\ as our improvement. %\cite{EPRINT:BBDLO22} has similar performance, but our protocol is significantly simpler. %\stan{Srini please see this paragraph}
+
+
+\iffalse
+We implement and experimentally evaluate our protocols. Our results demonstrate that to merge two lists with $2^{20}$ entries each of $8$B, we communicate (1) \stan{X}MB and run in \stan{X} seconds on a high-bandwidth network (bandwidth-optimized), and (2) communicate \stan{X}MB and run in \stan{X} seconds on a low-latency network (rounds-optimized).
+\fi

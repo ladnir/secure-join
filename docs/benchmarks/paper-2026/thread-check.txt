@@ -1,0 +1,2 @@
+    PID NLWP   RSS COMMAND
+   1093    1 831640 /mnt/c/Users/stani/OneDrive/Documents/LOGSTAR/secure-join/out/build/linux/frontend/paper_benchmark --method batcher --m 262144 --n 262144 --bits 32 --batch-size 1048576 --concurrency 1 --seed 1000

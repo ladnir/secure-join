@@ -19,3 +19,8 @@ target_link_libraries(pimedian secureJoin)
 
 add_executable(shuffledquicksort shuffledquicksort.cpp)
 target_link_libraries(shuffledquicksort secureJoin)
+
+if(UNIX)
+    add_executable(paper_benchmark paper_benchmark.cpp)
+    target_link_libraries(paper_benchmark secureJoin)
+endif()

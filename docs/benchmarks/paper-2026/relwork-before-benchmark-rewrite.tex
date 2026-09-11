@@ -1,0 +1,101 @@
+\section{Related Work}\label{sec:relwork}
+
+We review related work, focusing on works that optimize both insecure and secure merge. %sort and secure merge.
+Secure merge can be viewed as a special case of secure sort when the input lists are already sorted. I.e., any sort is also a merge protocol.
+For that reason, we first review works that focus on sort before getting into merge.
+When reviewing secure sort, we keep in mind that even in plaintext any comparison-based sorting protocol requires $O(\llength\log\llength)$ comparisons, whereas merge needs only $O(\llength)$ comparisons.
+Hence, sort is a harder problem than merge in the insecure setting.
+In the secure setting, concretely efficient merge protocols today evaluate Batcher's network or run a secure sort.
+Because of our contributions that get much closer to the plaintext merge costs, secure sort protocols are no longer competitive with secure merge.
+
+\subsection{Secure Sort}\label{sec:relworksorting}
+
+A common way to  get secure sort is to implement a sorting network with a generic MPC protocol such as GMW. Asymptotically, the fastest network is the AKS network \cite{COM:AKS83} requiring $O(\llength\log\llength)$ comparisons. While asymptotically optimal, the network is practically prohibitive as the hidden constants are enormous.
+In contrast, Batcher's sorting network \cite{AFIPS:Bat68} requires $\llength\log^2\llength$ comparisons but is practically efficient.
+
+The reason why sorting networks are often used over other traditional sorts such as mergesort and quicksort is that the data movement in these sorts is input-dependent, and hence not oblivious.
+\cite{ICISC:HKICT12} introduced a \emph{shuffle-then-sort} paradigm, which  observes that many traditional sorts can be made oblivious by first securely shuffling the inputs.
+I.e., after the shuffle, it is secure to sort with a traditional  $O(\llength\log\llength)$ sorting algorithm. 
+%The shuffle ensures that the data movement is oblivious of the input.
+One must still compute each comparison of the sort under MPC, but the result of the comparison can be revealed. The parties then reorder the data corresponding to the comparison inputs based on the comparison output. As secure shuffle can be implemented in $O(\llength)$ \cite{EPRINT:PRRS23}, the entire sort takes $O(\llength\log\llength)$.
+
+%comparison cost: $(c_\textsf{time}, c_\textsf{rounds}) \in \{(\ell, \ell), (\ell \log \ell, \log \ell)\}$
+
+%shuffle-then-sort: $O(c_\textsf{time}n\log n)$ OTs/communication and $O(c_\textsf{rounds}\log n)$ rounds 
+
+%Radix: $O(\ell n)$ OTs, $O(\ell n\log n)$ communication, $O(\ell)$ rounds.
+
+Alternative secure sorts include radix sort \cite{EPRINT:HICT14,EPRINT:CHIKKP19}, which outperforms shuffle-then-sort for some combination of list length $\llength$ and the bitlength $\lbitlength$. %Asymptotically, radix sort is preferred when $\log \llength > \frac{\lbitlength}{\log\lbitlength}$, which is often true.
+Zig-zag sort \cite{STOC:Goodrich14} runs in $O(\llength\log\llength)$ with small constants, but its depth is $O(\llength\log\llength)$.
+Randomized shellsort \cite{SODA:Goodrich10} also runs in $O(\llength\log\llength)$ with small constants, but is only correct with high probability.
+
+%\peter{We should be careful when comparing radix to the others. radix has $O(n \ell)$ time and $O(\ell)$ rounds while shuffle sort has $O(n\log(n) \ell)$ time and $O(\log(n) \ell)$ rounds or $O(n\log(n) \ell\log \ell)$ and $O(\log n \log \ell)$ rounds. So its not hard to see that radix is the best for various parameters.} \stan{Are you sure radix is O(nl)? I briefly took a look at the papers and the time seems same as the shuffle-then-sort works}
+
+\subsection{Secure Merge}\label{sec:relworkmerging}
+
+We now present works that explicitly solve secure merge.
+We start with techniques that use generic MPC to implement secure merge, and follow up with techniques based on the shuffle-then-sort paradigm (i.e. shuffle-then-merge). Then we discuss works that stress asymptotic guarantees. % but incur high constants. 
+In \Cref{fig:mergeasymptotics}
+we compare our asymptotic performance with state-of-the-art works.
+
+\begin{figure}[!h]\small
+    \centering
+    
+    \begin{tabular}{|l|c|c|r|r|}
+    \hline\textbf{Algorithm} & \textbf{\# Comparison} & \textbf{Depth } & \multicolumn{2}{c|}{\textbf{Constants }} \\
+    & & & ~\# Cmp. ~ & ~Depth~\\
+    \hline \hline
+    \cite{EPRINT:BBDLO22}'s Sub$^*$ & $O(n\log\log n)$ & $O(\log\log n)$ & 25.5 &19.2 \\
+    
+    \hline    \cite{EPRINT:BBDLO22}'s Full$^{\diamond}$ & $O(n)$ & $O(\log\log n)$ & 120.8 & 55.3\\
+    \hline
+        (Shuffled) Quick-Sort & $O(n\log\llength)$ & $O(\log\llength)$ & $1.4$ & $1.4$\\
+    \hline
+    Batcher's Network & $O(n\log\llength)$ & $O(\log\llength)$& $1.0$ & $1.0$\\
+    \hline
+    %GC & $O(\kappa\llength\log\llength)$ & $O(1)$& $1$ & $2$\\
+    \hline
+    %FHE & X & $O(1)$\\
+    %\hline
+   \ourapproach & $O(n \log^*\llength)$ & $O(\log\llength)$& $2.9$ & $1.7$\\ 
+    \hline
+    \ourapproachtwo & $O(\llength\log^c\llength)$, $c \approx1.71$ & $O(\log\log\llength)$& $0.3$ & $3.9$\\
+    \hline 
+    \end{tabular}
+    \caption{This table compares the asymptotics of our techniques \ourapproach\ and \ourapproachtwo\ with state-of-the-art approaches. Depth refers to the number of sequential comparisons. The Constants column estimates the size of the constants hidden by the asymptotics for $n=2^{20}$ and $c=\log_{3/2}(2) \approx 1.71$. $^*$ \cite{EPRINT:BBDLO22}'s symmetric merge subprotocol $\Pi_{\textsf{SSM-}{\log}{\log} n}$ (Step 1 in \Cref{sec:bbdlosecuremerge}). $^{\diamond}$ \cite{EPRINT:BBDLO22}'s full symmetric merge protocol (Step 3 in \Cref{sec:bbdlosecuremerge}).}
+    \label{fig:mergeasymptotics}
+\end{figure}
+
+\paragraph{Secure Merge via Generic MPC \cite{EPRINT:BBDLO22}.} We can pick any merging algorithm representable as a Boolean circuit and evaluate it with a garbled circuit (GC) or GMW.
+It is well-known that such circuit will have size at least $O(\llength\log\llength)$ and depth $O(\log\llength)$. For example, we can use Batcher's merging network to obtain such circuit.
+By using GMW to evaluate this circuit, we will incur $O(\llength\log\llength)$ communication/computation and $O(\log~\llength)$ rounds. We consider this the most performant merge technique prior to our work. If we use GC instead, we will get $O(1)$ rounds but will incur computational security parameter $\kappa$ blowup in communication and computation, i.e. $O(\kappa \llength\log\llength)$. 
+
+Note that we can also get a $O(1)$ round protocol by using fully homomorphic encryption (FHE).
+In this case, the communication is proportional to the size of the encryptions of one party's list, i.e. $O(\llength)$.
+As the computation must remain input-independent, however, one of the parties will need to execute a circuit under FHE with $O(\llength\log\llength)$ comparisons. As the circuit has depth $O(\log~\llength)$, this approach further requires bootstrapping, and hence is practically expensive.
+
+\paragraph{Secure Merge via Shuffle-then-merge.}
+
+While the shuffle-then-sort approach was originally designed for secure sort, similar techniques have been developed for secure merge \cite{AC:CKNPS18,CSCML:FalNemOst22}. We refer to them as shuffle-then-merge. In this setting, the approach is more subtle as the input lists are presorted and the merge needs to process them in sorted order (otherwise this technique reduces to secure sort). 
+
+In these techniques, the parties first construct a special linked list structure
+for each input list and then shuffle the linked lists. 
+The parties then essentially run a plaintext merge sort algorithm.
+They maintain a secret-shared version of the head of the two
+linked lists. At each step, the smaller head is placed into the merged list and the index of its shuffled child is revealed. The parties then update the head with its child and the process is repeated.
+
+While these techniques run in only $O(\llength)$ time and communication, the plaintext merge emulation is sequential, and thus takes $O(\llength)$ rounds. This is plainly prohibitive for most applications. As a result, standard shuffle-then-sort is in most settings more practical than shuffle-then-merge.
+
+%\cite{AC:CKNPS18} - single client and three servers
+%\cite{CSCML:FalNemOst22}
+
+\paragraph{Secure Merge with Strong Asymptotics.}
+
+We now discuss secure merge protocols that emphasize \emph{asymptotic} improvements \cite{ITC:FalOst21,CSCML:FalNemOst22,EPRINT:BBDLO22}.
+%As we use some of their ideas and subprotocols, we present them more closely in \Cref{sec:prelims}.
+\cite{ITC:FalOst21} introduced a protocol that runs in $O(\llength \log \log \llength)$ time and communication and almost linear rounds. %\stan{try to give exact number}
+Such round complexity is prohibitive in most settings. Our \ourapproach\ uses some of their ideas but is significantly different and requires only $O(\log\llength)$ rounds (see \Cref{sec:ourapproachoverview}). \cite{CSCML:FalNemOst22} gives a $O(n)$ time and communication protocol, but also requires $O(n)$ rounds.
+Recently, \cite{EPRINT:BBDLO22} introduced a protocol that runs in $O(\llength)$ time and communication and $O(\log\log \llength)$ rounds. This approach, like \ourapproachtwo, is based on \cite{JC:Val75}'s medians-based approach (see \Cref{sec:valinsecuremerge}) and mixes several merge protocols with different properties such that they get their desired asymptotics. While asymptotically intriguing, the protocol is complex and has high constants. As discussed in \Cref{sec:intro}, we show that our \ourapproach\ reduces their bandwidth/rounds by $\approx8.3\times$/$\approx3.1\times$, respectively. 
+We note that one of \cite{EPRINT:BBDLO22}'s subprotocols that implements their full linear time merge, can be viewed as a standalone merge of arbitrary length lists. This protocol corresponds to Step 1 in our high level description of \cite{EPRINT:BBDLO22} (see \Cref{sec:bbdlosecuremerge}) and runs in $O(n\log\log n)$ time with $O(\log \log n)$ rounds. Concretely, our \ourapproach\ reduces bandwidth over this subprotocol by $\approx 7.5\times$ and rounds by $\approx 1.2\times$.
+%We note that for evaluating \cite{EPRINT:BBDLO22}'s protocol to compare with our \ourapproach and \ourapproachtwo protocols, we only consider the costs due to the number of comparisons and their associated number of rounds. While this is the bottleneck for our protocols, the protocol of \cite{EPRINT:BBDLO22} has other more expensive operations as well. For instance, \cite{EPRINT:BBDLO22} makes extensive use of \cite{CSCML:FalNemOst22}'s merge, which has relatively high round complexity even for small $n$. 
+See Section \ref{sec:eval} for a more detailed comparison. %It is indicative of the fact that, in comparison to our estimates, our protocols would likely only further outperform \cite{EPRINT:BBDLO22} in practice. %\stan{Srini please add a sentence or two here it is much more}  %\srini{See if we can say anything more.}

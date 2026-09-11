@@ -1,0 +1,30 @@
+{
+  "artifacts": {
+    "benchmark-section.pdf": {
+      "sha256": "325b034c4406cb6d6579903b5bf816fdea198f165c737e5885a0cab6584f400b",
+      "pages": 7,
+      "rendered_pages_visually_checked": true,
+      "all_fonts_embedded": true,
+      "path": "C:\\Users\\stani\\OneDrive\\Documents\\LOGSTAR\\output\\pdf\\benchmark-section.pdf"
+    },
+    "benchmark-full-results.pdf": {
+      "sha256": "550a04ed673f11e714753858f3355a5334b7f90ee7e886ba761bed8e42d6ad57",
+      "pages": 13,
+      "rendered_pages_visually_checked": true,
+      "all_fonts_embedded": true,
+      "path": "C:\\Users\\stani\\OneDrive\\Documents\\LOGSTAR\\output\\pdf\\benchmark-full-results.pdf"
+    }
+  },
+  "full_manuscript_compiles": true,
+  "new_evaluation_has_no_overfull_boxes_or_unresolved_references": true,
+  "existing_theory_layout_and_font_warnings_unchanged": true,
+  "configurations": 390,
+  "timed_executions": 930,
+  "fresh_crypto_round_audits": 130,
+  "restoration": {
+    "verified_at": "2026-09-11T06:28:19.788229-04:00",
+    "original_wslconfig_absent_restored": true,
+    "wsl_shutdown_verified": true,
+    "benchmark_network_namespaces_removed": true
+  }
+}

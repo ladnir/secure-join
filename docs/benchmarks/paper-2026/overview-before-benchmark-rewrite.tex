@@ -1,0 +1,230 @@
+\section{Technical Overview}\label{sec:overview}
+
+We now explain our constructions at a high level. We start with our \emph{symmetric} constructions, which take as input two secret-shared lists \X\ and \Y\ of size \llength\ and output  
+a secret-shared permutation $[2n]\rightarrow[2n]$ such that $\pi(\X||\Y)$ is merged. In \Cref{sec:ourapproachoverview} we introduce \ourapproach, our bandwidth-optimized construction, and then continue in \Cref{sec:ourapproachtwooverview} with \ourapproachtwo, our rounds-optimized construction. We then present \sqrtmerge\ (\Cref{sec:sqrtmergeoverview}), our \emph{asymmetric} construction for merging lists of length $n^{\frac{1}{2}}$ and $n$. 
+Sections \ref{sec:constructionone}, \ref{sec:constructiontwo}, and \ref{sec:sqrtconstruction} present our constructions in formal detail. %\srini{We should add an overview for the square-root construction as well.}
+
+Our goal is to optimize for \emph{concrete efficiency}.
+Asymptotically, \ourapproach\ runs in $O(\llength\log^{*}\llength)$ %\stan{possibly change to $O(n~{\log^*n})$} 
+time and communication and uses $O(\log n)$ rounds; \ourapproachtwo\ runs in $O(n\log^c n)$ time and communication and uses $O(\log\log n)$ rounds, where $c = \log_{\frac{3}{2}}2 \approx 1.71$; our \sqrtmerge\ runs in $O(n)$ time and communication and uses $O(\log n)$ rounds.
+
+
+\subsection{\ourapproach\ High Level Explanation}\label{sec:ourapproachoverview}
+At a high level, the \ourprotocol\ construction divides the lists $\X,\Y$ into blocks, invokes \mergeinvprotocol\ to merge the lists of blocks, and then recurses on adjacent blocks. The approach was first used in \cite{ITC:FalOst21} and can be summarized as follows: divide $X||Y$ into blocks of size $\blockSize:=O(\log n)$ (to be precise, \cite{ITC:FalOst21} used $\mathrm{polylog\ } n$) and merge these $\numBlocks:=2\frac{n}{\blockSize}$ blocks using the first element as the block value (each block is treated as a unit). Since there are $\numBlocks=O(\frac{n}{\log n})$ blocks, this can be done by even a naive $\numBlocks \log \numBlocks$ time and $\log\numBlocks$ rounds sort protocol% (in our case we simply use \ourprotocol)
+. After the block merge reorders the blocks, the hope is that the individual items are close to their final merged positions. \cite{ITC:FalOst21} proceeds by performing a sliding window merge sort which sequentially sorts adjacent blocks together, i.e., merge-sort blocks $(i,i+1)$, then $(i+1,i+2)$, etc. Due to the sequential nature of this sort, most items will be carried along to their final position. \cite{ITC:FalOst21} proved that the sliding window merge correctly places all but a small number of so called \emph{strays}, which can be extracted and merged separately. Unfortunately for \cite{ITC:FalOst21}, sequentially merging adjacent blocks introduces a near-linear round complexity overhead. Note that \cite{EPRINT:BBDLO22} states that \cite{ITC:FalOst21} has $\log n$ round complexity, which we confirmed to be incorrect.% \srini{We should mention that the other paper incorrectly states that \cite{ITC:FalOst21} has better round complexity.} \stan{added please see. hope it is not too strong}
+
+Our approach deviates significantly in how we merge adjacent blocks together and handle the strays. In particular, after reordering the blocks, \ourprotocol\ makes careful use of a so-called \emph{aggregation tree} \cite{CCS:BDGRR22} to efficiently distribute information between the blocks. This in turn allows \ourprotocol\ to merge adjacent blocks in parallel instead of sequentially. This combination of techniques allows our protocol to reduce the round complexity of  \cite{ITC:FalOst21} from near-linear to $O(\log n)$ while simultaneously reducing the running time from $O(n\log\log n)$ to $O(\llength \log^{*}\llength)$% \stan{possibly change to $O(n \log^* n)$} time
+. In more detail, \ourprotocol\ proceeds as follows:
+
+%\peter{We dont cancat, we recurse. stop citing FO21. }
+%\begin{enumerate}
+%    \item \textbf{[Concatenate]} Concatenate the input lists \X\ and \Y\ to get a list $\X||\Y$ of size $2\llength$,
+%    \item \textbf{[Split]} Split $\X||\Y$ into %$\frac{2\llength}{\log\llength}$
+%    blocks $\block_0, \ldots, \block_{\frac{2\llength}{\log\llength} - 1}$ of size $\log\llength$, and 
+%    \item \textbf{[Sort]} Sort $\X||\Y$ based on the first element in each block $\block_i$ (we call $\block_{i,0}$ a pivot).  With \cite{ITC:FalOst21}'s protocol for sorting lists with large payloads, this can be done in $O(\frac{\llength}{\log \llength}\log(\frac{\llength}{\log\llength}) + \llength)$ communication, which is linear.
+%\end{enumerate}
+\begin{enumerate}
+\item \label{highlevelapproach1} \textbf{[Block Merge]} Select the $\numBlocks=\frac{n}{\blockSize}=O(\frac{n}{\log n})$ medians of $X,Y$. I.e., invoke $\X':=\medprotocol(\X)$, $ \Y':=\medprotocol(\Y)$ and compute a permutation that would merge them $\pi=\mergeinvprotocol(\X',\Y')$. %(it is possible to use other merge protocols that satisfy some criteria discussed in \Cref{sec:constructionone}).
+Then permute the $b$-sized blocks of $\X,\Y$ by $\pi$, i.e., $\pi(B)$ where $B:= B^{\X}||B^{\Y}$ are the blocks of $\X||\Y$.
+\end{enumerate}
+That is, $\medprotocol$ outputs the $\numBlocks$ medians which are merged with any efficient merging/sorting algorithm. This outputs a permutation $\pi : [2\numBlocks] \rightarrow [2\numBlocks]$ that merges $(\X'||\Y')$. The original lists are divided into blocks of size $\blockSize=O(\log n)$ and permuted by $\pi$. Because the initial lists were sorted, most elements in $B$ are now close to their final position. For example, it is easy to see that the location of the $\X',\Y'$ medians in $B$ will be at most $\blockSize-1$ positions from their final position. However, it is possible for some elements to be far from their final position when many blocks from the other list merge into the middle of a block. An example of this can be seen in \Cref{fig:logstarobservations}. %In these examples we will annotate each block $\block_i$ to denote which list it is from, i.e., $B^{\X}_i$ or $B^{\Y}_i$. 
+
+The example considers two lists $\X$ (red) and $\Y$ (blue), where the first two blocks of $\X$ are $[1,10,15,16,22,45,51]$ and $[61,62,63,64,65,66,70]$, and the first four blocks of $\Y$ are $[11,12,13,14,17,18,19]$, $[21,23,24,25,26,27,29]$, followed by $[31,32,33,34,37,38,39]$ and $[41,42,43,44,67,67,68]$. When the blocks are merged using their first elements as the block values, they get reordered as the first block of $\X$, the first four blocks of $\Y$, and then the second block of $\X$. We label these reordered blocks as $\block_0, \ldots, \block_5$. As the figure shows, block $\block_0$ has elements that merge with the next $4$ blocks, $\block_1,\ldots,\block_4$. If an element of a block has a value that falls within the range of the next blocks, we call it a \emph{stray}. 
+We make the following observations about strays:
+
+
+\begin{figure}[h]
+    \centering
+%\scalebox{0.37}{
+% trim: left, bottom, right, top
+\includegraphics[scale=0.37,trim={0cm 11cm 0cm 0cm},clip]{figures/logStarPlot1.pdf}
+ \caption{%/
+ This figure shows a segment of a plausible state for the merge after blocks are merged. Note that there are two transition blocks $\block_0$ (first block of $\X$) and $\block_{4}$ (fourth block of $\Y$). By observation $1$, they are the only blocks that can have strays. %Also, the pivot of $\block^{\X}_{i+5}$ is at least as large as the last element of $\block^{\X}_i$. 
+ By observation $2$, all blocks starting with $\block_{1}$ until the next transition block come from the list $\Y$. By observation $3$, all strays in $\block_0$ belong to blocks $\block_{1}, \ldots, \block_{4}$ from $\Y$.
+}\label{fig:logstarobservations}
+\end{figure}
+
+%\begin{figure}[t]
+%\centering
+%      \includegraphics[height=6cm]{plots/logstar1-crop.pdf}  
+      % \includegraphics[height=5cm,width=6.7cm]{plots/initruntime.png}
+% \caption{%/
+% This figure shows a segment of a plausible state for the merge after blocks are merged. Note that there are two transition blocks $\block^{\X}_i$ and $\block^{\Y}_{i+4}$. By observation $1$, they are the only blocks that can have strays. Also, the pivot of $\block^{\X}_{i+5}$ is at least as large as the last element of $\block^{\X}_i$. By observation $2$, all blocks starting with $B^{\lone}_{i+1}$ until the next transition block come from the other list \Y. By observation $3$, all strays in $\block^{\X}_i$ belong to $\block^{\Y}_{i+1}, \ldots, \block^{\Y}_{i+4}$.
+%}\label{fig:logstarobservations}
+%\end{figure}
+
+%\peter{we can have a comparison section if you want. but we dont need to describe FO21 any more.} At this point, \ourapproach\ and \cite{ITC:FalOst21} diverge. First, we define strays differently. In \cite{ITC:FalOst21}, elements must be sufficiently far from the final index to be considered strays (depending on parameter settings). In \ourapproach, any element that does not belong to the current block is a stray. \cite{ITC:FalOst21} extract their strays and match them to their true blocks. By \cite{ITC:FalOst21}'s definition of strays, it is still possible that elements that were not far enough (i.e., were not marked as strays) are in the wrong block. So they re-sort to place all elements in their final position. Their technique is based on sequential sorting with sliding windows and requires $O(\llength)$ rounds \stan{verify number of rounds}. Our technique instead directly extracts the strays (padded to $\log \llength$) into the appropriate block (also of size $\log \llength$). By our definition of a stray element, all elements are now in the right block. We finish the merge by recursively merging the blocks with their strays using the same procedure.
+
+%We now describe how to efficiently extract the strays and assign them to the right blocks $\block_i$. Recall after step $3$ we hold a list $\X||\Y$ of length $2\llength$ that is partitioned into $\frac{2\llength}{\log\llength}$ blocks $\block_i$ each of $\blockSize=\log\llength$ elements. The blocks are merge sorted and they are ordered in the list based on their pivots $\block_{i,0}$, i.e., the first element. Each block comes either from list \X\ or \Y\ (we will annotate each block to denote which list, i.e., $\block^{\X}_i$ or $\block^{\Y}_i$).
+
+
+\begin{itemize}
+    \item \textbf{Observation 1:}\label{op1} If a block $\block_i$ has strays, then the next block $\block_{i+1}$ must come from the other list (i.e., if $\block_{i}$ is from $\X$ and has strays, then $\block_{i+1}$ is from $\Y$, or vice versa). This means that a block $\block_i$ can only contain a stray if it is a \emph{transition block}, i.e., a block from one list that is followed by a block from the other list. In the example, $\block_0$ and $\block_4$ are the transition blocks and they are the only blocks with strays.
+    \item \textbf{Observation 2:}\label{op2} If a block $\block_i$ has strays, then all blocks following $\block_i$ until the next transition block will come from the other list. % There can be no transition until this point. Mathematically, for $\block_i^{\X}$ with strays, $\block_j^{\Y}$ for all $j \geq i+1$ where $\block_{i,\blockSize-1}^{\X} \geq \block_{j,0}^{\Y}$ (and vice versa).
+    In the example, blocks $\block_1, \ldots, \block_4$ are all from $\Y$.
+    \item \textbf{Observation 3:}\label{op3} All strays in $\block_i$ can only belong to $\block_{i+1}, \ldots, \block_j$, where $j$ is the next transition point,
+    %\block_{\frac{2\llength}{\log\llength}}$
+    i.e., all strays from block $\block_i$ will be distributed among blocks until the next transition point $j$. Similarly, $\block_{i+1}, \ldots, \block_j$ only contain strays from $\block_i$. In the example, the strays from block $\block_0$ are distributed among the blocks $\block_1, \ldots, \block_4$, and the blocks $\block_1, \ldots, \block_4$ only contain strays from block $\block_0$.
+\end{itemize}
+
+Based on these observations we arrive at our high level strategy: map the strays of each block to the subsequent blocks that they \emph{belong to} and then recursively merge these strays with those blocks. This is visualized in \Cref{fig:logstarsteps} and detailed in the following steps:
+
+\begin{figure}[h]
+% trim: left, bottom, right, top
+\includegraphics[scale=0.37,trim={0cm 7cm 0cm 7.5cm},clip]{figures/logStarPlot2.pdf}
+    \centering
+    
+\caption{%/
+   In this figure we give a visual aid for steps 2 and 3 of \ourprotocol. We build on the example in \Cref{fig:logstarobservations}. We show the blocks $S_1, \ldots, S_5$ copied into $\block_1, \ldots, \block_5$. We then highlight the parts of the copied blocks with strays belonging to the corresponding block. The rest of the copied blocks are marked off as dummies.
+ }\label{fig:logstarsteps} 
+\end{figure}
+
+%\begin{figure}[t]
+%\centering
+% \begin{adjustwidth}{-0.09\textwidth}{-0.09\textwidth}
+      %\includegraphics[height=5.5cm]{plots/logstar2-crop.pdf}  
+      %\hspace{1.1cm}\includegraphics[height=5.5cm]{plots/logstar3-crop.pdf}
+ %\end{adjustwidth}
+
+ %\caption{%/
+ %  In this figure we give visual aid for steps 4 (left) and 5 (right) of \ourapproach. We build on the example in \Cref{fig:logstarobservations}. On the left, we show in red block $\block_i^{\X}$ copied into $\block_{i+1}^{\Y}, \ldots, \block_{i+4}^{\Y}$ and in blue block $\block_{i+4}^{\Y}$ copied into $\block_{i+5}^{\X}$. On the right, we highlight the parts of the copied blocks with strays belonging to the corresponding block. % (the rest of the copied blocks being marked as dummies).
+ %}\label{fig:logstarsteps} 
+%\end{figure}
+
+\begin{enumerate}
+\setcounter{enumi}{1}
+    \item \label{highlevelapproach2} \textbf{[Duplicate]} We obliviously duplicate each transition block $\block_i$ onto the next streak of blocks from the other lists, e.g., \Cref{fig:logstarsteps} duplicates $\block_0$ onto blocks $\block_1,...,\block_4$. For each $\block_j$, let $S_j$ denote the duplicated block that is associated with it, e.g., $S_{1}=\ldots=S_{4}=\block_0$ in \Cref{fig:logstarsteps}. Recall from our observations that $S_i$ contains all strays that belong to $\block_i$. Naively duplicating the blocks would require $O(n)$ rounds. However, \cite{CCS:BDGRR22} introduced the so called aggregation tree protocol \aggtreeprotocol\ that requires linear time and $O(\log\llength)$ rounds. 
+    \item \label{highlevelapproach3}\textbf{[Extract]} We next extract from $S_i$ only the strays that belong to $\block_i$. This can be done trivially in $O(\llength)$ time and $O(1)$ rounds by selecting all elements of $S_i$ in the range $[\block_{i,0}, \block_{i+1,0})$, i.e., the first element of $\block_i$ and the first element of the next block $\block_{i+1}$. The remaining elements of $S_i$ are marked as dummies such that $S_i$ retains $\log\llength$ elements. We similarly extract from $\block_i$ only the elements that are smaller than $\block_{i+1,0}$.
+\end{enumerate}
+
+\noindent After step 3, we hold $2\numBlocks$ blocks $\block_i$ and their corresponding blocks of strays (and dummies) $S_i$. Both are of size $\blockSize=O(\log\llength)$. We now finish our merge:
+
+\begin{enumerate}
+\setcounter{enumi}{3}
+    \item \label{highlevelapproach4} \textbf{[Recurse]} Recursively call steps 1-3 on each $(\block_i, S_i)$ until they are of constant size, at which point we merge with another protocol. As the blocks reduce to $\log$ size at each recursion, we need $O(\log^*\llength)$ recursive steps to get to a constant. In practice, for any feasible list size, we never need to do more than $2$ recursive calls before using a na\"ive protocol for the base case.  
+    \item \label{highlevelapproach5}
+    \textbf{[Reconstruct]} We now concatenate outputs from step 4. Note that at each of the $\log^*\llength$ recursive steps, we double the list size by inserting $S_i$ next to each block $\block_i$. We also double the list size by merging \X and \Y together. I.e., the list is now of length $O(\llength\cdot 2^{\log^*\llength})$. We need to remove all the extra (all but $2\llength$) dummy elements from the merged list. We use an in-order extraction technique from \cite{EPRINT:PRRS23} (see \Cref{sec:prelims}). 
+\end{enumerate}
+
+\noindent We now explain at a high level why \ourprotocol\ runs in $O(n\cdot 2^{\log^*n})$ time and communication and uses $O(\log n)$ rounds.
+
+\paragraph{Time and Communication.}
+
+Recall that in step $4$ we extract block $S_i$ for each block $\block_i$ and then recursively merge them. Thus, we effectively double the size of the list $\X||\Y$ (step $1$) in each recursive call. We also double once to merge $\X||\Y$. As we recurse $O(\log^*\llength)$ times, the list is of size $O(\llength\cdot 2^{\log^*\llength})$ after the last recursive call. Each recursive call is linear time and communication, and thus the resulting complexity is $O(\llength\cdot 2^{\log^*\llength})$.
+
+\paragraph{Rounds.}
+
+We use aggregation trees to copy blocks $S_i$ in step $4$, which require $\log\llength$ rounds (the remaing steps run in $O(1)$ rounds).
+We execute step 4 at each of the $\log^*\llength$ recursive calls.
+While a loose analysis would result in $O(\log^*\llength\cdot\log\llength)$ rounds, the round complexity gets smaller in each recursive call as the size of the blocks reduces exponentially each time. Specifically, the number of rounds required in the $i$th level of the recursion is $c\cdot\log^{(i)}\llength$, where $c$ is a fixed constant and $\log^{(i)}$ is $i$ iterations of the $\log$ function. It is easy to see (inductively) that $\log^{(i)}\llength \le \frac{\log n}{2^{i-1}}$. Therefore, the round complexity is
+$$c\cdot\sum_{i\ge 1}\log^{(i)}\llength \le c\cdot\sum_{i\ge 1}\frac{\log n}{2^{i-1}} = O(\log\llength)$$
+
+
+\paragraph{Getting to $\llength\log^{*}\llength$.} We now describe how to optimize \ourprotocol\ to get time and communication down from $O(\llength\cdot 2^{\log^*\llength})$ to $O(\llength\log^*\llength)$. Intuitively, we need to prevent the list size from doubling every recursive call while still performing roughly linear work in every recursive step. The key idea is the following: When we duplicate a block containing strays out onto the blocks where the strays may belong, there are several copies of the block that are created, but for any given stray element, only one of them is used (the element will be turned into a dummy in all other copies). This means that there are going to be several merges involving completely dummy blocks in the later stages of the recursion. If we prevent recursing on such subproblems, we will prevent this perpetual doubling of the size of the list at every recursive step. Care must be taken to prune these subproblems obliviously, but we show how to do it in \Cref{sec:extension}.
+
+
+\subsection{\ourapproachtwo\ High Level Explanation}\label{sec:ourapproachtwooverview}
+
+\begin{figure}[t]
+\centering
+
+% trim: left, bottom, right, top
+\includegraphics[scale=0.37,trim={0cm 13cm 0cm 4.5cm},clip]{figures/logStarPlot3.pdf}  
+
+      %\includegraphics[height=6cm]{plots/median-crop.pdf}  
+      % \includegraphics[height=5cm,width=6.7cm]{plots/initruntime.png}
+ \caption{%/
+ This figure shows steps $1$-$4$ of \ourapproachtwo\ (c.f. \Cref{sec:ourapproachtwooverview}). In (1), we retrieve medians $\lzero'$ of \lzero\ and compute where they map in \lone\ (i.e., we merge them). (2) copies each element of $\lzero'$ such that $|\lzero'| = |\lone|$. (3) repeats steps $1$-$2$ with the lists switched. In (4), the lists are aligned and can be recursively merged. Step $5$ is a simple concatenation of the outputs from step $4$, and hence we do not display it in the figure. 
+}\label{fig:medianobservations}
+\end{figure}
+
+%\peter{use ``block'' to refer to a fixed size block and chunk to refer to when the region is variable size.} \stan{sounds good}
+
+In this construction we build on the insecure medians-based approach of \cite{JC:Val75} (see \Cref{sec:valinsecuremerge}), first explored in the secure context by \cite{EPRINT:BBDLO22}.
+Recall \cite{JC:Val75}'s approach selects evenly-spaced $\numBlocks$-medians of \X, i.e. it computes $\X'=\med(\X,\numBlocks)=\{\X_0,\X_{\blockSize},\ldots,\X_{n-\blockSize}\}$, where $\blockSize=\frac{n}{\numBlocks}$. The positions of these medians will partition \X into $\numBlocks$ evenly sized \emph{blocks}, e.g. the first block $\{\X_0,\ldots,\X_{\blockSize-1}\}$. Similarly, these medians $\X'=\med(\X,\numBlocks)$ will partition \Y into variable-sized \emph{chunks} with the $i$th chunk falling in the range $[X_{i\blockSize},X_{i\blockSize+\blockSize})$, see (1) in Figure \ref{fig:medianobservations}.
+
+The challenge is that in secure computation, the size of the variable-sized chunks must remain secret as we cannot leak the number of elements of \Y\ lying between successive medians of \X. The first step of this approach is to \emph{obliviously align} the subproblems as suggested in \cite{EPRINT:BBDLO22}'s lemma (see \Cref{sec:ourapproachtwoalignment}). Conceptually, this means we will insert $n$ dummy elements into the $X,Y$ lists such that the $i$th block of $X$ will start at the same position as the $i$th chunk of $Y$. Once aligned, we can define aligned subproblems and recursively solve them.
+
+\noindent We now discuss this in more detail. An example of this approach can be seen in \Cref{fig:medianobservations}.
+Let $\numBlocks = n^{\frac{1}{3}}$ be the number of medians. The block size will be $\blockSize=n^{\frac{2}{3}}$.
+
+\begin{enumerate}
+
+\item \textbf{[$(\numBlocks,\llength)$-merge]} The first step is to determine where the $\numBlocks$ medians of \X\ map to in \Y.
+We can do this in $O(\llength)$ time and communication and $O(1)$ rounds by using the highly-efficient  \knmergeprotocol\ (a modified  protocol of \cite{EPRINT:BBDLO22}) that merges lists of $\numBlocks=n^{\frac{1}{3}}$ and $n$ elements.
+However, instead of actually merging the $X'=\med(X, \numBlocks),Y$ lists, this protocol, as defined in our notation, outputs a secret-shared permutation $\pi: [k+n] \rightarrow [k+n]$ such that $\pi(\X'||Y)$ is merged.
+
+% How to get cx,cy?
+%---------------------------------------
+% 1) n^1/3 x' compared with med_{n^2/3}(Y)
+% 2) we know at most n^1/3 blocks are active
+% 3) extract these blocks of Y, to get Y' of size n^2/3 total elems.
+% 4) all pair between X' and Y', n work
+% 5) cx is computed as just the index of the Y' that it matches
+% 6) cy is compated as follows:
+%    a) for each x', we generate a one-hot vector which is 1 where x would go in Y'
+%    b) add these n^1/3 vectors together component wise, each vector of length n^2/3. A total of n work.
+%    c) unpermute/unextract these vectors, fill the missing blocks with zeros.
+%    d) prefix sum the combined vector.
+
+\item \textbf{[Permute]} \label{step:insertdummies}Now, instead of merging $(X'|| Y)$ via the permutation $\pi$, we modify $\pi$ by invoking \updatepermutation to obliviously merge $\blockSize$ copies of $x\in X'$, marked as dummies, where each $x$ in the merged $(X'||Y)$ would go. After invoking this modified permutation on $(X'|| Y)$, we have a list $\lzero' \merge \lone$ that has all the $n$  elements of $Y$ merged with $\blockSize$ copies of the medians $X'=\med(X,\numBlocks)$, i.e., containing a total of $n=\numBlocks \blockSize$ dummies. %The details on how to merge $\blockSize$ dummies in place of each median $x\in X'$ will be discussed later.
+
+%\item Now that we know where the medians of \X\ map to in \Y, we make $\frac{\llength}{k} = n^{\frac{2}{3}}$ copies of each median of \X\ such that the merged list is of length $2\llength$. Note that it is possible to locally compute the new indices in the list with the copied medians. \peter{this one is not clear.}
+
+%\item At this time, we have the (secret-shared) \emph{index} of each element in the $2\llength$ list. We now need to place each element into the right position.
+%This can be done using the tag-shuffle-reveal paradigm (see \Cref{sec:prelims}). The lists are already tagged with their final index. We now obliviously shuffle the list ($O(\llength)$ time and $O(1)$ round with \cite{ourotherpaper}'s protocol). Since the elements are now randomly permuted, we can reveal the final indices associated with each element and place the elements into the right positions.
+
+\item \textbf{[Repeat]} We repeat steps 1-2 for the other list. I.e., we take medians of \Y\ and  merge ($\blockSize$ copies of) them with \X. After this step, we hold two lists $\lzero' \merge \lone,\lzero \merge \lone'$ of length $2\llength$ that are \emph{aligned} (see \Cref{lemma:alignment} in \Cref{sec:ourapproachtwoalignment}). In particular, the $2\numBlocks$ medians of the two lists coincide and they are in fact the medians $\lzero'$ and $\lone'$. Thus, we have the guarantee that the medians $Y'=\med(Y, \numBlocks)$, (respectively $ X'=\med(X, \numBlocks)$) will be in the correct location of $\lzero \merge \lone'$, (respectively $\lzero' \merge \lone$). This guarantee is not trivial to see but allows us to recurse in the next step.
+
+\item \textbf{[Recurse]} We now split both lists into 
+$2\numBlocks$
+%$2B=\frac{2\llength}{\numBlocks}$ 
+blocks of length $\frac{n}{\numBlocks} = n^{\frac{2}{3}}$ and merge them separately (i.e., we merge the first block from the first list with the first block from the second list, etc.). We recursively invoke steps 1-4. It suffices to make $O(\log\log n)$ calls (see bottom of this section for explanation) until our blocks are of constant size, at which point we use a na\"ive protocol for the base case.
+
+\item \textbf{[Reconstruct]} We now concatenate outputs from step 4. Note that at each of the $O(\log\log\llength)$ recursive steps, we double the list size by inserting dummy medians to each list and then double it again when we merge the lists. I.e., the list is now of length $\llength\cdot 2^{O(\log\log \llength)} = n \cdot \mathrm{polylog}\ n$. We need to remove all the extra (all but $2\llength$) dummy elements from the merged list. We use an \emph{extraction} technique of \cite{EPRINT:PRRS23,EPRINT:BBDLO22}. I.e., whenever we insert the copies of the medians in Step \ref{step:insertdummies}, we mark them as dummies. We now extract (in order) the elements not marked as dummies to get the merged list. 
+
+\end{enumerate}
+
+\noindent
+We note that this protocol shares some similarities to Protocol 1 of \cite{EPRINT:BBDLO22} in that both protocols use \Cref{lemma:alignment} to first align the lists. However, apart from this alignment, our protocols deviate significantly. Our approach, as described above, uses relatively large blocks ($n^{\frac{2}{3}}$ size) and a recursive structure to merge the lists. In contrast, \cite{EPRINT:BBDLO22} uses extremely small blocks ($\log\log n$ size), which can directly be merged using \cite{CSCML:FalNemOst22}, with no recursion. However, this approach requires a $O(n)$ time subprotocol for merging $k=n/\log\log n$ medians with a size $n$ list. \cite{CSCML:FalNemOst22} achieved the desired asymptotics through a series of complex (and intriguing) protocols. However, the complexity of their subprotocols results in a significantly higher round complexity as detailed in Section \ref{sec:eval}.
+
+We now explain at a high level why \ourapproachtwo\ runs in $O(\llength\log^c\llength)$ time and communication and uses $O(\log\log\llength)$ rounds.
+
+\paragraph{Rounds.} We require $O(\log\log\llength)$ recursive calls to make the subproblems constant size. This is because the subproblem sizes in each recursive call reduces in size by a factor of $\frac{2}{3}$ in the exponent. Therefore, the size of the subproblems in the $i$th recursive call is $n^{\left(\frac{2}{3}\right)^i}$. Each recursive call requires $O(1)$ rounds. The value of $i$ required for this to be a constant is $c \log \log \llength = O(\log\log\llength)$, where $c = \log_{\frac{3}{2}}2$. Hence, we use a total of $O(\log\log\llength)$ rounds.
+
+\paragraph{Time and Communication.} At first look, each recursive step has a linear cost (in the length of the list) and we have $O(\log\log\llength)$ steps. Thus, we would expect $O(\llength\log\log\llength)$ time and communication. But the total size of the subproblems doubles at each step, resulting in $O(\llength\cdot\mathrm{polylog}\ \llength)$. Specifically, since we make at most $c\log\log\llength$ recursive calls and each recursive step has a linear cost (in the length of the list), the time and communication is$$O\left(\sum_{i = 0}^{c\log\log\llength-1}2^{i} \cdot \llength\right) = O\left(n \cdot 2^{c\log\log\llength}\right) = O(\llength\log^c\llength)$$where $c = \log_{\frac{3}{2}}2$ as before.
+
+\iffalse
+\quad We now show that $\log\log\llength$ recursive calls suffices. At each call, the subproblem size reduces to $\llength^{\frac{2}{3}}$. After $\log\log\llength$ steps, the size is $\llength^{\frac{2}{3}\log\log\llength}$, which we show is a constant. Clearly, $\frac{2}{3}$ can be expressed as $\frac{1}{c}$ and $O(\frac{1}{c}^{\log\log\llength}) = O(\frac{1}{\log\llength})$. Now, $O(\llength^{\frac{1}{\log\llength}})$ is a constant.
+\stan{Someone please check}
+\fi
+
+\subsection{\sqrtmerge\ High Level Explanation}\label{sec:sqrtmergeoverview}
+
+This protocol is designed for input lists of sizes $n^{\frac{1}{2}}$ and $n$. 
+Like \ourprotocoltwo, \sqrtmergeprotocol\ is closely inspired by Valiant's \cite{JC:Val75} plaintext medians-based approach and the secure merge of \cite{EPRINT:BBDLO22}. Unlike \ourprotocoltwo, it is not a recursive protocol.
+At a high level, we split \Y\ into evenly spaced blocks, find and extract for each $\X_i$ a block $\Y_j$ into which $\X_i$ goes, compute the position of $\X_i$ in that block, and then extrapolate the position to the full merged list. We now present in more detail.
+
+\begin{itemize}
+    \item \textbf{[Find]} We first split \Y\ into evenly-spaced same-size blocks. More specifically, we find $k=n^{\frac{1}{2}}$ medians of \Y\ with \med. These medians partition \Y\ into $k$ blocks of size $k$. We next find into which block of \Y\ each element of \X\ goes. This can be done in linear time by performing $k^2 = n$ secure comparisons.
+    \item \textbf{[Extract]} Now that we found the blocks, we want to extract them for each $\X_i$. The challenge is that multiple $\X_i$ can go into the same block $\Y_j$. 
+    This information must remain oblivious. Our solution once again relies on \cite{CCS:BDGRR22}'s aggregation trees. 
+    First, we extract for each $\X_i$ a single block. This block is either a real block $\Y_j$\footnote{Note that $j$ can differ from $i$.} or a dummy all-zero block $D_i$. We extract $D_i$ if and only if some previous $\X_{<i}$ already extracted the real block $\Y_j$. In other words, we extract $\Y_j$ only for the smallest $\X_i$ that goes into it; otherwise we extract $D_i$.
+    This step is simple. We mark for each $\X_i$ either the $\Y_j$ or the $D_i$ we want to extract, shuffle $\Y || D$ together, reveal the marks in the clear, and then extract \emph{in order} the marked blocks. 
+    The challenge now is to replace the dummy $D_i$ with the real $\Y_j$. This is where we use \emph{prefix} aggregation trees. They replace all $D_{>i}$ following the closest previous $Y_j$ with $Y_j$. Note that all $D_{>i}$ between the $\Y_j$ and the next $\Y_{j+1}$ should be replaced with $\Y_j$. This is because the lists are ordered, and hence all elements of \X\ between the extracted $\Y_j$ and $\Y_{i+j}$ go into the same block $\Y_j$.
+    \item \textbf{[Find]} Now that we extracted the correct block $Y_j$ for each $\X_i$, we find where $\X_i$ goes in that block. This can be done once again in linear time with $k^2 = n$ secure comparisons.
+    \item \textbf{[Extrapolate]} We now extrapolate to find out where all elements of \X\ and \Y\ go in $\X \merge \Y$. For \X\ this is simple. We know (1) the position of $\X_i$ in its block $\Y_j$, (2) $i$ elements of \X\ come before $\X_i$, and through straightforward housekeeping we learn, and (3) the number of blocks of $\Y$ before $\Y_j$. Summing these will yield the final positions of all $\X_i$. For \Y, this is more complex as we need to consolidate the positions of different $\X_i$ across possibly multiple copies of the same $\Y_j$. We can do that once again with aggregation trees. We use a \emph{suffix} aggregation tree to compute a list that is non-zero only at the indices in $\Y_j$ where elements of \X\ are inserted. I.e., the non-zero entries can be viewed as offsets resulting from $\X_i$ being merged into the block $\Y_j$. Importantly, these offsets include all elements of \X\ that go into $\Y_j$. At this point, we know where all elements of \X\ go in the extracted blocks. Now, if we can place the extracted blocks with offsets into their initial position in \Y\ and set the remaining unextracted offsets to zeros (i.e., no $\X_i$ goes in them), we can do a (1) simple prefix sum and (2) add in $j$, the number of $\Y_{<j}$ to get the final positions of \Y\ in $\X \merge \Y$. This can be simply achieved by reversing the block extraction process. I.e., we simply unshuffle the extracted blocks. Now that we know the final positions of all $\X_i$ and $\Y_i$ in $\X \merge \Y$, constructing the merging permutation is straightforward.
+    
+
+\end{itemize}
+
+
+% $k=n^{\frac{1}{2}}$ blocks of size $k$ and find out to which block $S_i$ each element of \X\ belongs. This can be done with $k^2 = n$ secure comparisons. We next use aggregation trees \cite{CCS:BDGRR22} to extract this block $S_i$ for each $\X_i$. This step runs in $O(\llength)$ time and $O(\log\llength)$ rounds. We next compare each $\X_i$ with all $k$ elements in $S_i$ to find out where in the block $S_i$ the element $X_i$ goes. This is once again a linear operation. We now account for the blocks that were not extracted to compute the final indices of \lzero\ and \lone. For \lzero, it is straightforward. For \lone, it is more complex as we can have multiple copies of the same block. We use aggregation trees once again to compute the final indices of \lone. We then output a permutation computed from the indices. 
+
+%\medskip
+
+%\noindent We now explain at a high level why \sqrtmergeprotocol\ runs in $O(n)$ time and communication and uses $O(\log n)$ rounds.
+
+\paragraph{Rounds.} The only building block that does not run in $O(1)$ rounds is an aggregation tree, which runs in $O(\log n)$ rounds. We execute aggregation trees twice; \sqrtmergeprotocol\ runs in $O(\log n)$ rounds.
+
+\paragraph{Time and Communication.} We perform secure comparisons to (1) find the block $\Y_j$ for each $\X_i$ and to (2) find where each $\X_i$ goes in $\Y_j$. Both steps require $k^2=n$ comparisons, and thus are linear. We also execute aggregation trees twice and (un)shuffle \cite{EPRINT:PRRS23}, which are both $O(n)$. The remaining primitives are straightforward. All building blocks are $O(n)$, hence \sqrtmergeprotocol\ is $O(n)$.

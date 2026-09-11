@@ -1,0 +1,1197 @@
+START local 8 balanced logstar 0
+DONE local 8 balanced logstar 0 elapsed_s 0.38 offline_ms 340.419 online_ms 2.813 rss_MiB 0.0
+START local 8 balanced median 0
+DONE local 8 balanced median 0 elapsed_s 0.38 offline_ms 348.577 online_ms 3.371 rss_MiB 0.0
+START local 8 balanced batcher 0
+DONE local 8 balanced batcher 0 elapsed_s 0.1 offline_ms 67.157 online_ms 2.05 rss_MiB 0.0
+START local 8 balanced quick 0
+DONE local 8 balanced quick 0 elapsed_s 0.24 offline_ms 217.589 online_ms 0.589 rss_MiB 0.0
+START local 8 cube cube 0
+DONE local 8 cube cube 0 elapsed_s 0.16 offline_ms 131.667 online_ms 0.903 rss_MiB 0.0
+START local 8 cube batcher 0
+DONE local 8 cube batcher 0 elapsed_s 0.08 offline_ms 50.16 online_ms 1.846 rss_MiB 0.0
+START local 8 cube quick 0
+DONE local 8 cube quick 0 elapsed_s 0.22 offline_ms 193.33 online_ms 0.484 rss_MiB 0.0
+START local 8 sqrt sqrt 0
+DONE local 8 sqrt sqrt 0 elapsed_s 0.2 offline_ms 162.77 online_ms 2.028 rss_MiB 0.0
+START local 8 sqrt batcher 0
+DONE local 8 sqrt batcher 0 elapsed_s 0.08 offline_ms 49.514 online_ms 1.944 rss_MiB 0.0
+START local 8 sqrt quick 0
+DONE local 8 sqrt quick 0 elapsed_s 0.23 offline_ms 205.388 online_ms 0.467 rss_MiB 0.0
+START local 8 balanced logstar 1
+DONE local 8 balanced logstar 1 elapsed_s 0.37 offline_ms 327.84 online_ms 3.836 rss_MiB 0.0
+START local 8 sqrt quick 1
+DONE local 8 sqrt quick 1 elapsed_s 0.23 offline_ms 204.103 online_ms 0.456 rss_MiB 0.0
+START local 8 sqrt batcher 1
+DONE local 8 sqrt batcher 1 elapsed_s 0.08 offline_ms 51.633 online_ms 1.752 rss_MiB 0.0
+START local 8 sqrt sqrt 1
+DONE local 8 sqrt sqrt 1 elapsed_s 0.16 offline_ms 138.735 online_ms 1.938 rss_MiB 0.0
+START local 8 cube quick 1
+DONE local 8 cube quick 1 elapsed_s 0.22 offline_ms 192.449 online_ms 0.524 rss_MiB 0.0
+START local 8 cube batcher 1
+DONE local 8 cube batcher 1 elapsed_s 0.08 offline_ms 49.818 online_ms 1.953 rss_MiB 0.0
+START local 8 cube cube 1
+DONE local 8 cube cube 1 elapsed_s 0.16 offline_ms 133.027 online_ms 1.199 rss_MiB 0.0
+START local 8 balanced quick 1
+DONE local 8 balanced quick 1 elapsed_s 0.27 offline_ms 236.497 online_ms 0.616 rss_MiB 0.0
+START local 8 balanced batcher 1
+DONE local 8 balanced batcher 1 elapsed_s 0.08 offline_ms 55.804 online_ms 1.881 rss_MiB 0.0
+START local 8 balanced median 1
+DONE local 8 balanced median 1 elapsed_s 0.37 offline_ms 344.573 online_ms 3.274 rss_MiB 0.0
+START local 8 balanced batcher 2
+DONE local 8 balanced batcher 2 elapsed_s 0.1 offline_ms 65.23 online_ms 2.127 rss_MiB 0.0
+START local 8 balanced quick 2
+DONE local 8 balanced quick 2 elapsed_s 0.28 offline_ms 244.032 online_ms 0.682 rss_MiB 0.0
+START local 8 cube cube 2
+DONE local 8 cube cube 2 elapsed_s 0.16 offline_ms 130.809 online_ms 1.172 rss_MiB 0.0
+START local 8 cube batcher 2
+DONE local 8 cube batcher 2 elapsed_s 0.08 offline_ms 49.185 online_ms 2.2 rss_MiB 0.0
+START local 8 cube quick 2
+DONE local 8 cube quick 2 elapsed_s 0.22 offline_ms 193.653 online_ms 0.447 rss_MiB 0.0
+START local 8 sqrt sqrt 2
+DONE local 8 sqrt sqrt 2 elapsed_s 0.17 offline_ms 138.316 online_ms 1.994 rss_MiB 0.0
+START local 8 sqrt batcher 2
+DONE local 8 sqrt batcher 2 elapsed_s 0.11 offline_ms 73.623 online_ms 1.789 rss_MiB 0.0
+START local 8 sqrt quick 2
+DONE local 8 sqrt quick 2 elapsed_s 0.23 offline_ms 203.477 online_ms 0.495 rss_MiB 0.0
+START local 8 balanced logstar 2
+DONE local 8 balanced logstar 2 elapsed_s 0.36 offline_ms 322.4 online_ms 3.85 rss_MiB 0.0
+START local 8 balanced median 2
+DONE local 8 balanced median 2 elapsed_s 0.4 offline_ms 349.4 online_ms 3.14 rss_MiB 0.0
+START local 9 balanced logstar 0
+DONE local 9 balanced logstar 0 elapsed_s 0.39 offline_ms 354.92 online_ms 3.214 rss_MiB 0.0
+START local 9 balanced median 0
+DONE local 9 balanced median 0 elapsed_s 0.49 offline_ms 455.031 online_ms 3.91 rss_MiB 0.0
+START local 9 balanced batcher 0
+DONE local 9 balanced batcher 0 elapsed_s 0.12 offline_ms 98.148 online_ms 2.234 rss_MiB 0.0
+START local 9 balanced quick 0
+DONE local 9 balanced quick 0 elapsed_s 0.31 offline_ms 281.63 online_ms 1.134 rss_MiB 0.0
+START local 9 cube cube 0
+DONE local 9 cube cube 0 elapsed_s 0.18 offline_ms 147.907 online_ms 1.936 rss_MiB 0.0
+START local 9 cube batcher 0
+DONE local 9 cube batcher 0 elapsed_s 0.09 offline_ms 59.687 online_ms 2.686 rss_MiB 0.0
+START local 9 cube quick 0
+DONE local 9 cube quick 0 elapsed_s 0.28 offline_ms 245.947 online_ms 0.761 rss_MiB 0.0
+START local 9 sqrt sqrt 0
+DONE local 9 sqrt sqrt 0 elapsed_s 0.19 offline_ms 153.638 online_ms 1.851 rss_MiB 0.0
+START local 9 sqrt batcher 0
+DONE local 9 sqrt batcher 0 elapsed_s 0.1 offline_ms 67.785 online_ms 2.298 rss_MiB 0.0
+START local 9 sqrt quick 0
+DONE local 9 sqrt quick 0 elapsed_s 0.26 offline_ms 222.541 online_ms 0.661 rss_MiB 0.0
+START local 9 balanced logstar 1
+DONE local 9 balanced logstar 1 elapsed_s 0.44 offline_ms 386.361 online_ms 3.15 rss_MiB 0.0
+START local 9 sqrt quick 1
+DONE local 9 sqrt quick 1 elapsed_s 0.25 offline_ms 220.993 online_ms 0.803 rss_MiB 0.0
+START local 9 sqrt batcher 1
+DONE local 9 sqrt batcher 1 elapsed_s 0.1 offline_ms 68.508 online_ms 2.291 rss_MiB 0.0
+START local 9 sqrt sqrt 1
+DONE local 9 sqrt sqrt 1 elapsed_s 0.19 offline_ms 160.18 online_ms 3.501 rss_MiB 0.0
+START local 9 cube quick 1
+DONE local 9 cube quick 1 elapsed_s 0.29 offline_ms 260.586 online_ms 0.77 rss_MiB 0.0
+START local 9 cube batcher 1
+DONE local 9 cube batcher 1 elapsed_s 0.08 offline_ms 56.449 online_ms 1.659 rss_MiB 0.0
+START local 9 cube cube 1
+DONE local 9 cube cube 1 elapsed_s 0.19 offline_ms 148.691 online_ms 2.807 rss_MiB 0.0
+START local 9 balanced quick 1
+DONE local 9 balanced quick 1 elapsed_s 0.33 offline_ms 284.608 online_ms 0.983 rss_MiB 0.0
+START local 9 balanced batcher 1
+DONE local 9 balanced batcher 1 elapsed_s 0.14 offline_ms 108.194 online_ms 2.868 rss_MiB 0.0
+START local 9 balanced median 1
+DONE local 9 balanced median 1 elapsed_s 0.51 offline_ms 467.392 online_ms 3.528 rss_MiB 0.0
+START local 9 balanced batcher 2
+DONE local 9 balanced batcher 2 elapsed_s 0.13 offline_ms 90.458 online_ms 2.266 rss_MiB 0.0
+START local 9 balanced quick 2
+DONE local 9 balanced quick 2 elapsed_s 0.32 offline_ms 276.987 online_ms 1.11 rss_MiB 0.0
+START local 9 cube cube 2
+DONE local 9 cube cube 2 elapsed_s 0.18 offline_ms 152.367 online_ms 1.474 rss_MiB 0.0
+START local 9 cube batcher 2
+DONE local 9 cube batcher 2 elapsed_s 0.1 offline_ms 63.476 online_ms 1.837 rss_MiB 0.0
+START local 9 cube quick 2
+DONE local 9 cube quick 2 elapsed_s 0.24 offline_ms 219.938 online_ms 0.581 rss_MiB 0.0
+START local 9 sqrt sqrt 2
+DONE local 9 sqrt sqrt 2 elapsed_s 0.21 offline_ms 158.4 online_ms 2.772 rss_MiB 0.0
+START local 9 sqrt batcher 2
+DONE local 9 sqrt batcher 2 elapsed_s 0.11 offline_ms 64.83 online_ms 2.272 rss_MiB 0.0
+START local 9 sqrt quick 2
+DONE local 9 sqrt quick 2 elapsed_s 0.25 offline_ms 216.401 online_ms 0.631 rss_MiB 0.0
+START local 9 balanced logstar 2
+DONE local 9 balanced logstar 2 elapsed_s 0.39 offline_ms 342.72 online_ms 4.124 rss_MiB 0.0
+START local 9 balanced median 2
+DONE local 9 balanced median 2 elapsed_s 0.45 offline_ms 408.293 online_ms 3.619 rss_MiB 0.0
+START local 10 balanced logstar 0
+DONE local 10 balanced logstar 0 elapsed_s 0.45 offline_ms 398.664 online_ms 5.054 rss_MiB 0.0
+START local 10 balanced median 0
+DONE local 10 balanced median 0 elapsed_s 0.79 offline_ms 755.596 online_ms 7.64 rss_MiB 182.0
+START local 10 balanced batcher 0
+DONE local 10 balanced batcher 0 elapsed_s 0.16 offline_ms 127.967 online_ms 3.476 rss_MiB 0.0
+START local 10 balanced quick 0
+DONE local 10 balanced quick 0 elapsed_s 0.44 offline_ms 395.482 online_ms 1.653 rss_MiB 0.0
+START local 10 cube cube 0
+DONE local 10 cube cube 0 elapsed_s 0.2 offline_ms 166.542 online_ms 1.628 rss_MiB 0.0
+START local 10 cube batcher 0
+DONE local 10 cube batcher 0 elapsed_s 0.11 offline_ms 80.604 online_ms 1.808 rss_MiB 0.0
+START local 10 cube quick 0
+DONE local 10 cube quick 0 elapsed_s 0.32 offline_ms 288.081 online_ms 1.043 rss_MiB 0.0
+START local 10 sqrt sqrt 0
+DONE local 10 sqrt sqrt 0 elapsed_s 0.21 offline_ms 173.473 online_ms 1.845 rss_MiB 0.0
+START local 10 sqrt batcher 0
+DONE local 10 sqrt batcher 0 elapsed_s 0.12 offline_ms 86.335 online_ms 4.425 rss_MiB 0.0
+START local 10 sqrt quick 0
+DONE local 10 sqrt quick 0 elapsed_s 0.34 offline_ms 295.449 online_ms 1.298 rss_MiB 0.0
+START local 10 balanced logstar 1
+DONE local 10 balanced logstar 1 elapsed_s 0.45 offline_ms 405.246 online_ms 3.204 rss_MiB 0.0
+START local 10 sqrt quick 1
+DONE local 10 sqrt quick 1 elapsed_s 0.33 offline_ms 296.81 online_ms 1.119 rss_MiB 0.0
+START local 10 sqrt batcher 1
+DONE local 10 sqrt batcher 1 elapsed_s 0.13 offline_ms 94.519 online_ms 1.966 rss_MiB 0.0
+START local 10 sqrt sqrt 1
+DONE local 10 sqrt sqrt 1 elapsed_s 0.22 offline_ms 181.176 online_ms 1.72 rss_MiB 0.0
+START local 10 cube quick 1
+DONE local 10 cube quick 1 elapsed_s 0.33 offline_ms 300.775 online_ms 1.217 rss_MiB 0.0
+START local 10 cube batcher 1
+DONE local 10 cube batcher 1 elapsed_s 0.11 offline_ms 79.271 online_ms 1.327 rss_MiB 0.0
+START local 10 cube cube 1
+DONE local 10 cube cube 1 elapsed_s 0.2 offline_ms 167.793 online_ms 1.76 rss_MiB 0.0
+START local 10 balanced quick 1
+DONE local 10 balanced quick 1 elapsed_s 0.44 offline_ms 406.933 online_ms 1.785 rss_MiB 0.0
+START local 10 balanced batcher 1
+DONE local 10 balanced batcher 1 elapsed_s 0.16 offline_ms 129.341 online_ms 2.399 rss_MiB 0.0
+START local 10 balanced median 1
+DONE local 10 balanced median 1 elapsed_s 0.82 offline_ms 767.567 online_ms 8.435 rss_MiB 181.2
+START local 10 balanced batcher 2
+DONE local 10 balanced batcher 2 elapsed_s 0.18 offline_ms 145.71 online_ms 2.859 rss_MiB 0.0
+START local 10 balanced quick 2
+DONE local 10 balanced quick 2 elapsed_s 0.45 offline_ms 424.503 online_ms 2.118 rss_MiB 0.0
+START local 10 cube cube 2
+DONE local 10 cube cube 2 elapsed_s 0.2 offline_ms 172.342 online_ms 1.448 rss_MiB 0.0
+START local 10 cube batcher 2
+DONE local 10 cube batcher 2 elapsed_s 0.1 offline_ms 78.714 online_ms 1.336 rss_MiB 0.0
+START local 10 cube quick 2
+DONE local 10 cube quick 2 elapsed_s 0.31 offline_ms 281.276 online_ms 1.116 rss_MiB 0.0
+START local 10 sqrt sqrt 2
+DONE local 10 sqrt sqrt 2 elapsed_s 0.21 offline_ms 174.128 online_ms 1.861 rss_MiB 0.0
+START local 10 sqrt batcher 2
+DONE local 10 sqrt batcher 2 elapsed_s 0.12 offline_ms 85.695 online_ms 2.259 rss_MiB 0.0
+START local 10 sqrt quick 2
+DONE local 10 sqrt quick 2 elapsed_s 0.32 offline_ms 283.898 online_ms 1.163 rss_MiB 0.0
+START local 10 balanced logstar 2
+DONE local 10 balanced logstar 2 elapsed_s 0.47 offline_ms 417.077 online_ms 4.361 rss_MiB 0.0
+START local 10 balanced median 2
+DONE local 10 balanced median 2 elapsed_s 0.83 offline_ms 802.369 online_ms 8.305 rss_MiB 181.2
+START local 11 balanced logstar 0
+DONE local 11 balanced logstar 0 elapsed_s 0.69 offline_ms 643.438 online_ms 4.48 rss_MiB 196.7
+START local 11 balanced median 0
+DONE local 11 balanced median 0 elapsed_s 1.71 offline_ms 1432.944 online_ms 14.365 rss_MiB 217.2
+START local 11 balanced batcher 0
+DONE local 11 balanced batcher 0 elapsed_s 0.25 offline_ms 218.41 online_ms 3.295 rss_MiB 0.0
+START local 11 balanced quick 0
+DONE local 11 balanced quick 0 elapsed_s 0.75 offline_ms 711.375 online_ms 3.176 rss_MiB 116.1
+START local 11 cube cube 0
+DONE local 11 cube cube 0 elapsed_s 0.23 offline_ms 210.777 online_ms 1.466 rss_MiB 0.0
+START local 11 cube batcher 0
+DONE local 11 cube batcher 0 elapsed_s 0.16 offline_ms 112.501 online_ms 2.002 rss_MiB 0.0
+START local 11 cube quick 0
+DONE local 11 cube quick 0 elapsed_s 0.45 offline_ms 423.121 online_ms 1.514 rss_MiB 0.0
+START local 11 sqrt sqrt 0
+DONE local 11 sqrt sqrt 0 elapsed_s 0.31 offline_ms 258.053 online_ms 3.563 rss_MiB 0.0
+START local 11 sqrt batcher 0
+DONE local 11 sqrt batcher 0 elapsed_s 0.18 offline_ms 132.282 online_ms 2.169 rss_MiB 0.0
+START local 11 sqrt quick 0
+DONE local 11 sqrt quick 0 elapsed_s 0.44 offline_ms 416.065 online_ms 1.799 rss_MiB 0.0
+START local 11 balanced logstar 1
+DONE local 11 balanced logstar 1 elapsed_s 0.63 offline_ms 583.238 online_ms 5.324 rss_MiB 197.7
+START local 11 sqrt quick 1
+DONE local 11 sqrt quick 1 elapsed_s 0.51 offline_ms 467.293 online_ms 1.7 rss_MiB 0.0
+START local 11 sqrt batcher 1
+DONE local 11 sqrt batcher 1 elapsed_s 0.14 offline_ms 114.435 online_ms 1.878 rss_MiB 0.0
+START local 11 sqrt sqrt 1
+DONE local 11 sqrt sqrt 1 elapsed_s 0.28 offline_ms 246.16 online_ms 1.736 rss_MiB 0.0
+START local 11 cube quick 1
+DONE local 11 cube quick 1 elapsed_s 0.44 offline_ms 406.031 online_ms 1.793 rss_MiB 0.0
+START local 11 cube batcher 1
+DONE local 11 cube batcher 1 elapsed_s 0.16 offline_ms 107.167 online_ms 2.375 rss_MiB 0.0
+START local 11 cube cube 1
+DONE local 11 cube cube 1 elapsed_s 0.24 offline_ms 199.067 online_ms 1.52 rss_MiB 0.0
+START local 11 balanced quick 1
+DONE local 11 balanced quick 1 elapsed_s 0.7 offline_ms 673.801 online_ms 3.113 rss_MiB 116.4
+START local 11 balanced batcher 1
+DONE local 11 balanced batcher 1 elapsed_s 0.27 offline_ms 236.877 online_ms 3.446 rss_MiB 0.0
+START local 11 balanced median 1
+DONE local 11 balanced median 1 elapsed_s 1.75 offline_ms 1466.446 online_ms 15.56 rss_MiB 216.0
+START local 11 balanced batcher 2
+DONE local 11 balanced batcher 2 elapsed_s 0.26 offline_ms 229.662 online_ms 3.272 rss_MiB 0.0
+START local 11 balanced quick 2
+DONE local 11 balanced quick 2 elapsed_s 0.77 offline_ms 744.702 online_ms 3.584 rss_MiB 114.8
+START local 11 cube cube 2
+DONE local 11 cube cube 2 elapsed_s 0.24 offline_ms 202.371 online_ms 2.101 rss_MiB 0.0
+START local 11 cube batcher 2
+DONE local 11 cube batcher 2 elapsed_s 0.13 offline_ms 97.949 online_ms 2.622 rss_MiB 0.0
+START local 11 cube quick 2
+DONE local 11 cube quick 2 elapsed_s 0.47 offline_ms 438.387 online_ms 1.672 rss_MiB 0.0
+START local 11 sqrt sqrt 2
+DONE local 11 sqrt sqrt 2 elapsed_s 0.27 offline_ms 239.718 online_ms 2.155 rss_MiB 0.0
+START local 11 sqrt batcher 2
+DONE local 11 sqrt batcher 2 elapsed_s 0.13 offline_ms 107.761 online_ms 2.519 rss_MiB 0.0
+START local 11 sqrt quick 2
+DONE local 11 sqrt quick 2 elapsed_s 0.44 offline_ms 410.969 online_ms 1.765 rss_MiB 0.0
+START local 11 balanced logstar 2
+DONE local 11 balanced logstar 2 elapsed_s 0.63 offline_ms 577.798 online_ms 4.678 rss_MiB 197.7
+START local 11 balanced median 2
+DONE local 11 balanced median 2 elapsed_s 1.63 offline_ms 1352.028 online_ms 13.554 rss_MiB 218.7
+START local 12 balanced logstar 0
+DONE local 12 balanced logstar 0 elapsed_s 1.12 offline_ms 1031.267 online_ms 7.811 rss_MiB 213.2
+START local 12 balanced median 0
+DONE local 12 balanced median 0 elapsed_s 1.73 offline_ms 1676.074 online_ms 19.666 rss_MiB 214.7
+START local 12 balanced batcher 0
+DONE local 12 balanced batcher 0 elapsed_s 0.47 offline_ms 434.184 online_ms 6.138 rss_MiB 0.0
+START local 12 balanced quick 0
+DONE local 12 balanced quick 0 elapsed_s 1.43 offline_ms 1384.507 online_ms 5.929 rss_MiB 128.3
+START local 12 cube cube 0
+DONE local 12 cube cube 0 elapsed_s 0.35 offline_ms 305.769 online_ms 2.087 rss_MiB 0.0
+START local 12 cube batcher 0
+DONE local 12 cube batcher 0 elapsed_s 0.18 offline_ms 147.871 online_ms 2.79 rss_MiB 0.0
+START local 12 cube quick 0
+DONE local 12 cube quick 0 elapsed_s 0.75 offline_ms 714.997 online_ms 3.173 rss_MiB 117.0
+START local 12 sqrt sqrt 0
+DONE local 12 sqrt sqrt 0 elapsed_s 0.37 offline_ms 328.716 online_ms 2.972 rss_MiB 0.0
+START local 12 sqrt batcher 0
+DONE local 12 sqrt batcher 0 elapsed_s 0.21 offline_ms 177.16 online_ms 3.049 rss_MiB 0.0
+START local 12 sqrt quick 0
+DONE local 12 sqrt quick 0 elapsed_s 0.78 offline_ms 744.952 online_ms 3.269 rss_MiB 117.0
+START local 12 balanced logstar 1
+DONE local 12 balanced logstar 1 elapsed_s 1.08 offline_ms 1029.716 online_ms 7.067 rss_MiB 200.7
+START local 12 sqrt quick 1
+DONE local 12 sqrt quick 1 elapsed_s 0.75 offline_ms 715.156 online_ms 3.209 rss_MiB 116.7
+START local 12 sqrt batcher 1
+DONE local 12 sqrt batcher 1 elapsed_s 0.21 offline_ms 171.195 online_ms 3.65 rss_MiB 0.0
+START local 12 sqrt sqrt 1
+DONE local 12 sqrt sqrt 1 elapsed_s 0.36 offline_ms 325.897 online_ms 2.944 rss_MiB 0.0
+START local 12 cube quick 1
+DONE local 12 cube quick 1 elapsed_s 0.75 offline_ms 717.448 online_ms 3.023 rss_MiB 117.0
+START local 12 cube batcher 1
+DONE local 12 cube batcher 1 elapsed_s 0.21 offline_ms 167.93 online_ms 2.844 rss_MiB 0.0
+START local 12 cube cube 1
+DONE local 12 cube cube 1 elapsed_s 0.31 offline_ms 280.369 online_ms 3.166 rss_MiB 0.0
+START local 12 balanced quick 1
+DONE local 12 balanced quick 1 elapsed_s 1.27 offline_ms 1229.926 online_ms 6.483 rss_MiB 130.8
+START local 12 balanced batcher 1
+DONE local 12 balanced batcher 1 elapsed_s 0.46 offline_ms 406.06 online_ms 6.956 rss_MiB 0.0
+START local 12 balanced median 1
+DONE local 12 balanced median 1 elapsed_s 1.73 offline_ms 1630.318 online_ms 17.731 rss_MiB 215.0
+START local 12 balanced batcher 2
+DONE local 12 balanced batcher 2 elapsed_s 0.53 offline_ms 478.853 online_ms 6.066 rss_MiB 72.6
+START local 12 balanced quick 2
+DONE local 12 balanced quick 2 elapsed_s 1.32 offline_ms 1279.383 online_ms 7.008 rss_MiB 130.1
+START local 12 cube cube 2
+DONE local 12 cube cube 2 elapsed_s 0.33 offline_ms 294.256 online_ms 2.142 rss_MiB 0.0
+START local 12 cube batcher 2
+DONE local 12 cube batcher 2 elapsed_s 0.18 offline_ms 145.324 online_ms 3.216 rss_MiB 0.0
+START local 12 cube quick 2
+DONE local 12 cube quick 2 elapsed_s 0.72 offline_ms 689.255 online_ms 3.26 rss_MiB 117.0
+START local 12 sqrt sqrt 2
+DONE local 12 sqrt sqrt 2 elapsed_s 0.4 offline_ms 356.318 online_ms 3.44 rss_MiB 0.0
+START local 12 sqrt batcher 2
+DONE local 12 sqrt batcher 2 elapsed_s 0.22 offline_ms 179.811 online_ms 3.678 rss_MiB 0.0
+START local 12 sqrt quick 2
+DONE local 12 sqrt quick 2 elapsed_s 0.78 offline_ms 753.21 online_ms 3.056 rss_MiB 116.5
+START local 12 balanced logstar 2
+DONE local 12 balanced logstar 2 elapsed_s 1.11 offline_ms 1048.567 online_ms 7.237 rss_MiB 199.9
+START local 12 balanced median 2
+DONE local 12 balanced median 2 elapsed_s 1.65 offline_ms 1591.554 online_ms 17.69 rss_MiB 216.5
+START local 13 balanced logstar 0
+DONE local 13 balanced logstar 0 elapsed_s 1.47 offline_ms 1400.343 online_ms 11.362 rss_MiB 203.2
+START local 13 balanced median 0
+DONE local 13 balanced median 0 elapsed_s 3.13 offline_ms 3035.559 online_ms 28.698 rss_MiB 244.0
+START local 13 balanced batcher 0
+DONE local 13 balanced batcher 0 elapsed_s 0.89 offline_ms 842.942 online_ms 10.953 rss_MiB 123.6
+START local 13 balanced quick 0
+DONE local 13 balanced quick 0 elapsed_s 2.51 offline_ms 2466.79 online_ms 13.011 rss_MiB 162.1
+START local 13 cube cube 0
+DONE local 13 cube cube 0 elapsed_s 0.43 offline_ms 393.636 online_ms 3.794 rss_MiB 0.0
+START local 13 cube batcher 0
+DONE local 13 cube batcher 0 elapsed_s 0.28 offline_ms 244.551 online_ms 4.501 rss_MiB 0.0
+START local 13 cube quick 0
+DONE local 13 cube quick 0 elapsed_s 1.37 offline_ms 1326.768 online_ms 6.082 rss_MiB 132.4
+START local 13 sqrt sqrt 0
+DONE local 13 sqrt sqrt 0 elapsed_s 0.52 offline_ms 485.791 online_ms 5.137 rss_MiB 48.4
+START local 13 sqrt batcher 0
+DONE local 13 sqrt batcher 0 elapsed_s 0.41 offline_ms 366.61 online_ms 4.827 rss_MiB 0.0
+START local 13 sqrt quick 0
+DONE local 13 sqrt quick 0 elapsed_s 1.42 offline_ms 1386.8 online_ms 6.648 rss_MiB 132.1
+START local 13 balanced logstar 1
+DONE local 13 balanced logstar 1 elapsed_s 1.48 offline_ms 1436.943 online_ms 10.381 rss_MiB 203.3
+START local 13 sqrt quick 1
+DONE local 13 sqrt quick 1 elapsed_s 1.43 offline_ms 1391.069 online_ms 6.198 rss_MiB 131.6
+START local 13 sqrt batcher 1
+DONE local 13 sqrt batcher 1 elapsed_s 0.39 offline_ms 323.848 online_ms 4.407 rss_MiB 0.0
+START local 13 sqrt sqrt 1
+DONE local 13 sqrt sqrt 1 elapsed_s 0.55 offline_ms 514.378 online_ms 4.819 rss_MiB 181.3
+START local 13 cube quick 1
+DONE local 13 cube quick 1 elapsed_s 1.39 offline_ms 1355.523 online_ms 6.906 rss_MiB 132.1
+START local 13 cube batcher 1
+DONE local 13 cube batcher 1 elapsed_s 0.3 offline_ms 258.124 online_ms 4.472 rss_MiB 0.0
+START local 13 cube cube 1
+DONE local 13 cube cube 1 elapsed_s 0.44 offline_ms 410.309 online_ms 3.258 rss_MiB 0.0
+START local 13 balanced quick 1
+DONE local 13 balanced quick 1 elapsed_s 2.57 offline_ms 2520.504 online_ms 13.49 rss_MiB 161.1
+START local 13 balanced batcher 1
+DONE local 13 balanced batcher 1 elapsed_s 0.91 offline_ms 861.083 online_ms 10.186 rss_MiB 123.6
+START local 13 balanced median 1
+DONE local 13 balanced median 1 elapsed_s 3.03 offline_ms 2956.105 online_ms 28.998 rss_MiB 248.3
+START local 13 balanced batcher 2
+DONE local 13 balanced batcher 2 elapsed_s 0.99 offline_ms 933.082 online_ms 10.694 rss_MiB 122.9
+START local 13 balanced quick 2
+DONE local 13 balanced quick 2 elapsed_s 2.83 offline_ms 2778.327 online_ms 13.383 rss_MiB 156.6
+START local 13 cube cube 2
+DONE local 13 cube cube 2 elapsed_s 0.48 offline_ms 434.622 online_ms 3.011 rss_MiB 0.0
+START local 13 cube batcher 2
+DONE local 13 cube batcher 2 elapsed_s 0.3 offline_ms 259.541 online_ms 3.83 rss_MiB 0.0
+START local 13 cube quick 2
+DONE local 13 cube quick 2 elapsed_s 1.49 offline_ms 1452.347 online_ms 6.977 rss_MiB 130.6
+START local 13 sqrt sqrt 2
+DONE local 13 sqrt sqrt 2 elapsed_s 0.59 offline_ms 532.318 online_ms 5.06 rss_MiB 180.8
+START local 13 sqrt batcher 2
+DONE local 13 sqrt batcher 2 elapsed_s 0.43 offline_ms 362.555 online_ms 4.911 rss_MiB 0.0
+START local 13 sqrt quick 2
+DONE local 13 sqrt quick 2 elapsed_s 1.5 offline_ms 1467.031 online_ms 6.882 rss_MiB 130.4
+START local 13 balanced logstar 2
+DONE local 13 balanced logstar 2 elapsed_s 1.55 offline_ms 1504.888 online_ms 11.856 rss_MiB 201.3
+START local 13 balanced median 2
+DONE local 13 balanced median 2 elapsed_s 3.07 offline_ms 2978.574 online_ms 28.873 rss_MiB 245.9
+START local 14 balanced logstar 0
+DONE local 14 balanced logstar 0 elapsed_s 2.56 offline_ms 2497.21 online_ms 18.076 rss_MiB 252.9
+START local 14 balanced median 0
+DONE local 14 balanced median 0 elapsed_s 5.76 offline_ms 5650.139 online_ms 60.659 rss_MiB 365.6
+START local 14 balanced batcher 0
+DONE local 14 balanced batcher 0 elapsed_s 1.93 offline_ms 1857.465 online_ms 21.676 rss_MiB 155.6
+START local 14 balanced quick 0
+DONE local 14 balanced quick 0 elapsed_s 5.51 offline_ms 5429.4 online_ms 28.484 rss_MiB 238.5
+START local 14 cube cube 0
+DONE local 14 cube cube 0 elapsed_s 0.75 offline_ms 663.389 online_ms 4.948 rss_MiB 182.4
+START local 14 cube batcher 0
+DONE local 14 cube batcher 0 elapsed_s 0.54 offline_ms 499.949 online_ms 7.139 rss_MiB 118.3
+START local 14 cube quick 0
+DONE local 14 cube quick 0 elapsed_s 2.92 offline_ms 2856.016 online_ms 14.641 rss_MiB 169.8
+START local 14 sqrt sqrt 0
+DONE local 14 sqrt sqrt 0 elapsed_s 0.89 offline_ms 825.84 online_ms 8.432 rss_MiB 182.3
+START local 14 sqrt batcher 0
+DONE local 14 sqrt batcher 0 elapsed_s 0.7 offline_ms 659.44 online_ms 7.751 rss_MiB 120.7
+START local 14 sqrt quick 0
+DONE local 14 sqrt quick 0 elapsed_s 2.82 offline_ms 2773.897 online_ms 14.817 rss_MiB 172.1
+START local 14 balanced logstar 1
+DONE local 14 balanced logstar 1 elapsed_s 2.68 offline_ms 2622.516 online_ms 19.412 rss_MiB 248.9
+START local 14 sqrt quick 1
+DONE local 14 sqrt quick 1 elapsed_s 3.06 offline_ms 2993.72 online_ms 13.046 rss_MiB 167.4
+START local 14 sqrt batcher 1
+DONE local 14 sqrt batcher 1 elapsed_s 0.83 offline_ms 795.11 online_ms 8.731 rss_MiB 119.2
+START local 14 sqrt sqrt 1
+DONE local 14 sqrt sqrt 1 elapsed_s 0.96 offline_ms 918.474 online_ms 8.054 rss_MiB 181.1
+START local 14 cube quick 1
+DONE local 14 cube quick 1 elapsed_s 3.06 offline_ms 3025.816 online_ms 14.534 rss_MiB 166.5
+START local 14 cube batcher 1
+DONE local 14 cube batcher 1 elapsed_s 0.54 offline_ms 506.604 online_ms 6.595 rss_MiB 118.4
+START local 14 cube cube 1
+DONE local 14 cube cube 1 elapsed_s 0.69 offline_ms 656.168 online_ms 5.269 rss_MiB 183.4
+START local 14 balanced quick 1
+DONE local 14 balanced quick 1 elapsed_s 5.24 offline_ms 5166.857 online_ms 28.326 rss_MiB 249.3
+START local 14 balanced batcher 1
+DONE local 14 balanced batcher 1 elapsed_s 2.06 offline_ms 1939.98 online_ms 21.754 rss_MiB 164.1
+START local 14 balanced median 1
+DONE local 14 balanced median 1 elapsed_s 5.89 offline_ms 5776.508 online_ms 62.618 rss_MiB 359.9
+START local 14 balanced batcher 2
+DONE local 14 balanced batcher 2 elapsed_s 1.99 offline_ms 1906.059 online_ms 22.442 rss_MiB 156.3
+START local 14 balanced quick 2
+DONE local 14 balanced quick 2 elapsed_s 5.28 offline_ms 5197.391 online_ms 30.497 rss_MiB 248.0
+START local 14 cube cube 2
+DONE local 14 cube cube 2 elapsed_s 0.73 offline_ms 692.353 online_ms 5.466 rss_MiB 182.4
+START local 14 cube batcher 2
+DONE local 14 cube batcher 2 elapsed_s 0.59 offline_ms 553.29 online_ms 6.702 rss_MiB 117.6
+START local 14 cube quick 2
+DONE local 14 cube quick 2 elapsed_s 2.93 offline_ms 2876.215 online_ms 17.216 rss_MiB 169.4
+START local 14 sqrt sqrt 2
+DONE local 14 sqrt sqrt 2 elapsed_s 0.91 offline_ms 859.739 online_ms 8.478 rss_MiB 182.6
+START local 14 sqrt batcher 2
+DONE local 14 sqrt batcher 2 elapsed_s 0.74 offline_ms 690.679 online_ms 9.769 rss_MiB 120.2
+START local 14 sqrt quick 2
+DONE local 14 sqrt quick 2 elapsed_s 3.1 offline_ms 3039.957 online_ms 13.812 rss_MiB 167.4
+START local 14 balanced logstar 2
+DONE local 14 balanced logstar 2 elapsed_s 2.69 offline_ms 2574.456 online_ms 19.266 rss_MiB 245.6
+START local 14 balanced median 2
+DONE local 14 balanced median 2 elapsed_s 5.75 offline_ms 5643.676 online_ms 62.064 rss_MiB 365.6
+START local 15 balanced logstar 0
+DONE local 15 balanced logstar 0 elapsed_s 5.2 offline_ms 5117.325 online_ms 38.087 rss_MiB 342.4
+START local 15 balanced median 0
+DONE local 15 balanced median 0 elapsed_s 14.39 offline_ms 14214.993 online_ms 125.709 rss_MiB 587.2
+START local 15 balanced batcher 0
+DONE local 15 balanced batcher 0 elapsed_s 4.58 offline_ms 4464.334 online_ms 48.642 rss_MiB 225.2
+START local 15 balanced quick 0
+DONE local 15 balanced quick 0 elapsed_s 12.46 offline_ms 12335.101 online_ms 80.838 rss_MiB 407.4
+START local 15 cube cube 0
+DONE local 15 cube cube 0 elapsed_s 1.38 offline_ms 1340.351 online_ms 10.971 rss_MiB 222.9
+START local 15 cube batcher 0
+DONE local 15 cube batcher 0 elapsed_s 1.15 offline_ms 1096.597 online_ms 12.299 rss_MiB 133.8
+START local 15 cube quick 0
+DONE local 15 cube quick 0 elapsed_s 6.06 offline_ms 5988.545 online_ms 30.803 rss_MiB 261.3
+START local 15 sqrt sqrt 0
+DONE local 15 sqrt sqrt 0 elapsed_s 1.59 offline_ms 1531.728 online_ms 14.585 rss_MiB 229.4
+START local 15 sqrt batcher 0
+DONE local 15 sqrt batcher 0 elapsed_s 1.34 offline_ms 1292.339 online_ms 15.502 rss_MiB 140.5
+START local 15 sqrt quick 0
+DONE local 15 sqrt quick 0 elapsed_s 6.37 offline_ms 6300.666 online_ms 36.495 rss_MiB 266.5
+START local 15 balanced logstar 1
+DONE local 15 balanced logstar 1 elapsed_s 5.25 offline_ms 5171.53 online_ms 37.756 rss_MiB 362.4
+START local 15 sqrt quick 1
+DONE local 15 sqrt quick 1 elapsed_s 5.9 offline_ms 5836.347 online_ms 29.918 rss_MiB 266.1
+START local 15 sqrt batcher 1
+DONE local 15 sqrt batcher 1 elapsed_s 1.45 offline_ms 1380.719 online_ms 17.482 rss_MiB 138.5
+START local 15 sqrt sqrt 1
+DONE local 15 sqrt sqrt 1 elapsed_s 1.57 offline_ms 1509.073 online_ms 16.572 rss_MiB 222.6
+START local 15 cube quick 1
+DONE local 15 cube quick 1 elapsed_s 5.59 offline_ms 5519.483 online_ms 30.413 rss_MiB 260.1
+START local 15 cube batcher 1
+DONE local 15 cube batcher 1 elapsed_s 1.11 offline_ms 1043.929 online_ms 13.345 rss_MiB 134.3
+START local 15 cube cube 1
+DONE local 15 cube cube 1 elapsed_s 1.18 offline_ms 1134.823 online_ms 11.484 rss_MiB 226.4
+START local 15 balanced quick 1
+DONE local 15 balanced quick 1 elapsed_s 11.32 offline_ms 11211.274 online_ms 66.143 rss_MiB 405.9
+START local 15 balanced batcher 1
+DONE local 15 balanced batcher 1 elapsed_s 4.53 offline_ms 4413.935 online_ms 50.993 rss_MiB 226.9
+START local 15 balanced median 1
+DONE local 15 balanced median 1 elapsed_s 12.54 offline_ms 12360.112 online_ms 127.386 rss_MiB 604.3
+START local 15 balanced batcher 2
+DONE local 15 balanced batcher 2 elapsed_s 4.37 offline_ms 4266.341 online_ms 48.228 rss_MiB 228.4
+START local 15 balanced quick 2
+DONE local 15 balanced quick 2 elapsed_s 11.81 offline_ms 11693.362 online_ms 74.575 rss_MiB 407.4
+START local 15 cube cube 2
+DONE local 15 cube cube 2 elapsed_s 1.21 offline_ms 1158.352 online_ms 11.782 rss_MiB 226.7
+START local 15 cube batcher 2
+DONE local 15 cube batcher 2 elapsed_s 1.13 offline_ms 1088.566 online_ms 12.176 rss_MiB 133.9
+START local 15 cube quick 2
+DONE local 15 cube quick 2 elapsed_s 5.74 offline_ms 5661.225 online_ms 40.086 rss_MiB 242.8
+START local 15 sqrt sqrt 2
+DONE local 15 sqrt sqrt 2 elapsed_s 1.6 offline_ms 1540.0 online_ms 14.914 rss_MiB 229.4
+START local 15 sqrt batcher 2
+DONE local 15 sqrt batcher 2 elapsed_s 1.48 offline_ms 1421.24 online_ms 16.969 rss_MiB 138.2
+START local 15 sqrt quick 2
+DONE local 15 sqrt quick 2 elapsed_s 5.99 offline_ms 5912.692 online_ms 30.542 rss_MiB 263.9
+START local 15 balanced logstar 2
+DONE local 15 balanced logstar 2 elapsed_s 5.32 offline_ms 5209.758 online_ms 39.346 rss_MiB 362.4
+START local 15 balanced median 2
+DONE local 15 balanced median 2 elapsed_s 12.01 offline_ms 11832.683 online_ms 121.206 rss_MiB 605.1
+START local 16 balanced logstar 0
+DONE local 16 balanced logstar 0 elapsed_s 10.48 offline_ms 10345.688 online_ms 71.919 rss_MiB 531.0
+START local 16 balanced median 0
+DONE local 16 balanced median 0 elapsed_s 25.31 offline_ms 25000.704 online_ms 243.36 rss_MiB 1262.0
+START local 16 balanced batcher 0
+DONE local 16 balanced batcher 0 elapsed_s 9.23 offline_ms 9014.115 online_ms 107.923 rss_MiB 381.2
+START local 16 balanced quick 0
+DONE local 16 balanced quick 0 elapsed_s 24.68 offline_ms 24478.071 online_ms 146.488 rss_MiB 777.6
+START local 16 cube cube 0
+DONE local 16 cube cube 0 elapsed_s 2.17 offline_ms 2115.802 online_ms 17.215 rss_MiB 256.1
+START local 16 cube batcher 0
+DONE local 16 cube batcher 0 elapsed_s 2.1 offline_ms 2029.067 online_ms 25.742 rss_MiB 170.1
+START local 16 cube quick 0
+DONE local 16 cube quick 0 elapsed_s 12.55 offline_ms 12446.508 online_ms 66.326 rss_MiB 440.5
+START local 16 sqrt sqrt 0
+DONE local 16 sqrt sqrt 0 elapsed_s 3.12 offline_ms 2997.144 online_ms 33.088 rss_MiB 268.7
+START local 16 sqrt batcher 0
+DONE local 16 sqrt batcher 0 elapsed_s 2.95 offline_ms 2875.391 online_ms 35.612 rss_MiB 187.4
+START local 16 sqrt quick 0
+DONE local 16 sqrt quick 0 elapsed_s 12.83 offline_ms 12721.992 online_ms 72.538 rss_MiB 434.6
+START local 16 balanced logstar 1
+DONE local 16 balanced logstar 1 elapsed_s 10.83 offline_ms 10704.428 online_ms 73.046 rss_MiB 580.5
+START local 16 sqrt quick 1
+DONE local 16 sqrt quick 1 elapsed_s 13.16 offline_ms 13044.383 online_ms 69.483 rss_MiB 440.6
+START local 16 sqrt batcher 1
+DONE local 16 sqrt batcher 1 elapsed_s 3.02 offline_ms 2943.006 online_ms 33.599 rss_MiB 186.4
+START local 16 sqrt sqrt 1
+DONE local 16 sqrt sqrt 1 elapsed_s 2.79 offline_ms 2690.005 online_ms 31.63 rss_MiB 275.0
+START local 16 cube quick 1
+DONE local 16 cube quick 1 elapsed_s 12.29 offline_ms 12174.604 online_ms 65.005 rss_MiB 434.6
+START local 16 cube batcher 1
+DONE local 16 cube batcher 1 elapsed_s 2.12 offline_ms 2059.135 online_ms 24.562 rss_MiB 169.4
+START local 16 cube cube 1
+DONE local 16 cube cube 1 elapsed_s 2.23 offline_ms 2179.268 online_ms 17.457 rss_MiB 255.1
+START local 16 balanced quick 1
+DONE local 16 balanced quick 1 elapsed_s 25.0 offline_ms 24777.479 online_ms 153.175 rss_MiB 792.0
+START local 16 balanced batcher 1
+DONE local 16 balanced batcher 1 elapsed_s 9.34 offline_ms 9114.947 online_ms 123.072 rss_MiB 379.6
+START local 16 balanced median 1
+DONE local 16 balanced median 1 elapsed_s 25.73 offline_ms 25385.182 online_ms 263.588 rss_MiB 1262.0
+START local 16 balanced batcher 2
+DONE local 16 balanced batcher 2 elapsed_s 9.37 offline_ms 9155.887 online_ms 117.224 rss_MiB 379.3
+START local 16 balanced quick 2
+DONE local 16 balanced quick 2 elapsed_s 26.28 offline_ms 26056.287 online_ms 169.608 rss_MiB 777.2
+START local 16 cube cube 2
+DONE local 16 cube cube 2 elapsed_s 2.46 offline_ms 2407.494 online_ms 18.933 rss_MiB 252.4
+START local 16 cube batcher 2
+DONE local 16 cube batcher 2 elapsed_s 2.29 offline_ms 2216.119 online_ms 26.72 rss_MiB 166.4
+START local 16 cube quick 2
+DONE local 16 cube quick 2 elapsed_s 12.58 offline_ms 12455.713 online_ms 68.594 rss_MiB 441.7
+START local 16 sqrt sqrt 2
+DONE local 16 sqrt sqrt 2 elapsed_s 2.91 offline_ms 2820.93 online_ms 30.497 rss_MiB 272.2
+START local 16 sqrt batcher 2
+DONE local 16 sqrt batcher 2 elapsed_s 2.94 offline_ms 2838.833 online_ms 35.514 rss_MiB 187.4
+START local 16 sqrt quick 2
+DONE local 16 sqrt quick 2 elapsed_s 13.12 offline_ms 12967.898 online_ms 82.308 rss_MiB 441.6
+START local 16 balanced logstar 2
+DONE local 16 balanced logstar 2 elapsed_s 11.4 offline_ms 11265.574 online_ms 77.671 rss_MiB 556.0
+START local 16 balanced median 2
+DONE local 16 balanced median 2 elapsed_s 28.08 offline_ms 27774.837 online_ms 231.215 rss_MiB 1140.3
+START local 17 balanced logstar 0
+DONE local 17 balanced logstar 0 elapsed_s 23.34 offline_ms 23080.514 online_ms 178.36 rss_MiB 1401.9
+START local 17 balanced median 0
+DONE local 17 balanced median 0 elapsed_s 55.68 offline_ms 54995.341 online_ms 565.889 rss_MiB 2729.0
+START local 17 balanced batcher 0
+DONE local 17 balanced batcher 0 elapsed_s 23.1 offline_ms 22666.654 online_ms 272.028 rss_MiB 695.1
+START local 17 balanced quick 0
+DONE local 17 balanced quick 0 elapsed_s 52.44 offline_ms 51995.546 online_ms 341.608 rss_MiB 1546.4
+START local 17 cube cube 0
+DONE local 17 cube cube 0 elapsed_s 4.12 offline_ms 4020.653 online_ms 34.309 rss_MiB 335.6
+START local 17 cube batcher 0
+DONE local 17 cube batcher 0 elapsed_s 3.86 offline_ms 3744.362 online_ms 48.961 rss_MiB 238.4
+START local 17 cube quick 0
+DONE local 17 cube quick 0 elapsed_s 24.1 offline_ms 23891.524 online_ms 156.708 rss_MiB 812.4
+START local 17 sqrt sqrt 0
+DONE local 17 sqrt sqrt 0 elapsed_s 5.9 offline_ms 5748.558 online_ms 57.388 rss_MiB 398.4
+START local 17 sqrt batcher 0
+DONE local 17 sqrt batcher 0 elapsed_s 5.79 offline_ms 5656.239 online_ms 70.169 rss_MiB 291.9
+START local 17 sqrt quick 0
+DONE local 17 sqrt quick 0 elapsed_s 25.53 offline_ms 25318.104 online_ms 147.431 rss_MiB 818.0
+START local 18 balanced logstar 0
+DONE local 18 balanced logstar 0 elapsed_s 42.34 offline_ms 41877.447 online_ms 327.305 rss_MiB 2923.4
+START local 18 balanced median 0
+DONE local 18 balanced median 0 elapsed_s 110.67 offline_ms 109255.792 online_ms 1219.366 rss_MiB 5235.2
+START local 18 balanced batcher 0
+DONE local 18 balanced batcher 0 elapsed_s 41.53 offline_ms 40648.639 online_ms 598.052 rss_MiB 1380.6
+START local 18 balanced quick 0
+DONE local 18 balanced quick 0 elapsed_s 110.48 offline_ms 109523.384 online_ms 812.013 rss_MiB 3197.7
+START local 18 cube cube 0
+DONE local 18 cube cube 0 elapsed_s 8.21 offline_ms 8068.275 online_ms 76.241 rss_MiB 603.4
+START local 18 cube batcher 0
+DONE local 18 cube batcher 0 elapsed_s 9.39 offline_ms 9174.202 online_ms 122.983 rss_MiB 395.1
+START local 18 cube quick 0
+DONE local 18 cube quick 0 elapsed_s 55.1 offline_ms 54617.35 online_ms 356.146 rss_MiB 1640.1
+START local 18 sqrt sqrt 0
+DONE local 18 sqrt sqrt 0 elapsed_s 10.73 offline_ms 10402.939 online_ms 130.781 rss_MiB 643.8
+START local 18 sqrt batcher 0
+DONE local 18 sqrt batcher 0 elapsed_s 12.09 offline_ms 11826.256 online_ms 153.12 rss_MiB 501.8
+START local 18 sqrt quick 0
+DONE local 18 sqrt quick 0 elapsed_s 55.8 offline_ms 55325.01 online_ms 385.229 rss_MiB 1640.2
+START local 19 balanced logstar 0
+DONE local 19 balanced logstar 0 elapsed_s 86.91 offline_ms 85897.396 online_ms 747.216 rss_MiB 5762.2
+START local 19 balanced median 0
+DONE local 19 balanced median 0 elapsed_s 227.34 offline_ms 223148.423 online_ms 3754.958 rss_MiB 11089.2
+START local 19 balanced batcher 0
+DONE local 19 balanced batcher 0 elapsed_s 90.55 offline_ms 88443.15 online_ms 1399.455 rss_MiB 2850.2
+START local 19 balanced quick 0
+DONE local 19 balanced quick 0 elapsed_s 226.98 offline_ms 224652.783 online_ms 2035.891 rss_MiB 6592.0
+START local 19 cube cube 0
+DONE local 19 cube cube 0 elapsed_s 16.36 offline_ms 16128.437 online_ms 133.96 rss_MiB 1205.6
+START local 19 cube batcher 0
+DONE local 19 cube batcher 0 elapsed_s 19.48 offline_ms 19060.936 online_ms 263.545 rss_MiB 720.9
+START local 19 cube quick 0
+DONE local 19 cube quick 0 elapsed_s 111.38 offline_ms 110393.99 online_ms 834.233 rss_MiB 3342.9
+START local 19 sqrt sqrt 0
+DONE local 19 sqrt sqrt 0 elapsed_s 23.0 offline_ms 22476.997 online_ms 269.611 rss_MiB 1349.0
+START local 19 sqrt batcher 0
+START local 19 sqrt batcher 0
+DONE local 19 sqrt batcher 0 elapsed_s 27.38 offline_ms 26804.769 online_ms 364.287 rss_MiB 955.1
+START local 19 sqrt quick 0
+DONE local 19 sqrt quick 0 elapsed_s 112.41 offline_ms 111483.809 online_ms 776.485 rss_MiB 3324.4
+START local 20 balanced logstar 0
+DONE local 20 balanced logstar 0 elapsed_s 180.08 offline_ms 177782.168 online_ms 1793.498 rss_MiB 11279.5
+START local 20 balanced median 0
+DONE local 20 balanced median 0 elapsed_s 481.37 offline_ms 466091.632 online_ms 13874.038 rss_MiB 22596.9
+START local 20 balanced batcher 0
+DONE local 20 balanced batcher 0 elapsed_s 187.31 offline_ms 182675.101 online_ms 2806.367 rss_MiB 6000.4
+START local 20 balanced quick 0
+DONE local 20 balanced quick 0 elapsed_s 478.0 offline_ms 472607.435 online_ms 4822.171 rss_MiB 14091.2
+START local 20 cube cube 0
+DONE local 20 cube cube 0 elapsed_s 30.97 offline_ms 30520.028 online_ms 289.852 rss_MiB 2514.3
+START local 20 cube batcher 0
+DONE local 20 cube batcher 0 elapsed_s 40.9 offline_ms 39967.637 online_ms 516.525 rss_MiB 1407.1
+START local 20 cube quick 0
+DONE local 20 cube quick 0 elapsed_s 243.65 offline_ms 241475.517 online_ms 1885.809 rss_MiB 7104.1
+START local 20 sqrt sqrt 0
+DONE local 20 sqrt sqrt 0 elapsed_s 43.21 offline_ms 42017.781 online_ms 648.53 rss_MiB 2772.2
+START local 20 sqrt batcher 0
+DONE local 20 sqrt batcher 0 elapsed_s 57.53 offline_ms 56366.04 online_ms 773.267 rss_MiB 1930.6
+START local 20 sqrt quick 0
+DONE local 20 sqrt quick 0 elapsed_s 242.21 offline_ms 240027.707 online_ms 1886.893 rss_MiB 7042.7
+START lan 8 balanced logstar 0
+DONE lan 8 balanced logstar 0 elapsed_s 0.63 offline_ms 261.751 online_ms 15.068 rss_MiB 4.2
+START lan 8 balanced median 0
+DONE lan 8 balanced median 0 elapsed_s 0.64 offline_ms 279.016 online_ms 10.621 rss_MiB 4.2
+START lan 8 balanced batcher 0
+DONE lan 8 balanced batcher 0 elapsed_s 0.38 offline_ms 48.278 online_ms 9.77 rss_MiB 4.2
+START lan 8 balanced quick 0
+DONE lan 8 balanced quick 0 elapsed_s 0.48 offline_ms 163.425 online_ms 21.306 rss_MiB 4.2
+START lan 8 cube cube 0
+DONE lan 8 cube cube 0 elapsed_s 0.37 offline_ms 89.766 online_ms 4.149 rss_MiB 4.2
+START lan 8 cube batcher 0
+DONE lan 8 cube batcher 0 elapsed_s 0.35 offline_ms 41.223 online_ms 10.731 rss_MiB 4.2
+START lan 8 cube quick 0
+DONE lan 8 cube quick 0 elapsed_s 0.52 offline_ms 153.313 online_ms 13.018 rss_MiB 4.2
+START lan 8 sqrt sqrt 0
+DONE lan 8 sqrt sqrt 0 elapsed_s 0.37 offline_ms 88.678 online_ms 7.008 rss_MiB 4.2
+START lan 8 sqrt batcher 0
+DONE lan 8 sqrt batcher 0 elapsed_s 0.4 offline_ms 42.767 online_ms 9.752 rss_MiB 4.2
+START lan 8 sqrt quick 0
+DONE lan 8 sqrt quick 0 elapsed_s 0.47 offline_ms 150.944 online_ms 12.8 rss_MiB 4.2
+START lan 8 balanced logstar 1
+DONE lan 8 balanced logstar 1 elapsed_s 0.62 offline_ms 330.12 online_ms 16.23 rss_MiB 4.2
+START lan 8 sqrt quick 1
+DONE lan 8 sqrt quick 1 elapsed_s 0.45 offline_ms 143.44 online_ms 13.391 rss_MiB 4.2
+START lan 8 sqrt batcher 1
+DONE lan 8 sqrt batcher 1 elapsed_s 0.37 offline_ms 41.351 online_ms 10.269 rss_MiB 4.2
+START lan 8 sqrt sqrt 1
+DONE lan 8 sqrt sqrt 1 elapsed_s 0.4 offline_ms 87.612 online_ms 5.917 rss_MiB 4.2
+START lan 8 cube quick 1
+DONE lan 8 cube quick 1 elapsed_s 0.47 offline_ms 133.812 online_ms 16.187 rss_MiB 4.2
+START lan 8 cube batcher 1
+DONE lan 8 cube batcher 1 elapsed_s 0.41 offline_ms 41.384 online_ms 10.19 rss_MiB 4.2
+START lan 8 cube cube 1
+DONE lan 8 cube cube 1 elapsed_s 0.39 offline_ms 90.659 online_ms 3.786 rss_MiB 4.2
+START lan 8 balanced quick 1
+DONE lan 8 balanced quick 1 elapsed_s 0.56 offline_ms 222.491 online_ms 16.127 rss_MiB 4.2
+START lan 8 balanced batcher 1
+DONE lan 8 balanced batcher 1 elapsed_s 0.37 offline_ms 46.845 online_ms 11.141 rss_MiB 4.2
+START lan 8 balanced median 1
+DONE lan 8 balanced median 1 elapsed_s 0.6 offline_ms 287.33 online_ms 10.0 rss_MiB 4.5
+START lan 8 balanced batcher 2
+DONE lan 8 balanced batcher 2 elapsed_s 0.34 offline_ms 45.099 online_ms 9.78 rss_MiB 4.2
+START lan 8 balanced quick 2
+DONE lan 8 balanced quick 2 elapsed_s 0.49 offline_ms 166.921 online_ms 14.775 rss_MiB 4.2
+START lan 8 cube cube 2
+DONE lan 8 cube cube 2 elapsed_s 0.41 offline_ms 86.019 online_ms 5.316 rss_MiB 4.2
+START lan 8 cube batcher 2
+DONE lan 8 cube batcher 2 elapsed_s 0.32 offline_ms 38.15 online_ms 9.349 rss_MiB 4.2
+START lan 8 cube quick 2
+DONE lan 8 cube quick 2 elapsed_s 0.46 offline_ms 153.7 online_ms 14.355 rss_MiB 4.2
+START lan 8 sqrt sqrt 2
+DONE lan 8 sqrt sqrt 2 elapsed_s 0.41 offline_ms 88.942 online_ms 6.089 rss_MiB 4.2
+START lan 8 sqrt batcher 2
+DONE lan 8 sqrt batcher 2 elapsed_s 0.37 offline_ms 45.2 online_ms 9.024 rss_MiB 4.2
+START lan 8 sqrt quick 2
+DONE lan 8 sqrt quick 2 elapsed_s 0.46 offline_ms 140.459 online_ms 10.505 rss_MiB 4.2
+START lan 8 balanced logstar 2
+DONE lan 8 balanced logstar 2 elapsed_s 0.6 offline_ms 279.34 online_ms 14.914 rss_MiB 4.2
+START lan 8 balanced median 2
+DONE lan 8 balanced median 2 elapsed_s 0.57 offline_ms 256.126 online_ms 10.053 rss_MiB 4.2
+START lan 9 balanced logstar 0
+DONE lan 9 balanced logstar 0 elapsed_s 0.6 offline_ms 289.79 online_ms 16.107 rss_MiB 4.2
+START lan 9 balanced median 0
+DONE lan 9 balanced median 0 elapsed_s 0.7 offline_ms 363.986 online_ms 12.395 rss_MiB 4.2
+START lan 9 balanced batcher 0
+DONE lan 9 balanced batcher 0 elapsed_s 0.37 offline_ms 78.445 online_ms 11.195 rss_MiB 4.2
+START lan 9 balanced quick 0
+DONE lan 9 balanced quick 0 elapsed_s 0.52 offline_ms 210.167 online_ms 17.232 rss_MiB 4.2
+START lan 9 cube cube 0
+DONE lan 9 cube cube 0 elapsed_s 0.43 offline_ms 101.858 online_ms 3.6 rss_MiB 4.2
+START lan 9 cube batcher 0
+DONE lan 9 cube batcher 0 elapsed_s 0.34 offline_ms 46.989 online_ms 10.451 rss_MiB 4.2
+START lan 9 cube quick 0
+DONE lan 9 cube quick 0 elapsed_s 0.5 offline_ms 182.434 online_ms 16.773 rss_MiB 4.2
+START lan 9 sqrt sqrt 0
+DONE lan 9 sqrt sqrt 0 elapsed_s 0.52 offline_ms 113.888 online_ms 6.866 rss_MiB 4.2
+START lan 9 sqrt batcher 0
+DONE lan 9 sqrt batcher 0 elapsed_s 0.4 offline_ms 51.665 online_ms 11.655 rss_MiB 4.2
+START lan 9 sqrt quick 0
+DONE lan 9 sqrt quick 0 elapsed_s 0.51 offline_ms 168.045 online_ms 15.888 rss_MiB 4.2
+START lan 9 balanced logstar 1
+DONE lan 9 balanced logstar 1 elapsed_s 0.63 offline_ms 300.269 online_ms 15.474 rss_MiB 4.2
+START lan 9 sqrt quick 1
+DONE lan 9 sqrt quick 1 elapsed_s 0.5 offline_ms 176.492 online_ms 16.526 rss_MiB 4.2
+START lan 9 sqrt batcher 1
+DONE lan 9 sqrt batcher 1 elapsed_s 0.36 offline_ms 51.084 online_ms 10.416 rss_MiB 4.2
+START lan 9 sqrt sqrt 1
+DONE lan 9 sqrt sqrt 1 elapsed_s 0.44 offline_ms 104.233 online_ms 6.501 rss_MiB 4.2
+START lan 9 cube quick 1
+DONE lan 9 cube quick 1 elapsed_s 0.54 offline_ms 187.512 online_ms 14.182 rss_MiB 4.2
+START lan 9 cube batcher 1
+DONE lan 9 cube batcher 1 elapsed_s 0.33 offline_ms 45.117 online_ms 10.738 rss_MiB 4.2
+START lan 9 cube cube 1
+DONE lan 9 cube cube 1 elapsed_s 0.42 offline_ms 105.416 online_ms 4.661 rss_MiB 4.2
+START lan 9 balanced quick 1
+DONE lan 9 balanced quick 1 elapsed_s 0.53 offline_ms 211.133 online_ms 18.901 rss_MiB 4.2
+START lan 9 balanced batcher 1
+DONE lan 9 balanced batcher 1 elapsed_s 0.38 offline_ms 80.297 online_ms 11.826 rss_MiB 4.2
+START lan 9 balanced median 1
+DONE lan 9 balanced median 1 elapsed_s 0.7 offline_ms 372.805 online_ms 12.433 rss_MiB 4.2
+START lan 9 balanced batcher 2
+DONE lan 9 balanced batcher 2 elapsed_s 0.43 offline_ms 77.088 online_ms 13.082 rss_MiB 4.2
+START lan 9 balanced quick 2
+DONE lan 9 balanced quick 2 elapsed_s 0.51 offline_ms 214.172 online_ms 23.547 rss_MiB 4.2
+START lan 9 cube cube 2
+DONE lan 9 cube cube 2 elapsed_s 0.4 offline_ms 103.997 online_ms 3.998 rss_MiB 4.2
+START lan 9 cube batcher 2
+DONE lan 9 cube batcher 2 elapsed_s 0.4 offline_ms 49.2 online_ms 10.79 rss_MiB 4.2
+START lan 9 cube quick 2
+DONE lan 9 cube quick 2 elapsed_s 0.54 offline_ms 181.388 online_ms 14.554 rss_MiB 4.2
+START lan 9 sqrt sqrt 2
+DONE lan 9 sqrt sqrt 2 elapsed_s 0.41 offline_ms 107.269 online_ms 6.611 rss_MiB 4.2
+START lan 9 sqrt batcher 2
+DONE lan 9 sqrt batcher 2 elapsed_s 0.37 offline_ms 53.589 online_ms 11.086 rss_MiB 4.2
+START lan 9 sqrt quick 2
+DONE lan 9 sqrt quick 2 elapsed_s 0.49 offline_ms 180.534 online_ms 19.924 rss_MiB 4.2
+START lan 9 balanced logstar 2
+DONE lan 9 balanced logstar 2 elapsed_s 0.63 offline_ms 282.17 online_ms 15.716 rss_MiB 4.2
+START lan 9 balanced median 2
+DONE lan 9 balanced median 2 elapsed_s 0.7 offline_ms 373.913 online_ms 12.585 rss_MiB 4.5
+START lan 10 balanced logstar 0
+DONE lan 10 balanced logstar 0 elapsed_s 0.68 offline_ms 354.732 online_ms 17.608 rss_MiB 4.2
+START lan 10 balanced median 0
+DONE lan 10 balanced median 0 elapsed_s 0.99 offline_ms 682.823 online_ms 24.502 rss_MiB 116.6
+START lan 10 balanced batcher 0
+DONE lan 10 balanced batcher 0 elapsed_s 0.45 offline_ms 127.676 online_ms 14.649 rss_MiB 4.2
+START lan 10 balanced quick 0
+DONE lan 10 balanced quick 0 elapsed_s 0.71 offline_ms 361.279 online_ms 28.339 rss_MiB 4.2
+START lan 10 cube cube 0
+DONE lan 10 cube cube 0 elapsed_s 0.43 offline_ms 123.194 online_ms 5.06 rss_MiB 4.2
+START lan 10 cube batcher 0
+DONE lan 10 cube batcher 0 elapsed_s 0.4 offline_ms 66.208 online_ms 12.15 rss_MiB 4.2
+START lan 10 cube quick 0
+DONE lan 10 cube quick 0 elapsed_s 0.58 offline_ms 245.571 online_ms 18.331 rss_MiB 4.2
+START lan 10 sqrt sqrt 0
+DONE lan 10 sqrt sqrt 0 elapsed_s 0.45 offline_ms 129.722 online_ms 6.84 rss_MiB 4.2
+START lan 10 sqrt batcher 0
+DONE lan 10 sqrt batcher 0 elapsed_s 0.38 offline_ms 71.291 online_ms 12.793 rss_MiB 4.2
+START lan 10 sqrt quick 0
+DONE lan 10 sqrt quick 0 elapsed_s 0.57 offline_ms 237.849 online_ms 22.013 rss_MiB 4.2
+START lan 10 balanced logstar 1
+DONE lan 10 balanced logstar 1 elapsed_s 0.7 offline_ms 369.703 online_ms 19.537 rss_MiB 4.2
+START lan 10 sqrt quick 1
+DONE lan 10 sqrt quick 1 elapsed_s 0.55 offline_ms 229.58 online_ms 18.152 rss_MiB 4.2
+START lan 10 sqrt batcher 1
+DONE lan 10 sqrt batcher 1 elapsed_s 0.4 offline_ms 77.746 online_ms 12.931 rss_MiB 4.2
+START lan 10 sqrt sqrt 1
+DONE lan 10 sqrt sqrt 1 elapsed_s 0.42 offline_ms 129.28 online_ms 6.986 rss_MiB 4.2
+START lan 10 cube quick 1
+DONE lan 10 cube quick 1 elapsed_s 0.59 offline_ms 261.515 online_ms 20.131 rss_MiB 4.2
+START lan 10 cube batcher 1
+DONE lan 10 cube batcher 1 elapsed_s 0.44 offline_ms 65.956 online_ms 12.055 rss_MiB 4.2
+START lan 10 cube cube 1
+DONE lan 10 cube cube 1 elapsed_s 0.47 offline_ms 120.741 online_ms 4.278 rss_MiB 4.2
+START lan 10 balanced quick 1
+DONE lan 10 balanced quick 1 elapsed_s 0.71 offline_ms 332.579 online_ms 22.753 rss_MiB 4.2
+START lan 10 balanced batcher 1
+DONE lan 10 balanced batcher 1 elapsed_s 0.45 offline_ms 117.596 online_ms 14.153 rss_MiB 4.2
+START lan 10 balanced median 1
+DONE lan 10 balanced median 1 elapsed_s 1.04 offline_ms 689.374 online_ms 23.961 rss_MiB 111.8
+START lan 10 balanced batcher 2
+DONE lan 10 balanced batcher 2 elapsed_s 0.45 offline_ms 121.682 online_ms 13.936 rss_MiB 4.2
+START lan 10 balanced quick 2
+DONE lan 10 balanced quick 2 elapsed_s 0.67 offline_ms 360.493 online_ms 24.251 rss_MiB 4.2
+START lan 10 cube cube 2
+DONE lan 10 cube cube 2 elapsed_s 0.43 offline_ms 123.709 online_ms 4.084 rss_MiB 4.2
+START lan 10 cube batcher 2
+DONE lan 10 cube batcher 2 elapsed_s 0.44 offline_ms 71.501 online_ms 12.039 rss_MiB 4.2
+START lan 10 cube quick 2
+DONE lan 10 cube quick 2 elapsed_s 0.63 offline_ms 279.063 online_ms 22.249 rss_MiB 4.2
+START lan 10 sqrt sqrt 2
+DONE lan 10 sqrt sqrt 2 elapsed_s 0.48 offline_ms 133.884 online_ms 6.588 rss_MiB 4.2
+START lan 10 sqrt batcher 2
+DONE lan 10 sqrt batcher 2 elapsed_s 0.38 offline_ms 72.249 online_ms 13.278 rss_MiB 4.2
+START lan 10 sqrt quick 2
+DONE lan 10 sqrt quick 2 elapsed_s 0.55 offline_ms 237.567 online_ms 19.135 rss_MiB 4.2
+START lan 10 balanced logstar 2
+DONE lan 10 balanced logstar 2 elapsed_s 0.72 offline_ms 376.438 online_ms 17.482 rss_MiB 4.2
+START lan 10 balanced median 2
+DONE lan 10 balanced median 2 elapsed_s 1.01 offline_ms 689.34 online_ms 22.393 rss_MiB 118.6
+START lan 11 balanced logstar 0
+DONE lan 11 balanced logstar 0 elapsed_s 0.92 offline_ms 549.926 online_ms 26.276 rss_MiB 112.1
+START lan 11 balanced median 0
+DONE lan 11 balanced median 0 elapsed_s 1.79 offline_ms 1328.55 online_ms 46.311 rss_MiB 141.1
+START lan 11 balanced batcher 0
+DONE lan 11 balanced batcher 0 elapsed_s 0.53 offline_ms 196.765 online_ms 18.214 rss_MiB 4.2
+START lan 11 balanced quick 0
+DONE lan 11 balanced quick 0 elapsed_s 0.95 offline_ms 600.273 online_ms 30.594 rss_MiB 65.5
+START lan 11 cube cube 0
+DONE lan 11 cube cube 0 elapsed_s 0.49 offline_ms 178.88 online_ms 6.246 rss_MiB 4.2
+START lan 11 cube batcher 0
+DONE lan 11 cube batcher 0 elapsed_s 0.41 offline_ms 93.638 online_ms 14.861 rss_MiB 4.2
+START lan 11 cube quick 0
+DONE lan 11 cube quick 0 elapsed_s 0.71 offline_ms 374.124 online_ms 24.081 rss_MiB 4.2
+START lan 11 sqrt sqrt 0
+DONE lan 11 sqrt sqrt 0 elapsed_s 0.53 offline_ms 208.014 online_ms 8.152 rss_MiB 4.2
+START lan 11 sqrt batcher 0
+DONE lan 11 sqrt batcher 0 elapsed_s 0.41 offline_ms 106.432 online_ms 14.733 rss_MiB 4.2
+START lan 11 sqrt quick 0
+DONE lan 11 sqrt quick 0 elapsed_s 0.71 offline_ms 385.796 online_ms 29.701 rss_MiB 4.2
+START lan 11 balanced logstar 1
+DONE lan 11 balanced logstar 1 elapsed_s 0.86 offline_ms 555.83 online_ms 24.413 rss_MiB 112.8
+START lan 11 sqrt quick 1
+DONE lan 11 sqrt quick 1 elapsed_s 0.73 offline_ms 386.157 online_ms 25.775 rss_MiB 4.2
+START lan 11 sqrt batcher 1
+DONE lan 11 sqrt batcher 1 elapsed_s 0.47 offline_ms 113.524 online_ms 16.165 rss_MiB 4.0
+START lan 11 sqrt sqrt 1
+DONE lan 11 sqrt sqrt 1 elapsed_s 0.52 offline_ms 210.051 online_ms 8.331 rss_MiB 4.2
+START lan 11 cube quick 1
+DONE lan 11 cube quick 1 elapsed_s 0.71 offline_ms 391.947 online_ms 25.48 rss_MiB 4.0
+START lan 11 cube batcher 1
+DONE lan 11 cube batcher 1 elapsed_s 0.37 offline_ms 95.759 online_ms 14.774 rss_MiB 4.2
+START lan 11 cube cube 1
+DONE lan 11 cube cube 1 elapsed_s 0.47 offline_ms 168.604 online_ms 5.322 rss_MiB 4.2
+START lan 11 balanced quick 1
+DONE lan 11 balanced quick 1 elapsed_s 0.93 offline_ms 604.202 online_ms 36.128 rss_MiB 65.2
+START lan 11 balanced batcher 1
+DONE lan 11 balanced batcher 1 elapsed_s 0.54 offline_ms 207.966 online_ms 19.646 rss_MiB 4.2
+START lan 11 balanced median 1
+DONE lan 11 balanced median 1 elapsed_s 1.83 offline_ms 1361.85 online_ms 47.576 rss_MiB 132.6
+START lan 11 balanced batcher 2
+DONE lan 11 balanced batcher 2 elapsed_s 0.52 offline_ms 202.341 online_ms 19.05 rss_MiB 4.2
+START lan 11 balanced quick 2
+DONE lan 11 balanced quick 2 elapsed_s 0.98 offline_ms 627.189 online_ms 37.698 rss_MiB 65.5
+START lan 11 cube cube 2
+DONE lan 11 cube cube 2 elapsed_s 0.51 offline_ms 190.013 online_ms 4.743 rss_MiB 4.2
+START lan 11 cube batcher 2
+DONE lan 11 cube batcher 2 elapsed_s 0.43 offline_ms 91.058 online_ms 15.137 rss_MiB 4.2
+START lan 11 cube quick 2
+DONE lan 11 cube quick 2 elapsed_s 0.71 offline_ms 385.492 online_ms 33.325 rss_MiB 4.2
+START lan 11 sqrt sqrt 2
+DONE lan 11 sqrt sqrt 2 elapsed_s 0.51 offline_ms 212.866 online_ms 8.514 rss_MiB 4.2
+START lan 11 sqrt batcher 2
+DONE lan 11 sqrt batcher 2 elapsed_s 0.44 offline_ms 113.539 online_ms 15.35 rss_MiB 4.2
+START lan 11 sqrt quick 2
+DONE lan 11 sqrt quick 2 elapsed_s 0.69 offline_ms 376.517 online_ms 26.488 rss_MiB 4.2
+START lan 11 balanced logstar 2
+DONE lan 11 balanced logstar 2 elapsed_s 0.91 offline_ms 543.458 online_ms 28.113 rss_MiB 112.5
+START lan 11 balanced median 2
+DONE lan 11 balanced median 2 elapsed_s 1.84 offline_ms 1354.602 online_ms 47.171 rss_MiB 134.1
+START lan 12 balanced logstar 0
+DONE lan 12 balanced logstar 0 elapsed_s 1.33 offline_ms 996.607 online_ms 40.698 rss_MiB 128.7
+START lan 12 balanced median 0
+DONE lan 12 balanced median 0 elapsed_s 1.91 offline_ms 1524.337 online_ms 58.242 rss_MiB 142.5
+START lan 12 balanced batcher 0
+DONE lan 12 balanced batcher 0 elapsed_s 0.69 offline_ms 366.795 online_ms 28.461 rss_MiB 4.2
+START lan 12 balanced quick 0
+DONE lan 12 balanced quick 0 elapsed_s 1.52 offline_ms 1173.661 online_ms 60.004 rss_MiB 75.5
+START lan 12 cube cube 0
+DONE lan 12 cube cube 0 elapsed_s 0.56 offline_ms 248.627 online_ms 5.514 rss_MiB 4.2
+START lan 12 cube batcher 0
+DONE lan 12 cube batcher 0 elapsed_s 0.45 offline_ms 142.693 online_ms 17.818 rss_MiB 4.2
+START lan 12 cube quick 0
+DONE lan 12 cube quick 0 elapsed_s 1.01 offline_ms 667.451 online_ms 33.414 rss_MiB 66.5
+START lan 12 sqrt sqrt 0
+DONE lan 12 sqrt sqrt 0 elapsed_s 0.64 offline_ms 305.461 online_ms 10.277 rss_MiB 4.2
+START lan 12 sqrt batcher 0
+DONE lan 12 sqrt batcher 0 elapsed_s 0.49 offline_ms 166.031 online_ms 18.707 rss_MiB 4.2
+START lan 12 sqrt quick 0
+DONE lan 12 sqrt quick 0 elapsed_s 0.99 offline_ms 663.233 online_ms 33.314 rss_MiB 66.0
+START lan 12 balanced logstar 1
+DONE lan 12 balanced logstar 1 elapsed_s 1.37 offline_ms 1015.974 online_ms 42.275 rss_MiB 128.0
+START lan 12 sqrt quick 1
+DONE lan 12 sqrt quick 1 elapsed_s 1.0 offline_ms 653.65 online_ms 34.445 rss_MiB 66.2
+START lan 12 sqrt batcher 1
+DONE lan 12 sqrt batcher 1 elapsed_s 0.49 offline_ms 176.063 online_ms 19.295 rss_MiB 4.2
+START lan 12 sqrt sqrt 1
+DONE lan 12 sqrt sqrt 1 elapsed_s 0.65 offline_ms 316.972 online_ms 10.79 rss_MiB 4.2
+START lan 12 cube quick 1
+DONE lan 12 cube quick 1 elapsed_s 1.02 offline_ms 694.707 online_ms 38.525 rss_MiB 66.5
+START lan 12 cube batcher 1
+DONE lan 12 cube batcher 1 elapsed_s 0.5 offline_ms 146.287 online_ms 18.469 rss_MiB 4.2
+START lan 12 cube cube 1
+DONE lan 12 cube cube 1 elapsed_s 0.58 offline_ms 258.3 online_ms 6.268 rss_MiB 4.2
+START lan 12 balanced quick 1
+DONE lan 12 balanced quick 1 elapsed_s 1.49 offline_ms 1151.624 online_ms 54.223 rss_MiB 77.0
+START lan 12 balanced batcher 1
+DONE lan 12 balanced batcher 1 elapsed_s 0.73 offline_ms 389.365 online_ms 31.146 rss_MiB 4.2
+START lan 12 balanced median 1
+DONE lan 12 balanced median 1 elapsed_s 1.87 offline_ms 1510.917 online_ms 56.819 rss_MiB 146.6
+START lan 12 balanced batcher 2
+DONE lan 12 balanced batcher 2 elapsed_s 0.7 offline_ms 388.169 online_ms 29.893 rss_MiB 4.2
+START lan 12 balanced quick 2
+DONE lan 12 balanced quick 2 elapsed_s 1.6 offline_ms 1223.829 online_ms 55.365 rss_MiB 75.5
+START lan 12 cube cube 2
+DONE lan 12 cube cube 2 elapsed_s 0.56 offline_ms 257.822 online_ms 5.833 rss_MiB 4.2
+START lan 12 cube batcher 2
+DONE lan 12 cube batcher 2 elapsed_s 0.47 offline_ms 151.803 online_ms 17.151 rss_MiB 4.2
+START lan 12 cube quick 2
+DONE lan 12 cube quick 2 elapsed_s 1.03 offline_ms 672.036 online_ms 34.267 rss_MiB 66.5
+START lan 12 sqrt sqrt 2
+DONE lan 12 sqrt sqrt 2 elapsed_s 0.66 offline_ms 309.796 online_ms 10.563 rss_MiB 4.2
+START lan 12 sqrt batcher 2
+DONE lan 12 sqrt batcher 2 elapsed_s 0.47 offline_ms 167.248 online_ms 18.601 rss_MiB 4.2
+START lan 12 sqrt quick 2
+DONE lan 12 sqrt quick 2 elapsed_s 1.12 offline_ms 756.017 online_ms 36.215 rss_MiB 66.5
+START lan 12 balanced logstar 2
+DONE lan 12 balanced logstar 2 elapsed_s 1.34 offline_ms 954.688 online_ms 40.407 rss_MiB 111.3
+START lan 12 balanced median 2
+DONE lan 12 balanced median 2 elapsed_s 1.88 offline_ms 1512.748 online_ms 56.981 rss_MiB 142.3
+START lan 13 balanced logstar 0
+DONE lan 13 balanced logstar 0 elapsed_s 1.7 offline_ms 1345.998 online_ms 49.414 rss_MiB 139.7
+START lan 13 balanced median 0
+DONE lan 13 balanced median 0 elapsed_s 3.29 offline_ms 2891.407 online_ms 94.452 rss_MiB 173.4
+START lan 13 balanced batcher 0
+DONE lan 13 balanced batcher 0 elapsed_s 1.2 offline_ms 838.484 online_ms 52.089 rss_MiB 60.5
+START lan 13 balanced quick 0
+DONE lan 13 balanced quick 0 elapsed_s 2.7 offline_ms 2311.797 online_ms 95.304 rss_MiB 100.0
+START lan 13 cube cube 0
+DONE lan 13 cube cube 0 elapsed_s 0.67 offline_ms 367.465 online_ms 8.511 rss_MiB 4.2
+START lan 13 cube batcher 0
+DONE lan 13 cube batcher 0 elapsed_s 0.55 offline_ms 247.843 online_ms 22.898 rss_MiB 4.2
+START lan 13 cube quick 0
+DONE lan 13 cube quick 0 elapsed_s 1.78 offline_ms 1408.93 online_ms 55.274 rss_MiB 78.2
+START lan 13 sqrt sqrt 0
+DONE lan 13 sqrt sqrt 0 elapsed_s 0.81 offline_ms 480.955 online_ms 15.115 rss_MiB 46.3
+START lan 13 sqrt batcher 0
+DONE lan 13 sqrt batcher 0 elapsed_s 0.63 offline_ms 291.648 online_ms 25.602 rss_MiB 4.2
+START lan 13 sqrt quick 0
+DONE lan 13 sqrt quick 0 elapsed_s 1.65 offline_ms 1293.719 online_ms 56.708 rss_MiB 78.0
+START lan 13 balanced logstar 1
+DONE lan 13 balanced logstar 1 elapsed_s 1.76 offline_ms 1405.979 online_ms 48.062 rss_MiB 137.9
+START lan 13 sqrt quick 1
+DONE lan 13 sqrt quick 1 elapsed_s 1.67 offline_ms 1279.449 online_ms 59.492 rss_MiB 78.5
+START lan 13 sqrt batcher 1
+DONE lan 13 sqrt batcher 1 elapsed_s 0.66 offline_ms 294.41 online_ms 26.515 rss_MiB 4.2
+START lan 13 sqrt sqrt 1
+DONE lan 13 sqrt sqrt 1 elapsed_s 0.81 offline_ms 484.391 online_ms 14.609 rss_MiB 110.5
+START lan 13 cube quick 1
+DONE lan 13 cube quick 1 elapsed_s 1.71 offline_ms 1352.593 online_ms 54.684 rss_MiB 78.2
+START lan 13 cube batcher 1
+DONE lan 13 cube batcher 1 elapsed_s 0.57 offline_ms 237.268 online_ms 23.626 rss_MiB 4.2
+START lan 13 cube cube 1
+DONE lan 13 cube cube 1 elapsed_s 0.71 offline_ms 385.913 online_ms 8.081 rss_MiB 4.2
+START lan 13 balanced quick 1
+DONE lan 13 balanced quick 1 elapsed_s 2.97 offline_ms 2582.962 online_ms 91.345 rss_MiB 99.8
+START lan 13 balanced batcher 1
+DONE lan 13 balanced batcher 1 elapsed_s 1.21 offline_ms 846.781 online_ms 51.683 rss_MiB 59.5
+START lan 13 balanced median 1
+DONE lan 13 balanced median 1 elapsed_s 3.33 offline_ms 2935.284 online_ms 94.467 rss_MiB 173.3
+START lan 13 balanced batcher 2
+DONE lan 13 balanced batcher 2 elapsed_s 1.25 offline_ms 872.339 online_ms 50.606 rss_MiB 60.5
+START lan 13 balanced quick 2
+DONE lan 13 balanced quick 2 elapsed_s 2.96 offline_ms 2527.858 online_ms 98.408 rss_MiB 108.3
+START lan 13 cube cube 2
+DONE lan 13 cube cube 2 elapsed_s 0.69 offline_ms 378.364 online_ms 9.131 rss_MiB 4.2
+START lan 13 cube batcher 2
+DONE lan 13 cube batcher 2 elapsed_s 0.57 offline_ms 246.504 online_ms 23.555 rss_MiB 4.2
+START lan 13 cube quick 2
+DONE lan 13 cube quick 2 elapsed_s 1.68 offline_ms 1307.885 online_ms 54.218 rss_MiB 78.0
+START lan 13 sqrt sqrt 2
+DONE lan 13 sqrt sqrt 2 elapsed_s 0.77 offline_ms 453.24 online_ms 14.922 rss_MiB 4.2
+START lan 13 sqrt batcher 2
+DONE lan 13 sqrt batcher 2 elapsed_s 0.64 offline_ms 323.499 online_ms 26.625 rss_MiB 4.2
+START lan 13 sqrt quick 2
+DONE lan 13 sqrt quick 2 elapsed_s 1.69 offline_ms 1334.243 online_ms 51.983 rss_MiB 78.5
+START lan 13 balanced logstar 2
+DONE lan 13 balanced logstar 2 elapsed_s 1.7 offline_ms 1360.054 online_ms 49.868 rss_MiB 139.9
+START lan 13 balanced median 2
+DONE lan 13 balanced median 2 elapsed_s 3.17 offline_ms 2755.391 online_ms 93.743 rss_MiB 175.6
+START lan 14 balanced logstar 0
+DONE lan 14 balanced logstar 0 elapsed_s 2.88 offline_ms 2486.262 online_ms 79.639 rss_MiB 177.6
+START lan 14 balanced median 0
+DONE lan 14 balanced median 0 elapsed_s 6.35 offline_ms 5843.432 online_ms 179.947 rss_MiB 263.3
+START lan 14 balanced batcher 0
+DONE lan 14 balanced batcher 0 elapsed_s 2.23 offline_ms 1778.194 online_ms 96.034 rss_MiB 82.3
+START lan 14 balanced quick 0
+DONE lan 14 balanced quick 0 elapsed_s 5.76 offline_ms 5266.637 online_ms 165.457 rss_MiB 144.9
+START lan 14 cube cube 0
+DONE lan 14 cube cube 0 elapsed_s 0.91 offline_ms 604.623 online_ms 13.902 rss_MiB 119.0
+START lan 14 cube batcher 0
+DONE lan 14 cube batcher 0 elapsed_s 0.83 offline_ms 467.254 online_ms 33.756 rss_MiB 29.0
+START lan 14 cube quick 0
+DONE lan 14 cube quick 0 elapsed_s 2.99 offline_ms 2592.776 online_ms 96.591 rss_MiB 103.0
+START lan 14 sqrt sqrt 0
+DONE lan 14 sqrt sqrt 0 elapsed_s 1.09 offline_ms 762.21 online_ms 21.151 rss_MiB 117.4
+START lan 14 sqrt batcher 0
+DONE lan 14 sqrt batcher 0 elapsed_s 0.96 offline_ms 591.416 online_ms 39.85 rss_MiB 62.0
+START lan 14 sqrt quick 0
+DONE lan 14 sqrt quick 0 elapsed_s 3.16 offline_ms 2766.849 online_ms 88.745 rss_MiB 104.8
+START lan 14 balanced logstar 1
+DONE lan 14 balanced logstar 1 elapsed_s 2.91 offline_ms 2527.896 online_ms 75.554 rss_MiB 181.7
+START lan 14 sqrt quick 1
+DONE lan 14 sqrt quick 1 elapsed_s 3.02 offline_ms 2615.036 online_ms 100.841 rss_MiB 103.2
+START lan 14 sqrt batcher 1
+DONE lan 14 sqrt batcher 1 elapsed_s 1.03 offline_ms 669.968 online_ms 40.689 rss_MiB 60.8
+START lan 14 sqrt sqrt 1
+DONE lan 14 sqrt sqrt 1 elapsed_s 1.08 offline_ms 745.262 online_ms 23.22 rss_MiB 120.9
+START lan 14 cube quick 1
+DONE lan 14 cube quick 1 elapsed_s 3.18 offline_ms 2767.731 online_ms 92.926 rss_MiB 105.5
+START lan 14 cube batcher 1
+DONE lan 14 cube batcher 1 elapsed_s 0.8 offline_ms 472.063 online_ms 34.238 rss_MiB 29.0
+START lan 14 cube cube 1
+DONE lan 14 cube cube 1 elapsed_s 0.96 offline_ms 617.098 online_ms 12.463 rss_MiB 119.5
+START lan 14 balanced quick 1
+DONE lan 14 balanced quick 1 elapsed_s 5.61 offline_ms 5159.986 online_ms 171.169 rss_MiB 144.8
+START lan 14 balanced batcher 1
+DONE lan 14 balanced batcher 1 elapsed_s 2.33 offline_ms 1897.95 online_ms 95.015 rss_MiB 80.7
+START lan 14 balanced median 1
+DONE lan 14 balanced median 1 elapsed_s 6.54 offline_ms 6059.243 online_ms 181.814 rss_MiB 263.5
+START lan 14 balanced batcher 2
+DONE lan 14 balanced batcher 2 elapsed_s 2.43 offline_ms 2013.175 online_ms 95.63 rss_MiB 81.4
+START lan 14 balanced quick 2
+DONE lan 14 balanced quick 2 elapsed_s 5.72 offline_ms 5254.504 online_ms 170.102 rss_MiB 144.5
+START lan 14 cube cube 2
+DONE lan 14 cube cube 2 elapsed_s 0.91 offline_ms 588.64 online_ms 12.734 rss_MiB 119.0
+START lan 14 cube batcher 2
+DONE lan 14 cube batcher 2 elapsed_s 0.76 offline_ms 427.371 online_ms 34.945 rss_MiB 4.2
+START lan 14 cube quick 2
+DONE lan 14 cube quick 2 elapsed_s 2.99 offline_ms 2583.145 online_ms 92.337 rss_MiB 103.0
+START lan 14 sqrt sqrt 2
+DONE lan 14 sqrt sqrt 2 elapsed_s 1.1 offline_ms 794.264 online_ms 20.463 rss_MiB 116.4
+START lan 14 sqrt batcher 2
+DONE lan 14 sqrt batcher 2 elapsed_s 0.87 offline_ms 551.998 online_ms 39.825 rss_MiB 62.8
+START lan 14 sqrt quick 2
+DONE lan 14 sqrt quick 2 elapsed_s 3.03 offline_ms 2581.252 online_ms 90.638 rss_MiB 103.2
+START lan 14 balanced logstar 2
+DONE lan 14 balanced logstar 2 elapsed_s 2.64 offline_ms 2252.75 online_ms 71.355 rss_MiB 174.7
+START lan 14 balanced median 2
+DONE lan 14 balanced median 2 elapsed_s 5.79 offline_ms 5277.454 online_ms 179.614 rss_MiB 262.0
+START lan 15 balanced logstar 0
+DONE lan 15 balanced logstar 0 elapsed_s 5.03 offline_ms 4598.843 online_ms 132.138 rss_MiB 264.6
+START lan 15 balanced median 0
+DONE lan 15 balanced median 0 elapsed_s 11.57 offline_ms 10866.648 online_ms 353.649 rss_MiB 431.2
+START lan 15 balanced batcher 0
+DONE lan 15 balanced batcher 0 elapsed_s 4.22 offline_ms 3712.698 online_ms 187.767 rss_MiB 131.9
+START lan 15 balanced quick 0
+DONE lan 15 balanced quick 0 elapsed_s 10.79 offline_ms 10152.741 online_ms 328.478 rss_MiB 294.7
+START lan 15 cube cube 0
+DONE lan 15 cube cube 0 elapsed_s 1.44 offline_ms 1060.228 online_ms 20.774 rss_MiB 142.0
+START lan 15 cube batcher 0
+DONE lan 15 cube batcher 0 elapsed_s 1.21 offline_ms 847.916 online_ms 55.194 rss_MiB 61.2
+START lan 15 cube quick 0
+DONE lan 15 cube quick 0 elapsed_s 5.62 offline_ms 5154.483 online_ms 172.123 rss_MiB 154.2
+START lan 15 sqrt sqrt 0
+DONE lan 15 sqrt sqrt 0 elapsed_s 1.8 offline_ms 1415.596 online_ms 38.275 rss_MiB 144.5
+START lan 15 sqrt batcher 0
+DONE lan 15 sqrt batcher 0 elapsed_s 1.58 offline_ms 1189.776 online_ms 69.156 rss_MiB 79.9
+START lan 15 sqrt quick 0
+DONE lan 15 sqrt quick 0 elapsed_s 5.64 offline_ms 5178.735 online_ms 172.897 rss_MiB 154.7
+START lan 15 balanced logstar 1
+DONE lan 15 balanced logstar 1 elapsed_s 5.26 offline_ms 4784.066 online_ms 134.497 rss_MiB 287.8
+START lan 15 sqrt quick 1
+DONE lan 15 sqrt quick 1 elapsed_s 6.05 offline_ms 5543.286 online_ms 170.861 rss_MiB 173.2
+START lan 15 sqrt batcher 1
+DONE lan 15 sqrt batcher 1 elapsed_s 1.57 offline_ms 1218.879 online_ms 72.042 rss_MiB 79.4
+START lan 15 sqrt sqrt 1
+DONE lan 15 sqrt sqrt 1 elapsed_s 1.81 offline_ms 1472.052 online_ms 38.233 rss_MiB 144.4
+START lan 15 cube quick 1
+DONE lan 15 cube quick 1 elapsed_s 5.93 offline_ms 5400.737 online_ms 190.988 rss_MiB 154.2
+START lan 15 cube batcher 1
+DONE lan 15 cube batcher 1 elapsed_s 1.25 offline_ms 903.771 online_ms 56.62 rss_MiB 61.0
+START lan 15 cube cube 1
+DONE lan 15 cube cube 1 elapsed_s 1.41 offline_ms 1090.262 online_ms 21.669 rss_MiB 142.0
+START lan 15 balanced quick 1
+DONE lan 15 balanced quick 1 elapsed_s 11.52 offline_ms 10870.967 online_ms 320.467 rss_MiB 256.4
+START lan 15 balanced batcher 1
+DONE lan 15 balanced batcher 1 elapsed_s 4.36 offline_ms 3853.942 online_ms 187.388 rss_MiB 130.9
+START lan 15 balanced median 1
+DONE lan 15 balanced median 1 elapsed_s 11.73 offline_ms 11036.098 online_ms 354.936 rss_MiB 441.2
+START lan 15 balanced batcher 2
+DONE lan 15 balanced batcher 2 elapsed_s 4.54 offline_ms 4020.221 online_ms 190.661 rss_MiB 143.1
+START lan 15 balanced quick 2
+DONE lan 15 balanced quick 2 elapsed_s 11.76 offline_ms 11107.761 online_ms 311.023 rss_MiB 300.2
+START lan 15 cube cube 2
+DONE lan 15 cube cube 2 elapsed_s 1.39 offline_ms 1057.477 online_ms 22.653 rss_MiB 145.8
+START lan 15 cube batcher 2
+DONE lan 15 cube batcher 2 elapsed_s 1.26 offline_ms 890.935 online_ms 56.934 rss_MiB 46.1
+START lan 15 cube quick 2
+DONE lan 15 cube quick 2 elapsed_s 5.68 offline_ms 5193.919 online_ms 163.426 rss_MiB 154.2
+START lan 15 sqrt sqrt 2
+DONE lan 15 sqrt sqrt 2 elapsed_s 1.79 offline_ms 1430.923 online_ms 38.408 rss_MiB 144.6
+START lan 15 sqrt batcher 2
+DONE lan 15 sqrt batcher 2 elapsed_s 1.59 offline_ms 1202.493 online_ms 71.459 rss_MiB 79.5
+START lan 15 sqrt quick 2
+DONE lan 15 sqrt quick 2 elapsed_s 5.74 offline_ms 5255.562 online_ms 181.158 rss_MiB 154.7
+START lan 15 balanced logstar 2
+DONE lan 15 balanced logstar 2 elapsed_s 5.33 offline_ms 4847.772 online_ms 138.297 rss_MiB 272.9
+START lan 15 balanced median 2
+DONE lan 15 balanced median 2 elapsed_s 11.78 offline_ms 11062.622 online_ms 352.831 rss_MiB 439.0
+START lan 16 balanced logstar 0
+DONE lan 16 balanced logstar 0 elapsed_s 10.7 offline_ms 10074.073 online_ms 262.147 rss_MiB 470.0
+START lan 16 balanced median 0
+DONE lan 16 balanced median 0 elapsed_s 25.69 offline_ms 24592.31 online_ms 735.641 rss_MiB 839.2
+START lan 16 balanced batcher 0
+DONE lan 16 balanced batcher 0 elapsed_s 9.53 offline_ms 8689.087 online_ms 390.998 rss_MiB 226.9
+START lan 16 balanced quick 0
+DONE lan 16 balanced quick 0 elapsed_s 26.13 offline_ms 25101.531 online_ms 706.422 rss_MiB 547.8
+START lan 16 cube cube 0
+DONE lan 16 cube cube 0 elapsed_s 2.45 offline_ms 2057.621 online_ms 37.144 rss_MiB 174.7
+START lan 16 cube batcher 0
+DONE lan 16 cube batcher 0 elapsed_s 2.38 offline_ms 1933.274 online_ms 105.27 rss_MiB 84.2
+START lan 16 cube quick 0
+DONE lan 16 cube quick 0 elapsed_s 13.22 offline_ms 12565.491 online_ms 346.83 rss_MiB 281.3
+START lan 16 sqrt sqrt 0
+DONE lan 16 sqrt sqrt 0 elapsed_s 3.15 offline_ms 2747.467 online_ms 68.668 rss_MiB 178.3
+START lan 16 sqrt batcher 0
+DONE lan 16 sqrt batcher 0 elapsed_s 3.23 offline_ms 2779.58 online_ms 139.975 rss_MiB 104.9
+START lan 16 sqrt quick 0
+DONE lan 16 sqrt quick 0 elapsed_s 12.85 offline_ms 12168.22 online_ms 335.388 rss_MiB 322.4
+START lan 16 balanced logstar 1
+DONE lan 16 balanced logstar 1 elapsed_s 11.24 offline_ms 10676.014 online_ms 264.632 rss_MiB 464.5
+START lan 16 sqrt quick 1
+DONE lan 16 sqrt quick 1 elapsed_s 12.67 offline_ms 12034.099 online_ms 337.649 rss_MiB 283.5
+START lan 16 sqrt batcher 1
+DONE lan 16 sqrt batcher 1 elapsed_s 3.29 offline_ms 2788.698 online_ms 136.209 rss_MiB 104.4
+START lan 16 sqrt sqrt 1
+DONE lan 16 sqrt sqrt 1 elapsed_s 3.25 offline_ms 2815.076 online_ms 67.154 rss_MiB 178.4
+START lan 16 cube quick 1
+DONE lan 16 cube quick 1 elapsed_s 12.39 offline_ms 11699.506 online_ms 333.703 rss_MiB 323.0
+START lan 16 cube batcher 1
+DONE lan 16 cube batcher 1 elapsed_s 2.57 offline_ms 2109.72 online_ms 105.353 rss_MiB 95.9
+START lan 16 cube cube 1
+DONE lan 16 cube cube 1 elapsed_s 2.45 offline_ms 2082.659 online_ms 37.142 rss_MiB 176.2
+START lan 16 balanced quick 1
+DONE lan 16 balanced quick 1 elapsed_s 24.85 offline_ms 23852.182 online_ms 667.191 rss_MiB 553.9
+START lan 16 balanced batcher 1
+DONE lan 16 balanced batcher 1 elapsed_s 9.19 offline_ms 8430.771 online_ms 390.375 rss_MiB 238.5
+START lan 16 balanced median 1
+DONE lan 16 balanced median 1 elapsed_s 26.15 offline_ms 25072.335 online_ms 741.431 rss_MiB 813.7
+START lan 16 balanced batcher 2
+DONE lan 16 balanced batcher 2 elapsed_s 9.0 offline_ms 8205.726 online_ms 385.585 rss_MiB 236.6
+START lan 16 balanced quick 2
+DONE lan 16 balanced quick 2 elapsed_s 24.84 offline_ms 23777.818 online_ms 703.133 rss_MiB 556.2
+START lan 16 cube cube 2
+DONE lan 16 cube cube 2 elapsed_s 2.43 offline_ms 2107.708 online_ms 36.625 rss_MiB 176.2
+START lan 16 cube batcher 2
+DONE lan 16 cube batcher 2 elapsed_s 2.38 offline_ms 1950.495 online_ms 103.638 rss_MiB 84.2
+START lan 16 cube quick 2
+DONE lan 16 cube quick 2 elapsed_s 12.29 offline_ms 11635.142 online_ms 347.119 rss_MiB 322.2
+START lan 16 sqrt sqrt 2
+DONE lan 16 sqrt sqrt 2 elapsed_s 3.13 offline_ms 2717.458 online_ms 66.868 rss_MiB 180.3
+START lan 16 sqrt batcher 2
+DONE lan 16 sqrt batcher 2 elapsed_s 3.37 offline_ms 2898.49 online_ms 136.685 rss_MiB 103.4
+START lan 16 sqrt quick 2
+DONE lan 16 sqrt quick 2 elapsed_s 13.34 offline_ms 12689.033 online_ms 323.947 rss_MiB 323.0
+START lan 16 balanced logstar 2
+DONE lan 16 balanced logstar 2 elapsed_s 10.43 offline_ms 9846.565 online_ms 259.853 rss_MiB 467.8
+START lan 16 balanced median 2
+DONE lan 16 balanced median 2 elapsed_s 25.75 offline_ms 24665.157 online_ms 736.703 rss_MiB 838.0
+START lan 17 balanced logstar 0
+DONE lan 17 balanced logstar 0 elapsed_s 22.09 offline_ms 21239.568 online_ms 507.836 rss_MiB 848.6
+START lan 17 balanced median 0
+DONE lan 17 balanced median 0 elapsed_s 54.18 offline_ms 52281.645 online_ms 1535.369 rss_MiB 1763.9
+START lan 17 balanced batcher 0
+DONE lan 17 balanced batcher 0 elapsed_s 20.23 offline_ms 19003.35 online_ms 848.527 rss_MiB 446.9
+START lan 17 balanced quick 0
+DONE lan 17 balanced quick 0 elapsed_s 50.77 offline_ms 48996.076 online_ms 1435.443 rss_MiB 1089.4
+START lan 17 cube cube 0
+DONE lan 17 cube cube 0 elapsed_s 4.71 offline_ms 4282.481 online_ms 74.917 rss_MiB 250.3
+START lan 17 cube batcher 0
+DONE lan 17 cube batcher 0 elapsed_s 4.8 offline_ms 4275.652 online_ms 198.577 rss_MiB 146.7
+START lan 17 cube quick 0
+DONE lan 17 cube quick 0 elapsed_s 25.97 offline_ms 24931.057 online_ms 699.752 rss_MiB 573.8
+START lan 17 sqrt sqrt 0
+DONE lan 17 sqrt sqrt 0 elapsed_s 5.71 offline_ms 5248.036 online_ms 140.148 rss_MiB 254.1
+START lan 17 sqrt batcher 0
+DONE lan 17 sqrt batcher 0 elapsed_s 6.61 offline_ms 6061.087 online_ms 266.417 rss_MiB 167.3
+START lan 17 sqrt quick 0
+DONE lan 17 sqrt quick 0 elapsed_s 26.67 offline_ms 25653.052 online_ms 685.63 rss_MiB 571.1
+START lan 18 balanced logstar 0
+DONE lan 18 balanced logstar 0 elapsed_s 45.64 offline_ms 44165.684 online_ms 1017.707 rss_MiB 1969.0
+START lan 18 balanced median 0
+Traceback (most recent call last):
+  File "/mnt/c/Users/stani/OneDrive/Documents/LOGSTAR/secure-join/scripts/run_paper_benchmarks.py", line 121, in <module>
+    if __name__=='__main__':main()
+                            ^^^^^^
+  File "/mnt/c/Users/stani/OneDrive/Documents/LOGSTAR/secure-join/scripts/run_paper_benchmarks.py", line 112, in main
+    try:rows,elapsed=record_trial(c,transport,repeat,sha,a.timeout,audit)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/Users/stani/OneDrive/Documents/LOGSTAR/secure-join/scripts/run_paper_benchmarks.py", line 34, in record_trial
+    started=time.monotonic();rows=trial(EXE,opts,profile,timeout)
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/mnt/c/Users/stani/OneDrive/Documents/LOGSTAR/secure-join/scripts/benchmark_logstar.py", line 158, in trial
+    raise RuntimeError(stderr + stdout)
+RuntimeError
