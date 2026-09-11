@@ -32,7 +32,7 @@ namespace secJoin
         { u64 r = 0; for (auto c : g.mCir.mLevelAndCounts) r += c != 0; return r; }
         u64 ands(const Gmw& g) { return g.mCir.mNonlinearGateCount * oc::roundUpTo(g.mN, 128); }
 
-        BetaCircuit interval(u64 width)
+        BetaCircuit interval(u64 width, u64& comparisons)
         {
             BetaCircuit c;
             BetaBundle b(width), s(width), hi(width), valid(1), out(2);
@@ -40,8 +40,8 @@ namespace secJoin
             c.addInputBundle(hi); c.addInputBundle(valid); c.addOutputBundle(out);
             // Compare (key, original source). Equal same-source upper bounds
             // are safe: those rows belong to an earlier block of that source.
-            auto hiB = logstarLessThan(c, hi, b);
-            auto hiS = logstarLessThan(c, hi, s);
+            auto hiB = logstarLessThan(c, hi, b); ++comparisons;
+            auto hiS = logstarLessThan(c, hi, s); ++comparisons;
             // Export hiB and invert its sharing locally. GMW output views do
             // not interpret BetaCircuit's lazy InvWire output annotation.
             c.addCopy(hiB, out[0]);
@@ -50,7 +50,7 @@ namespace secJoin
             return c;
         }
 
-        BetaCircuit crossComparisons(u64 m, u64 width)
+        BetaCircuit crossComparisons(u64 m, u64 width, u64& comparisons)
         {
             BetaCircuit c;
             BetaBundle input(2 * m * width + 1), output(m * m);
@@ -67,7 +67,7 @@ namespace secJoin
                 c.addCopy(valid, output[j * m]);
                 for (u64 k = 1; k < m; ++k)
                 {
-                    auto less = logstarLessThan(c, key[m + k], key[j], true);
+                    auto less = logstarLessThan(c, key[m + k], key[j], true); ++comparisons;
                     c.addGate(less, valid, oc::GateType::And, output[j * m + k]);
                 }
             }
@@ -75,7 +75,7 @@ namespace secJoin
             return c;
         }
 
-        BetaCircuit allPairs(u64 m, u64 width, bool reuse = false)
+        BetaCircuit allPairs(u64 m, u64 width, u64& comparisons, bool reuse = false)
         {
             // Sorted runs make every row/column of cross comparisons monotone.
             // Adjacent XORs therefore give one-hot insertion positions, without
@@ -98,7 +98,7 @@ namespace secJoin
                 for (u64 k = 0; k < m; ++k)
                 {
                     if (reuse) { less[j][k] = input[j * m + k]; continue; }
-                    auto comparison = logstarLessThan(c, key[m + k], key[j]);
+                    auto comparison = logstarLessThan(c, key[m + k], key[j]); ++comparisons;
                     less[j][k] = temp();
                     // An absent opposite predecessor contributes zero keys;
                     // this also makes the direct global-rank formula valid.
@@ -213,9 +213,13 @@ namespace secJoin
             optimized, optimized, optimized);
         blockGen.init(role, blocks, oc::divCeil(blockBits, 8) + 4, cor);
         prefix.init(1, blocks, blockBits - (optimized ? bits : 0), cor, 8);
-        if (optimized) mask.init(blocks, crossComparisons(block, bits + 1), cor);
-        else mask.init(2 * n, interval(bits + 1), cor);
-        tinyMerge.init(blocks, allPairs(block, bits + 1, optimized), cor);
+        u64 maskComparisons = 0, leafComparisons = 0;
+        if (optimized) mask.init(blocks, crossComparisons(block, bits + 1, maskComparisons), cor);
+        else mask.init(2 * n, interval(bits + 1, maskComparisons), cor);
+        tinyMerge.init(blocks, allPairs(block, bits + 1, leafComparisons, optimized), cor);
+        // Count once per logical SIMD lane; reused comparison results add no work.
+        mComparisons = medians.numComparisons() + mask.mN * maskComparisons
+            + tinyMerge.mN * leafComparisons;
         recover.init(4 * n, selectId(idBits), cor);
         if (!optimized) blockRanks.init(blocks, sumBlockIds(idBits), cor);
         compact.init(4 * n, 2 * n, lg(2 * n), cor, true);

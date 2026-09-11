@@ -207,4 +207,39 @@ when the executable and parameter hashes match. Errors are retained separately.
 
 ## Completed Median revision (2026-09-11)
 
-All 93 replacement Median timings and 13 audits are complete, including n = 2^20 on all three transports. The active manifest and strict validator select only this complete replacement. All original raw records, non-Median observations, root figures, and the BBDLO analytical subsection are preserved. See [the completed rerun](median-retune-20260911/README.md) for parameter selection, audit-only paging, and reproduction. The updated paper is 51 pages, the section preview 6 pages, and the full results 13 pages.
+All 93 replacement Median timings and 13 audits are complete, including n = 2^20 on all three transports. The active manifest and strict validator select only this complete replacement. All original raw records, non-Median observations, and root figures are preserved. The later comparison-count update below replaces only our analytical entries in the BBDLO subsection. See [the completed rerun](median-retune-20260911/README.md) for parameter selection, audit-only paging, and reproduction. The updated paper is 51 pages, the section preview 6 pages, and the full results 13 pages.
+
+## Exact implementation comparison counts
+
+Section 8.3 retains the approximate analytical comparison counts for BBDLO,
+while Logstar and Median now use exact counts from the C++ circuit constructors
+with the active benchmark parameters. `implementation-comparison-counts.json`
+records both methods for every n = 2^8 through 2^20, their commands, source and
+executable hashes, and checks against the archived public schedules.
+
+A comparison is counted once across the protocol, summed over logical SIMD
+lanes and batched subproblems. Semantic dummy records are included; padding
+lanes used only to fill 128-lane machine words are excluded. Reusing a comparison
+result does not add another comparison. The count is fixed by the public
+schedule, so preprocessing and online cryptography need not be rerun.
+
+The `comparison_counts` target uses the same protocol constructors as the timed
+runner. Logstar's added counters accompany actual comparator insertion and
+multiply by the corresponding logical batch sizes; Batcher and Median already
+expose comparison counters. The collector requires the AND counts, online round
+bounds, and all correlation requests to match the original selected schedules.
+It also verifies that the archived timed benchmark executable is unchanged.
+
+From the code repository in WSL:
+
+```bash
+cmake --build out/build/linux --target comparison_counts -j 2
+python3 scripts/count_paper_comparisons.py
+python3 scripts/write_paper_benchmark_section.py
+```
+
+The original analytical-comparison section saved in
+`evaluation-before-rewrite.tex` and the manuscript's separate analytical section
+remain unchanged. These comparison counts are not new runtime measurements.
+
+The current comparison-count update keeps the full paper at 51 pages; the standalone section preview is now 7 pages, including its references. Exact counts at n = 2^20 are 11,010,049 (Logstar) and 56,655,872 (Median).

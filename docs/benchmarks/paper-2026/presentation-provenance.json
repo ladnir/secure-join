@@ -139,7 +139,8 @@
     "run_paper_benchmarks.py": "42673922fd8b445b20d2165e0cd7515f296dbf48c14fa2d9250b626737dd4b52",
     "summarize_paper_benchmarks.py": "6209984e5c8f1f0547e079dff5633af17185a9be8ac80afe22e41a3a3d19d6d8",
     "watch_paper_median_memory.py": "9ecbbab9b4cc85fb027ac8e27a56c0a7d133c8ea23cf9996bbe263de7b3e69ce",
-    "write_paper_benchmark_section.py": "4006440d62e720c9886ae549b247c450e720398944d64416c0befa9eda833031"
+    "write_paper_benchmark_section.py": "7d4a2597e19d9f202584a817543a45675d92b7fd7092b58e7c981211b66e9181",
+    "count_paper_comparisons.py": "9ed77d02e0a7a62ae2a38841325e4301c0e889b20f109d1e2225819d0e30f030"
   },
   "counting": "Nonempty lines after removing C++ comments, Sort directory only; tests and dependencies excluded",
   "dependencies": {
@@ -177,5 +178,30 @@
     "audit_paging_policy": "Explicitly marked paging permitted only for untimed round audits; all audit elapsed times excluded. Timed records require zero sampled Linux process swap."
   },
   "experiment_provenance_sha256": "f9b7e4bd73f8df3b54f774637bbacf9643d227e4094e728c21ac99a7a3b52ee2",
-  "cost_aggregation": "Median of all individual executions across transports; 9 samples through 2^16 and 3 above; observed min-max ranges; times remain per transport"
+  "cost_aggregation": "Median of all individual executions across transports; 9 samples through 2^16 and 3 above; observed min-max ranges; times remain per transport",
+  "implementation_comparison_accounting": {
+    "data": "implementation-comparison-counts.json",
+    "sha256": "89f18ade7e3a398b94ed3408a335a0745b49dda4d0f607a847cbfdbae2fc1d6b",
+    "configurations": 26,
+    "all_original_schedules_verified": true,
+    "logstar_at_2_to_20": 11010049,
+    "median_at_2_to_20": 56655872,
+    "count_type": "Exact C++ public circuit construction with the measured parameters; not a cryptographic rerun",
+    "frozen_timed_executable_unchanged": true,
+    "newly_rendered_and_visually_checked": {
+      "main_llncs": [
+        41,
+        47,
+        48,
+        49
+      ],
+      "benchmark-section": [
+        1,
+        5,
+        6,
+        7
+      ]
+    },
+    "new_evaluation_has_no_overfull_boxes_or_unresolved_references": true
+  }
 }

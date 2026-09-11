@@ -8,6 +8,10 @@ add_executable(secJoinfrontend  ${SRCS})
 
 target_link_libraries(secJoinfrontend secureJoin_Tests tests_cryptoTools)
 
+# Public circuit accounting; does not generate correlations or run timed merges.
+add_executable(comparison_counts comparison_counts.cpp)
+target_link_libraries(comparison_counts secureJoin)
+
 add_executable(logstar logstar.cpp)
 target_link_libraries(logstar secureJoin)
 

@@ -65,6 +65,10 @@ namespace secJoin
         // Excludes input sharing, preprocessing, transport setup, and output opening.
         u64 onlineRoundBound() const;
         u64 paddedAnds() const;
+        // Exact scalar key comparisons in the initialized public schedule,
+        // including batched subproblems and semantic dummies, excluding SIMD
+        // padding lanes. A reused comparison result is counted only once.
+        u64 comparisons() const;
 
     private:
         struct Impl;

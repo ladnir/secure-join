@@ -27,16 +27,16 @@ namespace secJoin
         u64 ands(const Gmw& g) { return g.mCir.mNonlinearGateCount * oc::roundUpTo(g.mN, 128); }
 
         // All three interval comparisons execute in parallel. Keys are never changed.
-        BetaCircuit maskCircuit(u64 orderBits, bool optimized)
+        BetaCircuit maskCircuit(u64 orderBits, bool optimized, u64& comparisons)
         {
             BetaCircuit c;
             BetaBundle b(orderBits), s(orderBits), lo(orderBits), hi(orderBits);
             BetaBundle flags(2), out(2); // b.real, s.real
             c.addInputBundle(b); c.addInputBundle(s); c.addInputBundle(lo);
             c.addInputBundle(hi); c.addInputBundle(flags); c.addOutputBundle(out);
-            auto bHi = logstarLessThan(c, b, hi, optimized);
-            auto sLo = logstarLessThan(c, s, lo, optimized);
-            auto sHi = logstarLessThan(c, s, hi, optimized);
+            auto bHi = logstarLessThan(c, b, hi, optimized); ++comparisons;
+            auto sLo = logstarLessThan(c, s, lo, optimized); ++comparisons;
+            auto sHi = logstarLessThan(c, s, hi, optimized); ++comparisons;
             BetaBundle t(1); c.addTempWireBundle(t);
             c.addGate(sLo, sHi, oc::GateType::na_And, t[0]);
             c.addGate(flags[0], bHi, oc::GateType::And, out[0]);
@@ -67,7 +67,7 @@ namespace secJoin
         AltModComposedPerm compactGen;
         ComposedPerm compactPerm;
         std::vector<PiLogStarStage> stats;
-        u64 totalRounds = 0, totalAnds = 0;
+        u64 totalRounds = 0, totalAnds = 0, totalComparisons = 0;
 
         void record(std::size_t i, coproto::Socket& sock, u64 sent, u64 received,
                     std::chrono::steady_clock::time_point start)
@@ -117,6 +117,7 @@ namespace secJoin
             m->packed->init(n, keyBits, outerBlock, cor, opts.optimized);
             m->expanded = 4 * n;
             m->stats = m->packed->stats;
+            m->totalComparisons = m->packed->comparisons();
             for (auto& s : m->stats) { m->totalRounds += s.gmwRounds; m->totalAnds += s.paddedAnds; }
             m->requested = true;
             return;
@@ -140,7 +141,9 @@ namespace secJoin
                 opts.optimized, opts.optimized);
             l.permGen.init(m->role, l.blocks, l.block * m->rowBytes + 1 + 4, cor);
             l.prefix.init(count, l.blocksPerBatch, l.block * m->rowBytes * 8, cor);
-            l.mask.init(l.blocks * l.block, maskCircuit(m->orderBits, opts.optimized), cor);
+            u64 maskComparisons = 0;
+            l.mask.init(l.blocks * l.block, maskCircuit(m->orderBits, opts.optimized, maskComparisons), cor);
+            m->totalComparisons += l.medians.numComparisons() + l.mask.mN * maskComparisons;
             m->stats.push_back({"partition", count, size, l.block,
                 l.medians.numRounds() + l.prefix.numRounds() + rounds(l.mask),
                 l.medians.numAnds() + l.prefix.numAnds() + ands(l.mask)});
@@ -154,6 +157,7 @@ namespace secJoin
         m->base.init(count, size, m->orderBits, m->minimalBase ? m->orderBits : m->rowBytes * 8,
             cor, finalPayloadBits, opts.optimized, opts.optimized, m->minimalBase);
         m->stats.push_back({"base_merge", count, size, 0, m->base.numRounds(), m->base.numAnds()});
+        m->totalComparisons += m->base.numComparisons();
         if (!m->levels.empty())
         {
             // Stable one-bit radix partition. It returns scatter ranks, so apply Inverse.
@@ -353,4 +357,5 @@ namespace secJoin
     u64 PiLogStar::onlineRoundBound() const
     { return m->totalRounds + (m->packed ? 9 : m->levels.empty() ? 0 : 5 * (m->levels.size() + 1) + 4); }
     u64 PiLogStar::paddedAnds() const { return m->totalAnds; }
+    u64 PiLogStar::comparisons() const { return m->totalComparisons; }
 }

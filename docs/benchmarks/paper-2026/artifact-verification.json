@@ -1,9 +1,9 @@
 {
-  "verified_at": "2026-09-11T18:45:50.704397+00:00",
+  "verified_at": "2026-09-11T19:18:54.233353+00:00",
   "artifacts": {
     "main_llncs.pdf": {
       "path": "C:\\Users\\stani\\OneDrive\\Documents\\LOGSTAR\\output\\pdf\\main_llncs.pdf",
-      "sha256": "dc6bcaab69f9289d5322b48d4227ec256e8e791be3887d9ec5210166f55bcd9d",
+      "sha256": "23bddfff10c9b59851d16117ca4dd38c66c665b1678da37ff2378622f42627b1",
       "pages": 51,
       "changed_pages_rendered_and_visually_checked": true,
       "all_fonts_embedded": false,
@@ -11,8 +11,8 @@
     },
     "benchmark-section.pdf": {
       "path": "C:\\Users\\stani\\OneDrive\\Documents\\LOGSTAR\\output\\pdf\\benchmark-section.pdf",
-      "sha256": "0d56d569d3e3cfe51ef35574ce7377e747c58d25725a064511b1b2d4681a7d73",
-      "pages": 6,
+      "sha256": "6a16a0a542339d2cd5da357ae53d93e1f626408f45c5e377049dd276922818b3",
+      "pages": 7,
       "changed_pages_rendered_and_visually_checked": true,
       "all_fonts_embedded": true
     },
@@ -36,7 +36,7 @@
   "non_median_profile_summaries_unchanged": true,
   "non_median_pooled_costs_unchanged": true,
   "root_artifacts_unchanged": true,
-  "bbdlo_subsection_unchanged": true,
+  "bbdlo_subsection_unchanged": false,
   "all_median_timed_sampled_linux_swap_zero": true,
   "largest_audit_paging_excluded_from_timings": true,
   "median_validation_sha256": "60bca0c571ad6ee5570c635730de30a79877c7c058c923a5b7c93e02814d4f4c",
@@ -52,7 +52,8 @@
       45,
       46,
       47,
-      48
+      48,
+      49
     ],
     "benchmark-section": [
       1,
@@ -60,7 +61,8 @@
       3,
       4,
       5,
-      6
+      6,
+      7
     ],
     "benchmark-full-results": [
       1,
@@ -77,10 +79,11 @@
     "main_cic.tex": "1cad375d68f6c07e4a6ada0055d451a6dbcfcadb242f88bc23efa03bc2876b58",
     "abstract.tex": "36e1d53ffbc535c6ba3c36a82e3f73b4f7a6dd48fd474b01e4325e8fa1bddb58",
     "intro.tex": "3f5d061848f89ca7703b6884b6d33a4dc031b4f6d1dc12b3d65571d71d96cb8f",
-    "evaluation.tex": "4a1a8b09fb07d004545533a7638e539d58bde2b6ca5bba80766838da8a36e0f3",
-    "evaluation-new.tex": "4a1a8b09fb07d004545533a7638e539d58bde2b6ca5bba80766838da8a36e0f3",
-    "benchmark-section.tex": "aa04a8942c6d62e68262bf75a9dbe03ecbac794b61cda843ca5e91b4b27c9d36",
-    "benchmark-full-results.tex": "6575eea3e131f4146914904a1df2ce5d24a3478e2b2459561dbada577c7f194c"
+    "evaluation.tex": "c3240f1a64c3f23192af36868ba3efc5462af108356bf7f5c912d91d98d8634e",
+    "evaluation-new.tex": "c3240f1a64c3f23192af36868ba3efc5462af108356bf7f5c912d91d98d8634e",
+    "benchmark-section.tex": "3264db62c6a908f59bbb143130d8103bca04a51aa863128cc8d09ebaf32fae28",
+    "benchmark-full-results.tex": "6575eea3e131f4146914904a1df2ce5d24a3478e2b2459561dbada577c7f194c",
+    "bib/crypto.bib": "deefec9f8cba245e30b08a6cc992082e68c62fced367949782114c71a1f02944"
   },
   "machine_restoration_pending": false,
   "median_revision_machine_restoration": {
@@ -126,5 +129,32 @@
     "sqrt-runtime.png": "3a09e83e0dd5e6c7e126fb6a3039cab2f5ecc86e9cd425306e0ea027d9eb518a",
     "sqrt-wan-table.tex": "add96439a373b293bfdfe44d64dde44bb0fc496f1341bca5eabe81ee70750ff6",
     "summary.json": "2563aa2ea25fa67ffe05fb19b51bea3b2453ea86012d8960cabae56129388b64"
+  },
+  "bbdlo_analytical_estimates_unchanged": true,
+  "separate_analytical_section_unchanged": true,
+  "implementation_comparison_accounting": {
+    "data": "implementation-comparison-counts.json",
+    "sha256": "89f18ade7e3a398b94ed3408a335a0745b49dda4d0f607a847cbfdbae2fc1d6b",
+    "configurations": 26,
+    "all_original_schedules_verified": true,
+    "logstar_at_2_to_20": 11010049,
+    "median_at_2_to_20": 56655872,
+    "count_type": "Exact C++ public circuit construction with the measured parameters; not a cryptographic rerun",
+    "frozen_timed_executable_unchanged": true,
+    "newly_rendered_and_visually_checked": {
+      "main_llncs": [
+        41,
+        47,
+        48,
+        49
+      ],
+      "benchmark-section": [
+        1,
+        5,
+        6,
+        7
+      ]
+    },
+    "new_evaluation_has_no_overfull_boxes_or_unresolved_references": true
   }
 }

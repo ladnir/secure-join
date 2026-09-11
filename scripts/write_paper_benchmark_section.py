@@ -19,6 +19,111 @@ def write_text_if_changed(path, text):
         path.write_text(text)
 
 
+def write_bbdlo_comparison(params):
+    """Use exact C++ counts for our measured schedules; retain BBDLO estimates."""
+    path = RAW/'implementation-comparison-counts.json'
+    accounting = json.loads(path.read_text())
+    for name, expected in accounting['source_sha256'].items():
+        if hashlib.sha256((ROOT/name).read_bytes()).hexdigest() != expected:
+            raise RuntimeError('Comparison accounting source changed; rerun count_paper_comparisons.py')
+    size = next(s for s in params['sizes'] if s['n'] == 1 << 20)
+    selected = {}
+    for method in ['logstar', 'median']:
+        matches = [r for r in accounting['records'] if (r['method'], r['n']) == (method, 1 << 20)]
+        if len(matches) != 1:
+            raise RuntimeError('Missing unique implementation count at n=2^20')
+        record = matches[0]
+        plan = size['selected'][method]
+        if (not record['original_schedule_verified'] or record['selected_options'] != plan['options']
+                or record['padded_ands'] != plan['padded_ands' if method == 'logstar' else 'online_gmw_ands_padded']
+                or record['online_round_bound'] != plan['round_bound' if method == 'logstar' else 'online_round_bound']
+                or record['offline_requests_per_party'] != plan['offline_requests_per_party']):
+            raise RuntimeError('Comparison counts do not match the active measured schedule')
+        selected[method] = record['comparisons']
+    full, sub = accounting['bbdlo_estimates']['full'], accounting['bbdlo_estimates']['subprotocol']
+    if (full, sub) != (127000000, 115000000):
+        raise RuntimeError('BBDLO analytical estimates changed')
+    section = r"""% BBDLO estimates retained from evaluation-before-rewrite.tex; our counts from
+% secure-join/docs/benchmarks/paper-2026/implementation-comparison-counts.json.
+\subsection{Comparison with BBDLO}\label{sec:eval-bbdlo}
+
+We compare the number of secure comparisons in our implementations with
+analytical estimates for BBDLO~\cite{EPRINT:BBDLO22}. We include their full
+symmetric merge (Figure~4 of that work), which uses $O(n)$ work, and their
+symmetric subprotocol (Figure~7), which uses $O(n\log\log n)$ work. The latter
+also merges two length-$n$ lists as a standalone protocol. Both have
+$O(\log\log n)$ round complexity. We have not implemented these two BBDLO
+protocols; their entries retain our analytical estimates for the constructions
+and asymptotic parameter choices specified in their paper.
+
+For Logstar and Median, \Cref{tab:benchmark-bbdlo-analytical} instead reports
+exact counts obtained directly from the C++ circuit construction, using the
+same public parameters as the measured experiments in
+\Cref{tab:benchmark-parameters}. We count each scalar key comparison once
+across all batched subproblems, including comparisons involving dummy records
+but excluding padding lanes used only to fill SIMD words. Reused comparison
+results are counted only when first computed. These schedules are independent
+of the input values and network, so constructing the circuits suffices to
+count their comparisons exactly. At $n=2^{20}$, Logstar uses one packed
+partition level with block size four, Batcher on the medians, and comparison
+reuse in its terminal merges. Median uses one alignment level with child size
+$2048$, internal cube-merge block size $64$, and Batcher leaves.
+
+\begin{table}[!htbp]
+\centering\small
+\begin{tabular}{lrl}
+\hline
+Protocol & Secure comparisons & Count source\\
+\hline
+BBDLO full symmetric merge & $1.27\cdot10^8$ & Analytical estimate\\
+BBDLO symmetric subprotocol & $1.15\cdot10^8$ & Analytical estimate\\
+Logstar & $@LOGSTAR_COUNT@$ & Implementation (exact)\\
+Median & $@MEDIAN_COUNT@$ & Implementation (exact)\\
+\hline
+\end{tabular}
+\caption{Comparison counts at $n=2^{20}$ keys per input list. BBDLO entries
+are our approximate analytical estimates; Logstar and Median entries are
+exact counts from the implemented benchmark schedules.}
+\label{tab:benchmark-bbdlo-analytical}
+\end{table}
+\FloatBarrier
+
+At this size, the estimated comparison counts of BBDLO's full protocol and
+symmetric subprotocol are approximately $@LOGSTAR_FULL@\times$ and
+$@LOGSTAR_SUB@\times$ the implemented Logstar count, and
+$@MEDIAN_FULL@\times$ and $@MEDIAN_SUB@\times$ the implemented Median count,
+respectively. These ratios concern comparison work: they exclude shuffling,
+routing, and preprocessing, and give every comparison equal weight regardless
+of key width. They do not establish communication or end-to-end runtime
+improvements over an optimized BBDLO implementation.
+"""
+    values = {
+        'LOGSTAR_COUNT': f"{selected['logstar']:,}".replace(',', '{,}'),
+        'MEDIAN_COUNT': f"{selected['median']:,}".replace(',', '{,}'),
+        'LOGSTAR_FULL': f"{full/selected['logstar']:.1f}",
+        'LOGSTAR_SUB': f"{sub/selected['logstar']:.1f}",
+        'MEDIAN_FULL': f"{full/selected['median']:.2f}",
+        'MEDIAN_SUB': f"{sub/selected['median']:.2f}",
+    }
+    for key, value in values.items():
+        section = section.replace('@' + key + '@', value)
+    for name in ['evaluation-new.tex', 'evaluation.tex']:
+        target = PAPER/name
+        text = target.read_text()
+        marker = '% Comparison counts and analytical schedules adapted from the preserved'
+        if marker not in text:
+            marker = '% BBDLO estimates retained from evaluation-before-rewrite.tex; our counts from'
+        begin = text.index(marker)
+        if r'\subsection' in text[text.index(r'\label{sec:eval-bbdlo}', begin) + len(r'\label{sec:eval-bbdlo}'):]:
+            raise RuntimeError('Unexpected section after BBDLO comparison')
+        text = text[:begin] + section
+        text = text.replace('complements these measurements with an analytical\ncomparison to BBDLO.',
+                            'complements these measurements with exact implementation counts\nand analytical estimates for BBDLO.')
+        text = text.replace('complements these measurements with a comparison of\nsecure-comparison counts against BBDLO.',
+                            'complements these measurements with exact implementation counts\nand analytical estimates for BBDLO.')
+        write_text_if_changed(target, text)
+
+
 def main():
     rows,costs,params,median_revision=load_paper_study()
     if costs!=json.loads((FIG/'protocol-costs.json').read_text()):
@@ -27,6 +132,7 @@ def main():
         raise RuntimeError('Regenerate the figures and tables from the complete validated measurements')
     if hashlib.sha256((ROOT/'out/build/linux/frontend/paper_benchmark').read_bytes()).hexdigest()!=rows[0]['executable_sha256']:
         raise RuntimeError('The benchmark executable changed after measurement')
+    write_bbdlo_comparison(params)
     def get(shape,method,profile='wan',n=1<<20):
         result=dict(next(r for r in rows if (r['shape'],r['method'],r['profile'],r['n'])==(shape,method,profile,n)))
         common=next(r for r in costs if (r['shape'],r['method'],r['n'])==(shape,method,n))
