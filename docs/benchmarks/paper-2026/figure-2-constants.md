@@ -176,10 +176,10 @@ longer matches, review/regenerate the comparison archive before reusing it.
   `d1dbb7f48e5e1f989814742eb666b75c6f1d8f50fce3c952e8248f4e6dc7c79e`.
 - Active Median parameters are selected by `active-median-revision.json`;
   the audit verifies its hash against the comparison-count archive.
-- The manuscript changes are confined to Figure 2's constants/caption and a
-  Figure 2 cross-reference in the existing AI disclosure. This audit does not
-  change the implementation, recorded benchmarks, or asymptotic claims. Adding trailing zeroes to BBDLO values does not add precision to
-  those retained estimates.
+- The manuscript changes are confined to Figure 2's constants and caption.
+  This audit does not change the implementation, recorded benchmarks, or
+  asymptotic claims. Adding trailing zeroes to BBDLO values does not add
+  precision to those retained estimates.
 
 ## Submission layout verification
 
