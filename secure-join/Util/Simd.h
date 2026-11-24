@@ -1,5 +1,6 @@
 #pragma once
 #include "secure-join/Defines.h"
+#include <cstring>
 #ifdef ENABLE_SSE
 #include <immintrin.h>
 #endif
@@ -105,7 +106,8 @@ namespace secJoin
 #ifdef ENABLE_SSE
         _mm_storeu_si32(mem, a);
 #else
-        * (i32*)mem = a.get<i32>(0);
+        i32 lane = a.get<i32>(0);
+        std::memcpy(mem, &lane, sizeof(lane));
 #endif
     }
 }

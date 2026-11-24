@@ -2,6 +2,7 @@
 #include "CorGenerator.h"
 #include "secure-join/Util/match.h"
 #include "secure-join/Util/Simd.h"
+#include <cstring>
 
 namespace secJoin
 {
@@ -264,7 +265,7 @@ namespace secJoin
         span<oc::block> add,
         span<oc::block> mult)
     {
-        auto aIter16 = (u16*)add.data();
+        auto aIter = reinterpret_cast<u8*>(add.data());
         auto bIter8 = (u8*)mult.data();
 
 
@@ -379,7 +380,8 @@ namespace secJoin
 
             u16 ap = movemask_epi8(a00);
 
-            *aIter16++ = ap;
+            std::memcpy(aIter, &ap, sizeof(ap));
+            aIter += sizeof(ap);
             m += 16;
 
         }
@@ -393,8 +395,8 @@ namespace secJoin
         span<oc::block> mult)
     {
 
-        auto bIter16 = (u16*)add.data();
-        auto aIter16 = (u16*)mult.data();
+        auto bIter = reinterpret_cast<u8*>(add.data());
+        auto aIter = reinterpret_cast<u8*>(mult.data());
 
         if (add.size() * 128 != B.size())
             throw RTE_LOC;
@@ -533,11 +535,14 @@ namespace secJoin
             u16 ap = movemask_epi8(a00);
             u16 bp = movemask_epi8(b00);
 
-            assert(aIter16 < (u16*)(mult.data() + mult.size()));
-            assert(bIter16 < (u16*)(add.data() + add.size()));
+            assert(aIter + sizeof(u16) <= reinterpret_cast<u8*>(mult.data() + mult.size()));
+            assert(bIter + sizeof(u16) <= reinterpret_cast<u8*>(add.data() + add.size()));
 
-            *aIter16++ = ap ^ bp;
-            *bIter16++ = ap;
+            u16 mixed = ap ^ bp;
+            std::memcpy(aIter, &mixed, sizeof(mixed));
+            aIter += sizeof(mixed);
+            std::memcpy(bIter, &ap, sizeof(ap));
+            bIter += sizeof(ap);
         }
     }
 

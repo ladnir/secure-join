@@ -92,6 +92,7 @@ namespace secJoin_Tests
             t.add("RadixSort_mock_test                           ", RadixSort_mock_test);
 
 
+            t.add("perfectShuffle_span_Test                      ", perfectShuffle_span_Test);
             t.add("AggTree_plain_Test                            ", AggTree_plain_Test);
             t.add("AggTree_levelReveal_Test                      ", AggTree_levelReveal_Test);
             t.add("AggTree_dup_pre_levelReveal_Test              ", AggTree_dup_pre_levelReveal_Test);

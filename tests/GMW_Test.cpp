@@ -10,6 +10,7 @@
 #include "coproto/Socket/LocalAsyncSock.h"
 
 #include "secure-join/Util/Util.h"
+#include <cstring>
 using coproto::LocalAsyncSocket;
 using namespace secJoin;
 
@@ -213,10 +214,11 @@ namespace secJoin_Tests
 
         for (u64 i = 0; i < n; ++i)
         {
-            auto& i0s0 = *(i64*)s0[i].data();
-            auto& i0s1 = *(i64*)s1[i].data();
-
+            i64 i0s0 = 0;
+            i64 i0s1 = 0;
+            std::memcpy(&i0s0, s0[i].data(), sizeof(i0s0));
             i0s1 = v[i] ^ i0s0;
+            std::memcpy(s1[i].data(), &i0s1, sizeof(i0s1));
         }
 
         return { s0, s1 };

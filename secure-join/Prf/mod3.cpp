@@ -4,6 +4,10 @@
 #include "cryptoTools/Common/BitVector.h"
 #include "cryptoTools/Common/Aligned.h"
 #include "secure-join/Util/Simd.h"
+#include <bit>
+#include <cstddef>
+#include <cstring>
+#include <type_traits>
 
 namespace secJoin
 {
@@ -321,15 +325,6 @@ namespace secJoin
 			: mVal(v)
 		{}
 
-		SampleBlock256(SampleBlock256* v)
-		{
-			load(v);
-		}
-		void load(SampleBlock256* v)
-		{
-			mVal = _mm256_load_si256(&v->mVal);
-		}
-
 		static auto set32(u32 v) 
 		{
 			return _mm256_set1_epi32(v);
@@ -396,16 +391,6 @@ namespace secJoin
 
 		SampleBlock256() = default;
 
-		SampleBlock256(SampleBlock256* v)
-		{
-			load(v);
-		}
-		void load(SampleBlock256* v)
-		{
-			mVal[0] = block(((block*)v)[0]);
-			mVal[1] = block(((block*)v)[1]);
-		}
-
 		static auto set32(u32 v)
 		{
 			SampleBlock256 r;
@@ -443,39 +428,36 @@ namespace secJoin
 		template<int s>
 		SampleBlock256 srli_epi32() const
 		{
-
-			SampleBlock256 r;
-			auto rr = (i32*)&r;
-			auto vv = (const i32*)&mVal;
+			auto src = std::bit_cast<std::array<u32, 8>>(*this);
+			std::array<u32, 8> dst{};
 			for (u64 i = 0; i < 8; ++i)
-				rr[i] = vv[i] >> s;
-			return r;
-			//return _mm256_srli_epi32(mVal, s);
+				dst[i] = src[i] >> s;
+			return std::bit_cast<SampleBlock256>(dst);
 		}
 
 
 		SampleBlock256 sllv_epi32(const SampleBlock256& s) const
 		{
-			SampleBlock256 r;
-			auto rr = (i32*)&r;
-			auto ss = (const i32*)&s;
-			auto vv = (const i32*)&mVal;
+			auto src = std::bit_cast<std::array<i32, 8>>(*this);
+			auto sh = std::bit_cast<std::array<i32, 8>>(s);
+			std::array<i32, 8> dst{};
 			for (u64 i = 0; i < 8; ++i)
-				rr[i] = vv[i] << ss[i];
-			return r;
-			//return _mm256_sllv_epi32(mVal, s.mVal);
+				dst[i] = src[i] << sh[i];
+			return std::bit_cast<SampleBlock256>(dst);
 		}
 
 		template<int v>
 		static SampleBlock256 i32gather_epi32(const int* ptr, const SampleBlock256& index)
 		{
-			SampleBlock256 r;
-			auto rr = (i32*)&r;
-			auto idx = (const i32*)&index;
+			auto idx = std::bit_cast<std::array<i32, 8>>(index);
+			std::array<i32, 8> dst{};
 			for (u64 i = 0; i < 8; ++i)
-				rr[i] = *(const int*)((char*)ptr + idx[i] * v);
-			return r;
-			//return _mm256_i32gather_epi32(ptr, index.mVal, v);
+			{
+				i32 lane;
+				std::memcpy(&lane, reinterpret_cast<const char*>(ptr) + static_cast<std::ptrdiff_t>(idx[i]) * v, sizeof(lane));
+				dst[i] = lane;
+			}
+			return std::bit_cast<SampleBlock256>(dst);
 		}
 
 		int testz_si256(const SampleBlock256& o) const
@@ -490,18 +472,20 @@ namespace secJoin
 
 		SampleBlock256 add_epi32(const SampleBlock256& s) const
 		{
-
-			SampleBlock256 r;
-			auto rr = (i32*)&r;
-			auto ss = (const i32*)&s;
-			auto vv = (const i32*)&mVal;
+			auto src = std::bit_cast<std::array<u32, 8>>(*this);
+			auto rhs = std::bit_cast<std::array<u32, 8>>(s);
+			std::array<u32, 8> dst{};
 			for (u64 i = 0; i < 8; ++i)
-				rr[i] = vv[i] + ss[i];
-			return r;
+				dst[i] = src[i] + rhs[i];
+			return std::bit_cast<SampleBlock256>(dst);
 		}
 
 	};
 #endif
+
+	static_assert(std::is_trivially_copyable_v<SampleBlock256>);
+	static_assert(sizeof(SampleBlock256) == sizeof(std::array<u32, 8>));
+	static_assert(sizeof(SampleBlock256) == 2 * sizeof(block));
 
 	void sampleMod3Lookup(PRNG& prng, span<block> msbVec, span<block> lsbVec)
 	{
@@ -519,9 +503,9 @@ namespace secJoin
 		oc::AlignedArray<block, 128> rands;
 		oc::AlignedArray<block, 8> rands2;
 
-		auto e = (SampleBlock256*)(rands.data() + rands.size());
+		const block* const randsEnd = rands.data() + rands.size();
 		auto e2 = (u8*)(rands2.data() + rands2.size());
-		auto randsPtr = e;
+		const block* randsPtr = randsEnd;
 		u8* rands2Ptr = e2;
 
 		oc::AlignedArray<SampleBlock256, 4> lsbSum;
@@ -539,35 +523,25 @@ namespace secJoin
 
 			for (u64 k = 0; k < 8; ++k)
 			{
-				if (randsPtr >= e)
+				if (randsPtr == randsEnd)
 				{
 					prng.mAes.ecbEncCounterMode(prng.mBlockIdx, rands.size(), rands.data());
 					prng.mBlockIdx += rands.size();
-					randsPtr = (SampleBlock256*)rands.data();
+					randsPtr = rands.data();
 				}
 
-				SampleBlock256 indexBase(randsPtr);
+				SampleBlock256 indexBase;
+				std::memcpy(&indexBase, randsPtr, sizeof(indexBase));
+				randsPtr += 2;
 				for (u64 j = 0; j < lsbSum.size(); ++j)
 				{
 					auto indexes = indexBase & SampleBlock256::set32(255);
 					indexBase = indexBase.srli_epi32<8>();
 
-					//__m256i indexes = _mm256_set_epi32(
-					//    randsPtr->m256i_u8[j * 8 + 7],
-					//    randsPtr->m256i_u8[j * 8 + 6],
-					//    randsPtr->m256i_u8[j * 8 + 5],
-					//    randsPtr->m256i_u8[j * 8 + 4],
-					//    randsPtr->m256i_u8[j * 8 + 3],
-					//    randsPtr->m256i_u8[j * 8 + 2],
-					//    randsPtr->m256i_u8[j * 8 + 1],
-					//    randsPtr->m256i_u8[j * 8 + 0]
-					//);
-
 					v_[j] =   SampleBlock256::i32gather_epi32<4>((const i32*)mod3TableV.data(), indexes);
 					lsb_[j] = SampleBlock256::i32gather_epi32<4>((const i32*)mod3TableLsb.data(), indexes);
 					msb_[j] = SampleBlock256::i32gather_epi32<4>((const i32*)mod3TableMsb.data(), indexes);
 				}
-				randsPtr++;
 
 				// shift the sum if we have a valid sample
 				lsbSum[0] = lsbSum[0].sllv_epi32(v_[0]);
@@ -615,16 +589,15 @@ namespace secJoin
 
 			for (u64 j = 0; j < lsbSum.size(); ++j)
 			{
+				auto lsbLanes = std::bit_cast<std::array<u32, 8>>(lsbSum[j]);
+				auto msbLanes = std::bit_cast<std::array<u32, 8>>(msbSum[j]);
+				auto sizeLanes = std::bit_cast<std::array<u32, 8>>(size[j]);
 
 				for (u64 k = 0; k < 8; ++k)
 				{
-					u32* lsbSum32 = (u32*)&lsbSum[j];
-					u32* msbSum32 = (u32*)&msbSum[j];
-					u32* size32 = (u32*)&size[j];
-
-					auto& lsbk = lsbSum32[k];
-					auto& msbk = msbSum32[k];
-					auto& sizek = size32[k];
+					auto& lsbk = lsbLanes[k];
+					auto& msbk = msbLanes[k];
+					auto& sizek = sizeLanes[k];
 
 					while (sizek < 32)
 					{
@@ -647,6 +620,9 @@ namespace secJoin
 						sizek += flag;
 					}
 				}
+
+				lsbSum[j] = std::bit_cast<SampleBlock256>(lsbLanes);
+				msbSum[j] = std::bit_cast<SampleBlock256>(msbLanes);
 			}
 
 			auto s = std::min<u64>(msbVec.size() - i, lsbSum.size() * 2);

@@ -192,7 +192,7 @@ void RadixSort_oneHot_test(const oc::CLP& cmd)
 }
 
 
-void RadixSort_bitInjection_test(const oc::CLP& cmd)
+static void checkBitInjection(const oc::CLP& cmd, u64 outBits)
 {
 
     auto comm = coproto::LocalAsyncSocket::makePair();
@@ -230,11 +230,15 @@ void RadixSort_bitInjection_test(const oc::CLP& cmd)
     bi0.preprocess();
     bi1.preprocess();
 
-    macoro::sync_wait(macoro::when_all_ready(
-        bi0.bitInjection(k0, 32, f0, comm[0]),
-        bi1.bitInjection(k1, 32, f1, comm[1]),
+    auto tasks = macoro::sync_wait(macoro::when_all_ready(
+        bi0.bitInjection(k0, outBits, f0, comm[0]),
+        bi1.bitInjection(k1, outBits, f1, comm[1]),
         g0.start(), g1.start()
     ));
+    std::get<0>(tasks).result();
+    std::get<1>(tasks).result();
+    std::get<2>(tasks).result();
+    std::get<3>(tasks).result();
 
     auto ff = reveal(f0, f1);
     if ((u64)ff.rows() != n)
@@ -242,12 +246,13 @@ void RadixSort_bitInjection_test(const oc::CLP& cmd)
     if ((u64)ff.cols() != L)
         throw RTE_LOC;
 
+    auto mask = ~u32{0} >> (32 - outBits);
     for (u64 i = 0; i < k.rows(); ++i)
     {
         auto iter = oc::BitIterator(k[i].data());
         for (u64 j = 0; j < L; ++j)
         {
-            auto v = ff(i, j);
+            auto v = ff(i, j) & mask;
             auto b = *iter++;
             if (v != b)
             {
@@ -255,6 +260,12 @@ void RadixSort_bitInjection_test(const oc::CLP& cmd)
             }
         }
     }
+}
+
+void RadixSort_bitInjection_test(const oc::CLP& cmd)
+{
+    for (u64 outBits : {7, 13, 21, 31, 32})
+        checkBitInjection(cmd, outBits);
 }
 
 void RadixSort_genValMasks2_test(const oc::CLP& cmd)
