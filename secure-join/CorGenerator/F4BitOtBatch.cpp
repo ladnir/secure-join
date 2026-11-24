@@ -370,9 +370,8 @@ namespace secJoin
 			}
 
 			assert(mReceiver.mGen.hasBaseOts());
-			mReceiver.mMultType = oc::MultType::Tungsten;
 			mReceiver.mA = std::move(threadState.mA);
-			mReceiver.mEncodeTemp = std::move(threadState.mEncodeTemp);
+			mReceiver.mSpin = std::move(threadState.mSpin);
 			mReceiver.mGen.mTempBuffer = std::move(threadState.mPprfTemp);
 			mReceiver.mGen.mEagerSend = false;
 
@@ -384,7 +383,7 @@ namespace secJoin
 			compressRecver(mReceiver.mA);
 
 			threadState.mA = std::move(mReceiver.mA);
-			threadState.mEncodeTemp = std::move(mReceiver.mEncodeTemp);
+			threadState.mSpin = std::move(mReceiver.mSpin);
 			threadState.mPprfTemp = std::move(mReceiver.mGen.mTempBuffer);
 
 		}
@@ -418,11 +417,10 @@ namespace secJoin
 			}
 
 			assert(mSender.mGen.hasBaseOts());
-			mSender.mMultType = oc::MultType::Tungsten;
 
 
 			mSender.mB = std::move(threadState.mB);
-			mSender.mEncodeTemp = std::move(threadState.mEncodeTemp);
+			mSender.mSpin = std::move(threadState.mSpin);
 			mSender.mGen.mTempBuffer = std::move(threadState.mPprfTemp);
 			mSender.mGen.mEagerSend = false;
 
@@ -434,7 +432,7 @@ namespace secJoin
 			compressSender(mSender.mB);
 
 			threadState.mB = std::move(mSender.mB);
-			threadState.mEncodeTemp = std::move(mSender.mEncodeTemp);
+			threadState.mSpin = std::move(mSender.mSpin);
 			threadState.mPprfTemp = std::move(mSender.mGen.mTempBuffer);
 		}
 
@@ -447,77 +445,30 @@ namespace secJoin
 	void F4BitOtBatch::RecvBatch::compressRecver(
 		span<oc::block> A)
 	{
-		mOts.resize(A.size());
-		mChoiceLsb.resize(A.size());
-		mChoiceMsb.resize(A.size());
+		if (A.size() % 128)
+			throw RTE_LOC;
+		mOts.resize(A.size() / 128);
+		mChoiceLsb.resize(A.size() / 128);
+		mChoiceMsb.resize(A.size() / 128);
 		auto aIter = reinterpret_cast<u8*>(mOts.data());
 		auto lsbIter8 = (u8*)mChoiceLsb.data();
 		auto msbIter8 = (u8*)mChoiceMsb.data();
 
-		auto shuffle = std::array<block, 16>{};
-		osuCrypto::setBytes(shuffle, static_cast<u8>(1 << 7));
-		for (u64 i = 0; i < 16; ++i)
-			shuffle[i].set<u8>(i, 0);
-
-		auto OneBlock = block(1);
-		auto TwoBlock = block(2);
 		block mask = block(~0ull, ~3ull);
 
-		auto m = &A[0];
+		auto m = A.data();
 
 		for (u64 i = 0; i < A.size(); i += 16)
 		{
-			u32 lsb[8], msb[8];
+			const block bytes = gatherLowBytes(m);
+			const u16 lsb = packByteBits<0>(bytes);
+			const u16 msb = packByteBits<1>(bytes);
+			std::memcpy(lsbIter8, &lsb, sizeof(lsb));
+			std::memcpy(msbIter8, &msb, sizeof(msb));
+			lsbIter8 += sizeof(lsb);
+			msbIter8 += sizeof(msb);
 			for (u64 j = 0; j < 2; ++j)
 			{
-				// extract the choice bit from the LSB of m
-				storeu_si32(&lsb[0], m[0] & OneBlock);
-				storeu_si32(&lsb[1], m[1] & OneBlock);
-				storeu_si32(&lsb[2], m[2] & OneBlock);
-				storeu_si32(&lsb[3], m[3] & OneBlock);
-				storeu_si32(&lsb[4], m[4] & OneBlock);
-				storeu_si32(&lsb[5], m[5] & OneBlock);
-				storeu_si32(&lsb[6], m[6] & OneBlock);
-				storeu_si32(&lsb[7], m[7] & OneBlock);
-
-				assert(lsb[0] == (m[0].get<u64>(0) & 1));
-
-				// pack the choice bits.
-				*lsbIter8++ =
-					lsb[0] ^
-					(lsb[1] << 1) ^
-					(lsb[2] << 2) ^
-					(lsb[3] << 3) ^
-					(lsb[4] << 4) ^
-					(lsb[5] << 5) ^
-					(lsb[6] << 6) ^
-					(lsb[7] << 7);
-
-				// extract the choice bit from the MSB of m
-
-				storeu_si32(&msb[0], m[0] & TwoBlock);
-				storeu_si32(&msb[1], m[1] & TwoBlock);
-				storeu_si32(&msb[2], m[2] & TwoBlock);
-				storeu_si32(&msb[3], m[3] & TwoBlock);
-				storeu_si32(&msb[4], m[4] & TwoBlock);
-				storeu_si32(&msb[5], m[5] & TwoBlock);
-				storeu_si32(&msb[6], m[6] & TwoBlock);
-				storeu_si32(&msb[7], m[7] & TwoBlock);
-
-				assert(msb[0] == (m[0].get<u64>(0) & 2));
-
-
-				// pack the choice bits.
-				*msbIter8++ =
-					(msb[0] >> 1) ^
-					(msb[1]) ^
-					(msb[2] << 1) ^
-					(msb[3] << 2) ^
-					(msb[4] << 3) ^
-					(msb[5] << 4) ^
-					(msb[6] << 5) ^
-					(msb[7] << 6);
-
 				// mask of the choice bits which is stored in the LSB
 				m[0] = m[0] & mask;
 				m[1] = m[1] & mask;
@@ -536,45 +487,7 @@ namespace secJoin
 			}
 			m -= 16;
 
-			block a00 = shuffle_epi8(m[0], shuffle[0]);
-			block a01 = shuffle_epi8(m[1], shuffle[1]);
-			block a02 = shuffle_epi8(m[2], shuffle[2]);
-			block a03 = shuffle_epi8(m[3], shuffle[3]);
-			block a04 = shuffle_epi8(m[4], shuffle[4]);
-			block a05 = shuffle_epi8(m[5], shuffle[5]);
-			block a06 = shuffle_epi8(m[6], shuffle[6]);
-			block a07 = shuffle_epi8(m[7], shuffle[7]);
-			block a08 = shuffle_epi8(m[8], shuffle[8]);
-			block a09 = shuffle_epi8(m[9], shuffle[9]);
-			block a10 = shuffle_epi8(m[10], shuffle[10]);
-			block a11 = shuffle_epi8(m[11], shuffle[11]);
-			block a12 = shuffle_epi8(m[12], shuffle[12]);
-			block a13 = shuffle_epi8(m[13], shuffle[13]);
-			block a14 = shuffle_epi8(m[14], shuffle[14]);
-			block a15 = shuffle_epi8(m[15], shuffle[15]);
-
-			a00 = a00 ^ a08;
-			a01 = a01 ^ a09;
-			a02 = a02 ^ a10;
-			a03 = a03 ^ a11;
-			a04 = a04 ^ a12;
-			a05 = a05 ^ a13;
-			a06 = a06 ^ a14;
-			a07 = a07 ^ a15;
-
-			a00 = a00 ^ a04;
-			a01 = a01 ^ a05;
-			a02 = a02 ^ a06;
-			a03 = a03 ^ a07;
-
-			a00 = a00 ^ a02;
-			a01 = a01 ^ a03;
-
-			a00 = a00 ^ a01;
-
-			a00 = slli_epi16<7>(a00);
-
-			u16 ap = movemask_epi8(a00);
+			const u16 ap = packByteBits<0>(gatherLowBytes(m));
 
 			std::memcpy(aIter, &ap, sizeof(ap));
 			aIter += sizeof(ap);
@@ -587,8 +500,10 @@ namespace secJoin
 	void F4BitOtBatch::SendBatch::compressSender(
 		span<oc::block> B)
 	{
-		for (u64 i = 0; i < 4; ++i)
-			mOts[i].resize(B.size());
+		if (B.size() % 128)
+			throw RTE_LOC;
+		for (auto& ots : mOts)
+			ots.resize(B.size() / 128);
 
 		std::array<u8*, 4> iters
 		{
@@ -605,15 +520,10 @@ namespace secJoin
 		//    throw RTE_LOC;
 		using block = oc::block;
 
-		auto shuffle = std::array<block, 16>{};
-		osuCrypto::setBytes(shuffle, static_cast<char>(1 << 7));
-		for (u64 i = 0; i < 16; ++i)
-			shuffle[i].set<u8>(i, 0);
-
 		std::array<block, 16> sendMsg;
 		//auto m = B.data();
 
-		block mask = block(~0ull, ~3ull);;
+		block mask = block(~0ull, ~3ull);
 		std::array<block, 4> deltas;
 		deltas[0] = block(0, 0);
 		deltas[1] = mDelta & mask;
@@ -634,15 +544,6 @@ namespace secJoin
 					for (u64 j = 0; j < 2; ++j)
 					{
 						assert((m[0].get<u64>(0) & 3) == 0);
-
-						m[0] = m[0] & mask;
-						m[1] = m[1] & mask;
-						m[2] = m[2] & mask;
-						m[3] = m[3] & mask;
-						m[4] = m[4] & mask;
-						m[5] = m[5] & mask;
-						m[6] = m[6] & mask;
-						m[7] = m[7] & mask;
 
 						oc::mAesFixedKey.hashBlocks<8>(m, s);
 
@@ -678,45 +579,7 @@ namespace secJoin
 					break;
 				}
 
-				block a00 = shuffle_epi8(sendMsg[0], shuffle[0]);
-				block a01 = shuffle_epi8(sendMsg[1], shuffle[1]);
-				block a02 = shuffle_epi8(sendMsg[2], shuffle[2]);
-				block a03 = shuffle_epi8(sendMsg[3], shuffle[3]);
-				block a04 = shuffle_epi8(sendMsg[4], shuffle[4]);
-				block a05 = shuffle_epi8(sendMsg[5], shuffle[5]);
-				block a06 = shuffle_epi8(sendMsg[6], shuffle[6]);
-				block a07 = shuffle_epi8(sendMsg[7], shuffle[7]);
-				block a08 = shuffle_epi8(sendMsg[8], shuffle[8]);
-				block a09 = shuffle_epi8(sendMsg[9], shuffle[9]);
-				block a10 = shuffle_epi8(sendMsg[10], shuffle[10]);
-				block a11 = shuffle_epi8(sendMsg[11], shuffle[11]);
-				block a12 = shuffle_epi8(sendMsg[12], shuffle[12]);
-				block a13 = shuffle_epi8(sendMsg[13], shuffle[13]);
-				block a14 = shuffle_epi8(sendMsg[14], shuffle[14]);
-				block a15 = shuffle_epi8(sendMsg[15], shuffle[15]);
-
-				a00 = a00 ^ a08;
-				a01 = a01 ^ a09;
-				a02 = a02 ^ a10;
-				a03 = a03 ^ a11;
-				a04 = a04 ^ a12;
-				a05 = a05 ^ a13;
-				a06 = a06 ^ a14;
-				a07 = a07 ^ a15;
-
-				a00 = a00 ^ a04;
-				a01 = a01 ^ a05;
-				a02 = a02 ^ a06;
-				a03 = a03 ^ a07;
-
-				a00 = a00 ^ a02;
-				a01 = a01 ^ a03;
-
-				a00 = a00 ^ a01;
-
-				a00 = slli_epi16<7>(a00);
-
-				u16 ap = movemask_epi8(a00);
+				const u16 ap = packByteBits<0>(gatherLowBytes(sendMsg.data()));
 
 				assert(iters[b] + sizeof(ap) <= reinterpret_cast<u8*>(mOts[b].data() + mOts[b].size()));
 				std::memcpy(iters[b], &ap, sizeof(ap));

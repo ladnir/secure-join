@@ -10,6 +10,9 @@
 
 namespace secJoin
 {
+    // Public randomness sampled after both semi-honest parties have fixed their inputs.
+    macoro::task<> sampleCompressionSeed(u64 party, PRNG& prng, coproto::Socket& sock, block& seed);
+
 	// one to many secure join protocol
 	struct OmJoin : public oc::TimerAdapter
 	{
@@ -82,7 +85,7 @@ namespace secJoin
 		// a one appended.
 		BinMatrix loadKeys(
 			ColRef leftJoinCol,
-			ColRef rightJoinCol);
+			ColRef rightJoinCol, block codeSeed);
 
 		// this circuit compares two inputs for equality with the exception that
 		// the first bit is ignored.

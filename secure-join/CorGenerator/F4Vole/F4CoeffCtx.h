@@ -136,7 +136,7 @@ namespace secJoin
         // the protocol will perform binary decomposition
         // of F using this many bits
         template<typename F2>
-        u64 bitSize()
+        u64 bitSize() const
         {
             if (std::is_same<G, F2>::value)
                 return 2;

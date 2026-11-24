@@ -33,7 +33,7 @@ void OmJoin_loadKeys_Test()
     ColRef left(leftTable, leftTable.mColumns[0]);
     ColRef right(rightTable, rightTable.mColumns[0]);
 
-    auto res = OmJoin{}.loadKeys(left, right);
+    auto res = OmJoin{}.loadKeys(left, right, oc::ZeroBlock);
 
     for (u64 i = 0; i < n0; ++i)
     {

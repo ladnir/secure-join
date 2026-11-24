@@ -96,9 +96,5 @@ int main(int argc, char** argv)
     }
 
     tests += secJoin_Tests::Tests;
-    tests.runIf(clp);
-    // secJoin_Tests::Tests.runAll();
-
-    return 0;
-
+    return tests.runIf(clp) == oc::TestCollection::Result::failed ? 1 : 0;
 }

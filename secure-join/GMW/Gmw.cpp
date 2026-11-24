@@ -58,7 +58,7 @@ namespace secJoin
 		if (input.rows() != mN)
 			throw std::runtime_error("incorrect number of input rows. " LOCATION);
 
-		oc::transpose(input, memView);
+		oc::transpose({ input.data(), input.rows(), input.cols() }, memView);
 	}
 
 	void Gmw::setZeroInput(u64 i)
@@ -81,7 +81,7 @@ namespace secJoin
 		if (out.rows() != mN)
 			throw RTE_LOC;
 
-		oc::transpose(memView, out);
+		oc::transpose({ memView.data(), memView.rows(), memView.cols() }, out);
 	}
 
 	oc::MatrixView<u8> Gmw::getInputView(u64 i)

@@ -43,13 +43,8 @@ namespace secJoin
         block dst;
         for (u64 i = 0; i < 16; ++i)
         {
-            auto bi = b.get<i8>(i);
-
-            // 0 if bi < 0. otherwise 11111111
-            u8 mask = ~(-i8(bi >> 7));
-            u8 idx = bi & 15;
-
-            dst.set<i8>(i, a.get<i8>(idx) & mask);
+            const auto index = b.get<u8>(i);
+            dst.set<u8>(i, index & 0x80 ? 0 : a.get<u8>(index & 15));
         }
         return dst;
     }
@@ -58,29 +53,47 @@ namespace secJoin
     OC_FORCEINLINE block slli_epi16(const block& v)
     {
         block r;
-        auto rr = (i16*)&r;
-        auto vv = (const i16*)&v;
+        static_assert(s >= 0);
         for (u64 i = 0; i < 8; ++i)
-            rr[i] = vv[i] << s;
+            r.set<u16>(i, s < 16 ? static_cast<u16>(u32(v.get<u16>(i)) << s) : 0);
         return r;
     }
 
     OC_FORCEINLINE int movemask_epi8(const block v)
     {
-        // extract all the of MSBs if each byte.
-        u64 mask = 1;
         int r = 0;
-        for (i64 i = 0; i < 16; ++i)
-        {
-            r |= (v.get<u8>(0) >> i) & mask;
-            mask <<= 1;
-        }
+        for (u64 i = 0; i < 16; ++i)
+            r |= (v.get<u8>(i) >> 7) << i;
         return r;
     }
 
 #endif
 
 
+
+    // Gather byte zero of 16 consecutive blocks in lane order.
+    OC_FORCEINLINE block gatherLowBytes(const block* x)
+    {
+#ifdef ENABLE_SSE
+        const auto a = _mm_unpacklo_epi16(_mm_unpacklo_epi8(x[0], x[1]), _mm_unpacklo_epi8(x[2], x[3]));
+        const auto b = _mm_unpacklo_epi16(_mm_unpacklo_epi8(x[4], x[5]), _mm_unpacklo_epi8(x[6], x[7]));
+        const auto c = _mm_unpacklo_epi16(_mm_unpacklo_epi8(x[8], x[9]), _mm_unpacklo_epi8(x[10], x[11]));
+        const auto d = _mm_unpacklo_epi16(_mm_unpacklo_epi8(x[12], x[13]), _mm_unpacklo_epi8(x[14], x[15]));
+        return _mm_unpacklo_epi64(_mm_unpacklo_epi32(a, b), _mm_unpacklo_epi32(c, d));
+#else
+        block bytes;
+        for (u64 i = 0; i < 16; ++i)
+            bytes.set<u8>(i, x[i].get<u8>(0));
+        return bytes;
+#endif
+    }
+
+    template<int bit>
+    OC_FORCEINLINE u16 packByteBits(block bytes)
+    {
+        static_assert(bit >= 0 && bit < 8);
+        return static_cast<u16>(movemask_epi8(slli_epi16<7 - bit>(bytes)));
+    }
 
     //FOR j := 0 to 7
     //	i := j*16
@@ -94,7 +107,7 @@ namespace secJoin
         block r;
         for (i64 i = 0; i < 8; ++i)
         {
-            r.set(i, a.get<i16>(i) == b.get<i16>(i) ? 0xFFFF : 0);
+            r.set<u16>(i, a.get<i16>(i) == b.get<i16>(i) ? 0xFFFF : 0);
         }
         return r;
 #endif // ENABLE_SSE

@@ -18,6 +18,13 @@
 
 namespace secJoin
 {
+    template<typename SilentOt>
+    void configureBatchOt(SilentOt& ot, u64 size)
+    {
+        ot.configure(size, 2, 1, oc::SilentSecType::SemiHonest,
+            oc::SdNoiseDistribution::Regular, oc::MultType::Spin);
+    }
+
     // A struct used to track base correlations requests.
     // These requests will be used as inputs to the batches
     // that will generate the end user correlations.
@@ -117,6 +124,13 @@ namespace secJoin
         span<block> getRecvOt(u64 n)
         {
             return get<block>(mOtRecvMsg, mOtRecvIndex, n);
+        }
+
+        void setOtBase(oc::SilentOtExtReceiver& receiver)
+        {
+            const auto n = receiver.baseCount().mBaseOtCount;
+            auto choices = mOtRecvChoice.subvec(mOtRecvIndex, n);
+            receiver.setBaseCors(getRecvOt(n), choices, {}, {});
         }
 
         span<block> getRecvVole(u64 n)

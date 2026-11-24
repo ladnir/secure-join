@@ -25,6 +25,7 @@
 #include <libOTe/Tools/TungstenCode/TungstenCode.h>
 #include "libOTe/Tools/ExConvCode/ExConvCode.h"
 #include "F4CoeffCtx.h"
+#include "F4VoleCode.h"
 
 namespace secJoin
 {
@@ -80,11 +81,12 @@ namespace secJoin
 
 		// The matrix multiplication type which compresses 
 		// the sparse vector.
-		oc::MultType mMultType = oc::DefaultMultType;
+		oc::MultType mMultType = oc::MultType::Spin;
+        std::optional<oc::SpinCode> mSpin;
 
 		// The multi-point punctured PRF for generating
 		// the sparse vectors.
-		oc::RegularPprfReceiver<F, G, Ctx> mGen;
+		oc::RegularPprfReceiver<F, Ctx> mGen;
 
 		// The internal buffers for holding the expanded vectors.
 		// mA  = mB + mC * delta
@@ -280,7 +282,10 @@ namespace secJoin
 			mBaseType = type;
 
 
-			syndromeDecodingConfigure(mNumPartitions, mSizePer, mNoiseVecSize, mSecParam, mRequestSize, mMultType);
+			const auto config = configureF4Code(mSecParam, mRequestSize, mMultType);
+			mNumPartitions = config.mNumPartitions;
+			mSizePer = config.mSizePer;
+			mNoiseVecSize = config.mNoiseVectorSize;
 
 
 			mGen.configure(mSizePer, mNumPartitions);
@@ -325,38 +330,14 @@ namespace secJoin
 
 			mCtx.resize(mBaseC, mNumPartitions + (mMalType == oc::SilentSecType::Malicious));
 
-			if (mCtx.template bitSize<G>() == 1)
+			// Rejection sampling keeps the three nonzero coefficients equiprobable.
+			for (u64 i = 0; i < mNumPartitions; ++i)
 			{
-				mCtx.one(mBaseC.begin(), mBaseC.begin() + mNumPartitions);
+				do { mBaseC[i].mVal = prng.get<u8>() & 3; } while (!mBaseC[i].mVal);
 			}
-			else
-			{
-				VecG zero, one;
-				mCtx.resize(zero, 1);
-				mCtx.resize(one, 1);
-				mCtx.zero(zero.begin(), zero.end());
-				mCtx.one(one.begin(), one.end());
-				for (size_t i = 0; i < mNumPartitions; i++)
-				{
-					mCtx.fromBlock(mBaseC[i], prng.get<block>());
-
-					// must not be zero.
-					while (mCtx.eq(zero[0], mBaseC[i]))
-						mCtx.fromBlock(mBaseC[i], prng.get<block>());
-
-					// if we are not a field, then the noise should be odd.
-					if (mCtx.template isField<F>() == false)
-					{
-						u8 odd = mCtx.binaryDecomposition(mBaseC[i])[0];
-						if (odd)
-							mCtx.plus(mBaseC[i], mBaseC[i], one[0]);
-					}
-				}
-			}
-
 
 			mS.resize(mNumPartitions);
-			mGen.getPoints(mS, oc::PprfOutputFormat::Interleaved);
+			mGen.getPoints(mS, oc::PprfOutputFormat::ByPhysicalIndex);
 
 			if (mMalType == oc::SilentSecType::Malicious)
 			{
@@ -395,13 +376,13 @@ namespace secJoin
 			if (static_cast<u64>(recvBaseOts.size()) != silentBaseOtCount())
 				throw std::runtime_error("wrong number of silent base OTs");
 
+			if (baseA.size() != baseVoleCount())
+				throw std::invalid_argument("Wrong number of base GF(4) VOLEs");
 			mGen.setBase(recvBaseOts);
 
-			mCtx.resize(mBaseA, baseA.size());
-			mCtx.copy(baseA.begin(), baseA.end(), mBaseA.begin());
-
-			for (u64 i = 0; i < mBaseA.size(); ++i)
-				mBaseA[i] &= (block(~0ull, ~0ull << 2));
+			mBaseA.resize(baseA.size());
+			for (u64 i = 0; i < baseA.size(); ++i)
+				mBaseA[i] = baseA[i] & block(~0ull, ~3ull);
 
 			mState = State::HasBase;
 		}
@@ -500,8 +481,7 @@ namespace secJoin
 			setTimePoint("SilentVoleReceiver.alloc");
 
 			// allocate mA
-			mCtx.resize(mA, 0);
-			mCtx.resize(mA, mNoiseVecSize);
+			mA.reserve(mNoiseVecSize);
 
 
 			setTimePoint("SilentVoleReceiver.alloc.zero");
@@ -527,7 +507,12 @@ namespace secJoin
 			// 
 			//    mA = mB + mS(mBaseC * mDelta)
 			//
-			co_await mGen.expand(chl, mA, oc::PprfOutputFormat::Interleaved, true, mNumThreads);
+			mA.resize(mNumPartitions * mSizePer);
+			co_await mGen.expand(chl, mA, oc::PprfOutputFormat::ByPhysicalIndex, true, mNumThreads);
+			for (auto& leaf : mA)
+			    leaf &= block(~0ull, ~3ull);
+			mA.resize(mNoiseVecSize);
+			std::fill(mA.begin() + mNumPartitions * mSizePer, mA.end(), oc::ZeroBlock);
 
 			setTimePoint("SilentVoleReceiver.expand.pprf_transpose");
 
@@ -574,6 +559,9 @@ namespace secJoin
 
 			switch (mMultType)
 			{
+			case oc::MultType::Spin:
+			    compressF4Spin(mSpin, mRequestSize, mA);
+			    break;
 			case osuCrypto::MultType::ExConv7x24:
 			case osuCrypto::MultType::ExConv21x24:
 			{

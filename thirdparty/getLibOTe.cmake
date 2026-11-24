@@ -2,11 +2,7 @@
 set(USER_NAME           )      
 set(TOKEN               )      
 set(GIT_REPOSITORY      "https://github.com/osu-crypto/libOTe.git")
-set(GIT_TAG             "657f6da90bff5774a2d01c824e997572d5e8ba00")
-# Keep libOTe's PPRF API while picking up the GCC 15 fixes in cryptoTools,
-# coproto, macoro and libdivide.
-set(CRYPTOTOOLS_TAG     "994bbfa789ff2e7f37b7d022e7667996f1c551b9")
-
+set(GIT_TAG             "e0c1c9871d72825a65a7d357ce609929ed7b5799")
 set(DEP_NAME            libOTe)          
 set(CLONE_DIR "${SECUREJOIN_THIRDPARTY_CLONE_DIR}/${DEP_NAME}")
 #set(BUILD_DIR "${CLONE_DIR}/out/build/${SECUREJOIN_CONFIG}")
@@ -36,18 +32,16 @@ if(NOT EXISTS ${CLONE_DIR})
 endif()
 
 
+execute_process(COMMAND ${GIT} cat-file -e ${GIT_TAG}^{commit} WORKING_DIRECTORY ${CLONE_DIR}
+    RESULT_VARIABLE tag_missing ERROR_QUIET)
+if(tag_missing)
+    run(NAME "Fetch pinned libOTe" CMD ${GIT} fetch origin ${GIT_TAG} WD ${CLONE_DIR})
+endif()
 run(NAME "libOTe Checkout ${GIT_TAG} " CMD ${CHECKOUT_CMD}  WD ${CLONE_DIR})
-set(CRYPTOTOOLS_DIR "${CLONE_DIR}/cryptoTools")
-if(NOT EXISTS "${CRYPTOTOOLS_DIR}/.git")
-    run(NAME "Initialize cryptoTools" CMD ${GIT} submodule update --init cryptoTools WD ${CLONE_DIR})
-endif()
-execute_process(COMMAND ${GIT} cat-file -e ${CRYPTOTOOLS_TAG}^{commit}
-    WORKING_DIRECTORY "${CRYPTOTOOLS_DIR}" RESULT_VARIABLE missing_cryptoTools ERROR_QUIET)
-if(missing_cryptoTools)
-    run(NAME "Fetch cryptoTools" CMD ${GIT} fetch origin ${CRYPTOTOOLS_TAG} WD ${CRYPTOTOOLS_DIR})
-endif()
-run(NAME "Checkout cryptoTools ${CRYPTOTOOLS_TAG}" CMD ${GIT} checkout ${CRYPTOTOOLS_TAG} WD ${CRYPTOTOOLS_DIR})
+run(NAME "Initialize libOTe submodules" CMD ${GIT} submodule update --init --recursive WD ${CLONE_DIR})
 
+set(ENABLE_SPIN ON)
+option(ENABLE_LOGVOLE "Build libOTe LogVOLE" OFF)
 option(ENABLE_CIRCUITS " " true)
 if(ENABLE_MOCK_OT)
 else()

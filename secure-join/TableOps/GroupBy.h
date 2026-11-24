@@ -79,7 +79,7 @@ namespace secJoin
         void loadKeys(
             ColRef groupByCol,
             std::vector<u8>& actFlagVec,
-            BinMatrix& compressKeys);
+            BinMatrix& compressKeys, block codeSeed);
 
         void concatColumns(
             ColRef groupByCol,

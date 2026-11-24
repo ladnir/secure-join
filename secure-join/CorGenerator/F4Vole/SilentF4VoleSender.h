@@ -25,6 +25,7 @@
 #include <libOTe/Tools/QuasiCyclicCode.h>
 #include <libOTe/Tools/TungstenCode/TungstenCode.h>
 #include "F4CoeffCtx.h"
+#include "F4VoleCode.h"
 
 namespace secJoin
 {
@@ -57,7 +58,7 @@ namespace secJoin
         Ctx mCtx;
 
         // the pprf used to generate the noise vector.
-        oc::RegularPprfSender<F, G, Ctx> mGen;
+        oc::RegularPprfSender<F, Ctx> mGen;
 
         // the number of correlations requested.
         u64 mRequestSize = 0;
@@ -96,7 +97,8 @@ namespace secJoin
         oc::SilentSecType mMalType = oc::SilentSecType::SemiHonest;
 
         // A flag to specify the linear code to use
-        oc::MultType mMultType = oc::DefaultMultType;
+        oc::MultType mMultType = oc::MultType::Spin;
+        std::optional<oc::SpinCode> mSpin;
 
         VecF mEncodeTemp;
 
@@ -233,9 +235,10 @@ namespace secJoin
             mState = State::Configured;
             mBaseType = type;
 
-            syndromeDecodingConfigure(
-                mNumPartitions, mSizePer, mNoiseVecSize,
-                mSecParam, mRequestSize, mMultType);
+            const auto config = configureF4Code(mSecParam, mRequestSize, mMultType);
+            mNumPartitions = config.mNumPartitions;
+            mSizePer = config.mSizePer;
+            mNoiseVecSize = config.mNoiseVectorSize;
 
             mGen.configure(mSizePer, mNumPartitions);
         }
@@ -263,28 +266,15 @@ namespace secJoin
                 throw RTE_LOC;
 
             if (b.size() != baseVoleCount())
-                throw RTE_LOC;
-
+                throw std::invalid_argument("Wrong number of base GF(4) VOLEs");
             mGen.setBase(sendBaseOts);
 
 
-            // we store the negative of b. This is because
-            // we need the correlation
-            // 
-            //  mBaseA + mBaseB = mBaseC * delta
-            // 
-            // for the pprf to expand correctly but the 
-            // input correlation is a vole:
-            //
-            //  mBaseA = b + mBaseC * delta
-            // 
-            mCtx.resize(mBaseB, b.size());
-            mCtx.zero(mBaseB.begin(), mBaseB.end());
-            for (u64 i = 0; i < mBaseB.size(); ++i)
-            {
-                mCtx.minus(mBaseB[i], mBaseB[i], b[i]);
-                mBaseB[i] &= (block(~0ull, ~0ull << 2));
-            }
+            // Negation in characteristic two is the identity. Reserve the
+            // bottom two bits in each share for the receiver's coefficient.
+            mBaseB.resize(b.size());
+            for (u64 i = 0; i < b.size(); ++i)
+                mBaseB[i] = b[i] & block(~0ull, ~3ull);
         }
 
         // The native OT extension interface of silent
@@ -390,8 +380,7 @@ namespace secJoin
             //gTimer.setTimePoint("SilentVoleSender.iknp.base2");
 
             // allocate B
-            mCtx.resize(mB, 0);
-            mCtx.resize(mB, mNoiseVecSize);
+            mB.reserve(mNoiseVecSize);
 
             if (mTimer)
                 mGen.setTimer(*mTimer);
@@ -405,8 +394,13 @@ namespace secJoin
             // our secret share of delta * noiseVals. The receiver
             // can then manually add their shares of this to the
             // output of the PPRF at the correct locations.
+            mB.resize(mNumPartitions * mSizePer);
             co_await mGen.expand(chl, baseB, prng.get(), mB,
-                oc::PprfOutputFormat::Interleaved, true, 1);
+                oc::PprfOutputFormat::ByPhysicalIndex, true, 1);
+            for (auto& leaf : mB)
+                leaf &= block(~0ull, ~3ull);
+            mB.resize(mNoiseVecSize);
+            std::fill(mB.begin() + mNumPartitions * mSizePer, mB.end(), oc::ZeroBlock);
             setTimePoint("SilentVoleSender.expand.pprf");
 
             if (mDebug)
@@ -429,6 +423,9 @@ namespace secJoin
 
             switch (mMultType)
             {
+            case oc::MultType::Spin:
+                compressF4Spin(mSpin, mRequestSize, mB);
+                break;
             case osuCrypto::MultType::ExConv7x24:
             case osuCrypto::MultType::ExConv21x24:
             {

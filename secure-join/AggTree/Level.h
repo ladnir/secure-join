@@ -229,60 +229,28 @@ namespace secJoin
                 vals[0].resize(oc::divCeil(n, 2), bitCount);
                 vals[1].resize(n / 2, bitCount);
 
-                auto n = available / 2;
                 u64 i = 0, d = offset / 2;
-                // std::cout << "d " << d << std::endl;
-                for (; i < available2 - 2; i += 2, ++d)
+                for (; i < available2; i += 2, ++d)
                 {
-                    osuCrypto::copyBytes(vals[0][d], src[i + 0].subspan(0, byteCount));
-                    osuCrypto::copyBytes(vals[1][d], src[i + 1].subspan(0, byteCount));
+                    osuCrypto::copyBytes(vals[0][d], src[i].first(byteCount));
+                    osuCrypto::copyBytes(vals[1][d], src[i + 1].first(byteCount));
                     *oc::BitIterator(mLeftRight[0].mSufBit.data(), d) = controlBits[i + 1];
-                    *oc::BitIterator(mLeftRight[1].mSufBit.data(), d) = controlBits[i + 2];
+                    *oc::BitIterator(mLeftRight[1].mSufBit.data(), d) =
+                        i + 2 < controlBits.size() ? controlBits[i + 2] : 0;
                 }
-
-                {
-                    osuCrypto::copyBytes(vals[0][d], src[i + 0].subspan(0, byteCount));
-                    osuCrypto::copyBytes(vals[1][d], src[i + 1].subspan(0, byteCount));
-
-                    auto cLast = 0;
-                    if (i + 2 < controlBits.size())
-                    {
-                        cLast = controlBits[i + 2];
-                        // std::cout << "act clast " << d*2+1<< ": " << (int)cLast << " = c[" << i + 2 << "]" << std::endl;
-                    }
-
-                    *oc::BitIterator(mLeftRight[0].mSufBit.data(), d) = controlBits[i + 1];
-                    *oc::BitIterator(mLeftRight[1].mSufBit.data(), d) = cLast;
-
-                    i += 2;
-                    ++d;
-                }
-
                 if (available & 1)
                 {
-                    osuCrypto::copyBytes(vals[0][d], src[i + 0].subspan(0, byteCount));
-                    osuCrypto::setBytes(vals[1][d], 0);
-
-                    auto cLast = 0;
-                    if (i + 1 < controlBits.size())
-                    {
-                        cLast = controlBits[i + 1];
-                        std::cout << "act clast* " << (int)cLast << std::endl;
-                    }
-
-                    *oc::BitIterator(mLeftRight[0].mSufBit.data(), d) = cLast;
+                    osuCrypto::copyBytes(vals[0][d], src[i].first(byteCount));
+                    *oc::BitIterator(mLeftRight[0].mSufBit.data(), d) =
+                        i + 1 < controlBits.size() ? controlBits[i + 1] : 0;
                     *oc::BitIterator(mLeftRight[1].mSufBit.data(), d) = 0;
-
                     ++d;
                 }
-
-                // if there is space left over fill with zeros
+                // vals is zero-initialized. Clear the corresponding control bits.
                 for (; d < n / 2; ++d)
                 {
-                    osuCrypto::setBytes(vals[0][d], 0);
-                    osuCrypto::setBytes(vals[1][d], 0);
-                    *oc::BitIterator(mLeftRight[0].mPreBit.data(), d) = 0;
-                    *oc::BitIterator(mLeftRight[1].mPreBit.data(), d) = 0;
+                    *oc::BitIterator(mLeftRight[0].mSufBit.data(), d) = 0;
+                    *oc::BitIterator(mLeftRight[1].mSufBit.data(), d) = 0;
                 }
 
                 vals[0].transpose(mLeftRight[0].mSufVal);

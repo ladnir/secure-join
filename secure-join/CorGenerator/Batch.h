@@ -17,7 +17,9 @@ namespace secJoin
 
     struct BatchThreadState
     {
-        oc::AlignedUnVector<block> mA, mB, mEncodeTemp, mPprfTemp;
+        oc::AlignedUnVector<block> mA, mB;
+        oc::pprf::ExpandTreeBuffer mPprfTemp;
+        std::optional<oc::SpinCode> mSpin;
         macoro::eager_task<> mTask;
     };
 
