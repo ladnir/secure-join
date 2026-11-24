@@ -320,7 +320,8 @@ namespace secJoin
             co_await silentSendInplace(delta, b.size(), prng, chl);
 
             mCtx.copy(mB.begin(), mB.begin() + b.size(), b.begin());
-            clear();
+            if (!mStationary)
+                clear();
 
             setTimePoint("SilentVoleSender.expand.ldpc.msgCpy");
 
@@ -360,7 +361,8 @@ namespace secJoin
             }
             setTimePoint("SilentVoleSender.expand.derandomize");
 
-            clear();
+            if (!mStationary)
+                clear();
 
             } MACORO_CATCH(exPtr) {
                 co_await chl.close();

@@ -494,6 +494,39 @@ void CorGenerator_SpinWorkers_Test(const oc::CLP&)
         receiver.finish(r);
     }
 
+    // The public copying and chosen-VOLE interfaces must also resume the
+    // same stationary stream when callers supply their own output buffers.
+    {
+        SilentF4VoleSender s;
+        SilentF4VoleReceiver r;
+        s.configure(k, oc::SilentBaseType::BaseExtend, 128, {}, Noise::Stationary);
+        r.configure(k, oc::SilentBaseType::BaseExtend, 128, {}, Noise::Stationary);
+        SilentF4VoleSender::VecF a(k), b(k);
+        SilentF4VoleReceiver::VecG choices(k);
+        CoeffCtxGF4 ctx;
+        const auto delta = random[0].get<block>() & block(~0ull, ~3ull);
+        for (unsigned round = 0; round < 2; ++round)
+        {
+            for (auto& c : choices)
+                c.mVal = random[1].get<u8>() & 3;
+            auto done = macoro::sync_wait(macoro::when_all_ready(
+                round ? s.sendChosen(delta, b, random[0], channel[0]) : s.silentSend(delta, b, random[0], channel[0]),
+                round ? r.receiveChosen(choices, a, random[1], channel[1]) : r.silentReceive(a, random[1], channel[1])));
+            std::get<0>(done).result();
+            std::get<1>(done).result();
+            if (!s.isConfigured() || !r.isConfigured() || s.silentBaseOtCount() || r.silentBaseOtCount())
+                throw std::runtime_error("GF(4) wrapper lost its stationary PPRF");
+            for (u64 i = 0; i < k; ++i)
+            {
+                const F4 c = round ? choices[i] : F4{u8(a[i].get<u8>(0) & 3)};
+                block product;
+                ctx.mul(product, delta, c);
+                if ((a[i] & block(~0ull, ~3ull)) != (b[i] ^ product))
+                    throw std::runtime_error("GF(4) wrapper correlation mismatch");
+            }
+        }
+    }
+
     // Four full batches exercise two rounds on each of two workers. Keep the
     // public storage across init() and check private streams start afresh.
     PRNG prng(oc::ZeroBlock);

@@ -436,7 +436,8 @@ namespace secJoin
 
 			mCtx.copy(mA.begin(), mA.begin() + a.size(), a.begin());
 
-			clear();
+			if (!mStationary)
+			    clear();
 
 			} MACORO_CATCH(exPtr) {
 				if(!chl.closed()) co_await chl.close();
@@ -476,7 +477,8 @@ namespace secJoin
 
 			co_await chl.send(std::move(diff));
 
-			clear();
+			if (!mStationary)
+			    clear();
 
 			} MACORO_CATCH(exPtr) {
 				if (!chl.closed()) co_await chl.close();
