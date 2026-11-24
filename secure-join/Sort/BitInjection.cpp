@@ -5,25 +5,32 @@ namespace secJoin
 {
 
 
+	template<u64 Bytes>
+	static void unpackWords(span<const u8> in, span<u32> out)
+	{
+		for (u64 i = 0; i < out.size(); ++i)
+		{
+			u32 word = 0;
+			std::memcpy(&word, in.data() + i * Bytes, Bytes);
+			out[i] = word;
+		}
+	}
+
 	inline void unpack(span<const u8> in, u64 bitCount, span<u32> out)
 	{
+		auto bytes = oc::divCeil(bitCount, 8);
+		if (out.size() * bytes != in.size())
+			throw RTE_LOC;
 
-
-		if (bitCount == 32)
-			osuCrypto::copyBytes(out, in);
-		else
+		switch (bytes)
 		{
-			auto n = oc::divCeil(bitCount, 8);
-			if (out.size() * n != in.size())
-				throw RTE_LOC;
-			for (u64 j = 0; j < out.size(); ++j)
-			{
-				u32 v = 0;
-				std::memcpy(&v, in.data() + j * n, std::min<u64>(n, sizeof(v)));
-				out[j] = v;
-			}
+		case 0: std::fill(out.begin(), out.end(), 0); break;
+		case 1: unpackWords<1>(in, out); break;
+		case 2: unpackWords<2>(in, out); break;
+		case 3: unpackWords<3>(in, out); break;
+		case 4: osuCrypto::copyBytes(out, in); break;
+		default: throw RTE_LOC;
 		}
-
 	}
 	inline void pack(span<const u32> in, u64 bitCount, span<u8> out)
 	{
@@ -84,6 +91,9 @@ namespace secJoin
 		auto updates = oc::AlignedUnVector<u32>{};
 		auto mask = u32{};
 
+		if (outBitCount > 32)
+			throw std::runtime_error("outBitCount exceeds 32 bits. " LOCATION);
+
 		if (mInBitCount > in.cols() * 8)
 			throw std::runtime_error("mInBitCount longer than the row size. " LOCATION);
 
@@ -98,7 +108,7 @@ namespace secJoin
 
 
 		out.resize(in.rows(), mInBitCount);
-		mask = outBitCount == 32 ? -1 : ((1 << outBitCount) - 1);
+		mask = outBitCount == 32 ? ~u32{0} : ((u32{1} << outBitCount) - 1);
 
 		if (mRole)
 		{

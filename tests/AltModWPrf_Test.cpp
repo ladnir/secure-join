@@ -163,7 +163,17 @@ void AltModWPrf_mod3BitDecompostion_test()
 
 void AltModWPrf_sampleMod3_test(const oc::CLP& cmd)
 {
-
+	{
+		// The 65th output block crosses the 128-block random buffer refill.
+		PRNG prng(oc::ZeroBlock);
+		std::array<block, 65> msb, lsb;
+		sampleMod3Lookup(prng, msb, lsb);
+		if (msb.front() != block(0x4891092ad0281014ull, 0xb804758096382277ull) ||
+			lsb.front() != block(0x1648668104450b62ull, 0x439b084468069488ull) ||
+			msb.back() != block(0x850452644220150bull, 0x089706388b014672ull) ||
+			lsb.back() != block(0x0a9a08102c530234ull, 0x360850075462380dull))
+			throw RTE_LOC;
+	}
 	std::array<std::array<u8, 5>, 256>const mod3TableFull{ {
 	{  0, 0, 0, 0, 0},{  1, 0, 0, 0, 0},{  2, 0, 0, 0, 0},{  0, 1, 0, 0, 0},{  1, 1, 0, 0, 0},{  2, 1, 0, 0, 0},{  0, 2, 0, 0, 0},{  1, 2, 0, 0, 0},
 	{  2, 2, 0, 0, 0},{  0, 0, 1, 0, 0},{  1, 0, 1, 0, 0},{  2, 0, 1, 0, 0},{  0, 1, 1, 0, 0},{  1, 1, 1, 0, 0},{  2, 1, 1, 0, 0},{  0, 2, 1, 0, 0},

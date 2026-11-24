@@ -173,6 +173,25 @@ void perfectShuffle_span_Test()
         if (XX[1] != X[1])
             throw RTE_LOC;
     }
+
+    // Unaligned byte spans spanning a full SIMD batch and an odd tail.
+    alignas(block) std::array<u8, 130> input, actual;
+    alignas(block) std::array<u8, 67> evens, odds;
+    auto packed = oc::span<u8>(input).subspan(1);
+    auto roundTrip = oc::span<u8>(actual).subspan(1);
+    auto even = oc::span<u8>(evens).subspan(1, 65);
+    auto odd = oc::span<u8>(odds).subspan(2, 65);
+    prng.get(packed.data(), packed.size());
+
+    std::array<u8, 65> refEven, refOdd;
+    cPerfectUnshuffle(packed, refEven, refOdd);
+    perfectUnshuffle(packed, even, odd);
+    if (!std::equal(even.begin(), even.end(), refEven.begin()) ||
+        !std::equal(odd.begin(), odd.end(), refOdd.begin()))
+        throw RTE_LOC;
+    perfectShuffle(even, odd, roundTrip);
+    if (!std::equal(roundTrip.begin(), roundTrip.end(), packed.begin()))
+        throw RTE_LOC;
 }
 
 void perfectShuffle_128_Test()

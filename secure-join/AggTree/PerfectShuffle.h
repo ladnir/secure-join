@@ -258,29 +258,19 @@ namespace secJoin
 		return std::bit_cast<std::array<u64, 2>>(y);
 	}
 
-	inline u64 blockLane(const oc::block& b, u64 lane)
-	{
-		return std::bit_cast<std::array<u64, 2>>(b)[lane];
-	}
-
-	inline oc::block blockFromLanes(u64 lo, u64 hi)
-	{
-		return std::bit_cast<oc::block>(std::array<u64, 2>{lo, hi});
-	}
-
 	// perfect shuffle 4 blocks on x0,x1 into 8 blocks of y.
-	inline void ssePerfectShuffle(const oc::block* x0, const oc::block* x1, oc::block* y)
+	OC_FORCEINLINE void ssePerfectShuffle(const oc::block* x0, const oc::block* x1, oc::block* y)
 	{
 		// perfect shuffle the bytes.
 		const oc::block b = _mm_set_epi8(15, 7, 14, 6, 13, 5, 12, 4, 11, 3, 10, 2, 9, 1, 8, 0);
-		y[0] = _mm_set_epi64x(blockLane(x1[0], 0), blockLane(x0[0], 0));
-		y[1] = _mm_set_epi64x(blockLane(x1[0], 1), blockLane(x0[0], 1));
-		y[2] = _mm_set_epi64x(blockLane(x1[1], 0), blockLane(x0[1], 0));
-		y[3] = _mm_set_epi64x(blockLane(x1[1], 1), blockLane(x0[1], 1));
-		y[4] = _mm_set_epi64x(blockLane(x1[2], 0), blockLane(x0[2], 0));
-		y[5] = _mm_set_epi64x(blockLane(x1[2], 1), blockLane(x0[2], 1));
-		y[6] = _mm_set_epi64x(blockLane(x1[3], 0), blockLane(x0[3], 0));
-		y[7] = _mm_set_epi64x(blockLane(x1[3], 1), blockLane(x0[3], 1));
+		y[0] = _mm_unpacklo_epi64(x0[0], x1[0]);
+		y[1] = _mm_unpackhi_epi64(x0[0], x1[0]);
+		y[2] = _mm_unpacklo_epi64(x0[1], x1[1]);
+		y[3] = _mm_unpackhi_epi64(x0[1], x1[1]);
+		y[4] = _mm_unpacklo_epi64(x0[2], x1[2]);
+		y[5] = _mm_unpackhi_epi64(x0[2], x1[2]);
+		y[6] = _mm_unpacklo_epi64(x0[3], x1[3]);
+		y[7] = _mm_unpackhi_epi64(x0[3], x1[3]);
 		y[0] = _mm_shuffle_epi8(y[0], b);
 		y[1] = _mm_shuffle_epi8(y[1], b);
 		y[2] = _mm_shuffle_epi8(y[2], b);
@@ -297,11 +287,10 @@ namespace secJoin
 	}
 
 	// perfect unshuffle 8 blocks of y into 4 blocks on x0,x1 into.
-	inline void ssePerfectUnshuffle(const oc::block* yy, oc::block* x0, oc::block* x1)
+	OC_FORCEINLINE void ssePerfectUnshuffle(const oc::block* yy, oc::block* x0, oc::block* x1)
 	{
 		std::array<oc::block, 8> y;
-		std::copy((u8*)yy, (u8*)(yy + y.size()), (u8*)y.data());
-		// m emcpy(y.data(), yy, sizeof(y));
+		std::memcpy(y.data(), yy, sizeof(y));
 
 		// perfect shuffle the bits. 
 		ssePerfectShuffle_round<1>(y.data());
@@ -320,14 +309,14 @@ namespace secJoin
 		y[7] = _mm_shuffle_epi8(y[7], b);
 
 		
-		x0[0] = blockFromLanes(blockLane(y[0], 0), blockLane(y[1], 0));
-		x1[0] = blockFromLanes(blockLane(y[0], 1), blockLane(y[1], 1));
-		x0[1] = blockFromLanes(blockLane(y[2], 0), blockLane(y[3], 0));
-		x1[1] = blockFromLanes(blockLane(y[2], 1), blockLane(y[3], 1));
-		x0[2] = blockFromLanes(blockLane(y[4], 0), blockLane(y[5], 0));
-		x1[2] = blockFromLanes(blockLane(y[4], 1), blockLane(y[5], 1));
-		x0[3] = blockFromLanes(blockLane(y[6], 0), blockLane(y[7], 0));
-		x1[3] = blockFromLanes(blockLane(y[6], 1), blockLane(y[7], 1));
+		x0[0] = _mm_unpacklo_epi64(y[0], y[1]);
+		x1[0] = _mm_unpackhi_epi64(y[0], y[1]);
+		x0[1] = _mm_unpacklo_epi64(y[2], y[3]);
+		x1[1] = _mm_unpackhi_epi64(y[2], y[3]);
+		x0[2] = _mm_unpacklo_epi64(y[4], y[5]);
+		x1[2] = _mm_unpackhi_epi64(y[4], y[5]);
+		x0[3] = _mm_unpacklo_epi64(y[6], y[7]);
+		x1[3] = _mm_unpackhi_epi64(y[6], y[7]);
 	}
 
 	inline void ssePerfectShuffle(span<const u8> input0, span<const u8> input1, span<u8> output)
@@ -336,15 +325,14 @@ namespace secJoin
 		assert(input0.size() == (output.size() + 1) / 2);
 		u64 n1024 = output.size() / sizeof(std::array<oc::block, 8>);
 
-		auto in0 = (oc::block*)input0.data();
-		auto in1 = (oc::block*)input1.data();
-		auto out = (oc::block*)output.data();
 		for (u64 i = 0; i < n1024; ++i)
 		{
-			ssePerfectShuffle(in0, in1, out);
-			in0 += 4;
-			in1 += 4;
-			out += 8;
+			std::array<oc::block, 4> x0, x1;
+			std::array<oc::block, 8> y;
+			std::memcpy(x0.data(), input0.data() + i * sizeof(x0), sizeof(x0));
+			std::memcpy(x1.data(), input1.data() + i * sizeof(x1), sizeof(x1));
+			ssePerfectShuffle(x0.data(), x1.data(), y.data());
+			std::memcpy(output.data() + i * sizeof(y), y.data(), sizeof(y));
 		}
 
 		auto n64 = n1024 * 16;
@@ -377,19 +365,14 @@ namespace secJoin
 
 		u64 n1024 = input.size() / sizeof(std::array<oc::block, 8>);
 
-		auto out0 = (oc::block*)output0.data();
-		auto out1 = (oc::block*)output1.data();
-		auto in =   (oc::block*)input.data();
 		for (u64 i = 0; i < n1024; ++i)
 		{
-			assert((u8*)(in + 8) <= input.data() + input.size());
-			assert((u8*)(out0 + 4) <= output0.data() + output0.size());
-			assert((u8*)(out1 + 4) <= output1.data() + output1.size());
-			ssePerfectUnshuffle(in, out0, out1);
-
-			in += 8;
-			out0 += 4;
-			out1 += 4;
+			std::array<oc::block, 8> y;
+			std::array<oc::block, 4> x0, x1;
+			std::memcpy(y.data(), input.data() + i * sizeof(y), sizeof(y));
+			ssePerfectUnshuffle(y.data(), x0.data(), x1.data());
+			std::memcpy(output0.data() + i * sizeof(x0), x0.data(), sizeof(x0));
+			std::memcpy(output1.data() + i * sizeof(x1), x1.data(), sizeof(x1));
 		}
 
 
