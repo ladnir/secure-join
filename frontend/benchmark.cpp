@@ -497,7 +497,7 @@ namespace secJoin
 		recver.setTimer(rTimer);
 		for (u64 t = 0; t < trials; ++t)
 		{
-            if (t == 0 || noise == SdNoiseDistribution::Regular)
+            if (t == 0 || (noise == SdNoiseDistribution::Regular && multType != MultType::Spin))
             {
                 sender.configure(n, 2, 1, SilentSecType::SemiHonest, noise, multType);
                 recver.configure(n, 2, 1, SilentSecType::SemiHonest, noise, multType);

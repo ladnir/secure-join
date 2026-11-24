@@ -169,7 +169,7 @@ namespace secJoin
 
 		// Bind public worker IDs and the private stream lifetime to this peer session.
         // The request schedule already fixes the batch index on both sides.
-        if (!mMock)
+        if (!mMock && !mBatches.empty())
         {
             std::array<u64, 6> config{1, static_cast<u64>(mNoise), mNumConcurrent, mBatchSize,
                 mPartyIdx, mPrng.get<u64>()};
