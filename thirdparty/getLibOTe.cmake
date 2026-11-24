@@ -3,6 +3,9 @@ set(USER_NAME           )
 set(TOKEN               )      
 set(GIT_REPOSITORY      "https://github.com/osu-crypto/libOTe.git")
 set(GIT_TAG             "657f6da90bff5774a2d01c824e997572d5e8ba00")
+# Keep libOTe's PPRF API while picking up the GCC 15 fixes in cryptoTools,
+# coproto, macoro and libdivide.
+set(CRYPTOTOOLS_TAG     "994bbfa789ff2e7f37b7d022e7667996f1c551b9")
 
 set(DEP_NAME            libOTe)          
 set(CLONE_DIR "${SECUREJOIN_THIRDPARTY_CLONE_DIR}/${DEP_NAME}")
@@ -23,9 +26,8 @@ endif()
 string (REPLACE ";" "%" CMAKE_PREFIX_PATH_STR "${CMAKE_PREFIX_PATH}")
 
 find_program(GIT git REQUIRED)
-set(DOWNLOAD_CMD  ${GIT} clone --recursive ${GIT_REPOSITORY})
+set(DOWNLOAD_CMD  ${GIT} clone ${GIT_REPOSITORY})
 set(CHECKOUT_CMD  ${GIT} checkout ${GIT_TAG})
-set(SUBMODULE_CMD   ${GIT} submodule update --recursive)
     
 
 message("============= Building ${DEP_NAME} =============")
@@ -35,7 +37,16 @@ endif()
 
 
 run(NAME "libOTe Checkout ${GIT_TAG} " CMD ${CHECKOUT_CMD}  WD ${CLONE_DIR})
-run(NAME "libOTe submodule"       CMD ${SUBMODULE_CMD} WD ${CLONE_DIR})
+set(CRYPTOTOOLS_DIR "${CLONE_DIR}/cryptoTools")
+if(NOT EXISTS "${CRYPTOTOOLS_DIR}/.git")
+    run(NAME "Initialize cryptoTools" CMD ${GIT} submodule update --init cryptoTools WD ${CLONE_DIR})
+endif()
+execute_process(COMMAND ${GIT} cat-file -e ${CRYPTOTOOLS_TAG}^{commit}
+    WORKING_DIRECTORY "${CRYPTOTOOLS_DIR}" RESULT_VARIABLE missing_cryptoTools ERROR_QUIET)
+if(missing_cryptoTools)
+    run(NAME "Fetch cryptoTools" CMD ${GIT} fetch origin ${CRYPTOTOOLS_TAG} WD ${CRYPTOTOOLS_DIR})
+endif()
+run(NAME "Checkout cryptoTools ${CRYPTOTOOLS_TAG}" CMD ${GIT} checkout ${CRYPTOTOOLS_TAG} WD ${CRYPTOTOOLS_DIR})
 
 option(ENABLE_CIRCUITS " " true)
 if(ENABLE_MOCK_OT)
