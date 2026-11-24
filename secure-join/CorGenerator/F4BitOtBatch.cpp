@@ -2,6 +2,7 @@
 #include "CorGenerator.h"
 #include "secure-join/Util/match.h"
 #include "secure-join/Util/Simd.h"
+#include <cstring>
 
 namespace secJoin
 {
@@ -449,7 +450,7 @@ namespace secJoin
 		mOts.resize(A.size());
 		mChoiceLsb.resize(A.size());
 		mChoiceMsb.resize(A.size());
-		auto aIter16 = (u16*)mOts.data();
+		auto aIter = reinterpret_cast<u8*>(mOts.data());
 		auto lsbIter8 = (u8*)mChoiceLsb.data();
 		auto msbIter8 = (u8*)mChoiceMsb.data();
 
@@ -575,7 +576,8 @@ namespace secJoin
 
 			u16 ap = movemask_epi8(a00);
 
-			*aIter16++ = ap;
+			std::memcpy(aIter, &ap, sizeof(ap));
+			aIter += sizeof(ap);
 			m += 16;
 
 		}
@@ -588,12 +590,12 @@ namespace secJoin
 		for (u64 i = 0; i < 4; ++i)
 			mOts[i].resize(B.size());
 
-		std::array<u16*, 4> iters
+		std::array<u8*, 4> iters
 		{
-			(u16*)mOts[0].data(),
-			(u16*)mOts[1].data(),
-			(u16*)mOts[2].data(),
-			(u16*)mOts[3].data()
+			reinterpret_cast<u8*>(mOts[0].data()),
+			reinterpret_cast<u8*>(mOts[1].data()),
+			reinterpret_cast<u8*>(mOts[2].data()),
+			reinterpret_cast<u8*>(mOts[3].data())
 		};
 		//auto bIter16 = (u16*)add.data();
 		//auto aIter16 = (u16*)mult.data();
@@ -716,8 +718,9 @@ namespace secJoin
 
 				u16 ap = movemask_epi8(a00);
 
-				assert(iters[b] < (u16*)(mOts[b].data() + mOts[b].size()));
-				*iters[b]++ = ap;
+				assert(iters[b] + sizeof(ap) <= reinterpret_cast<u8*>(mOts[b].data() + mOts[b].size()));
+				std::memcpy(iters[b], &ap, sizeof(ap));
+				iters[b] += sizeof(ap);
 			}
 		}
 	}

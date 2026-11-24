@@ -1,4 +1,5 @@
 #include "BitInjection.h"
+#include <cstring>
 
 namespace secJoin
 {
@@ -16,7 +17,11 @@ namespace secJoin
 			if (out.size() * n != in.size())
 				throw RTE_LOC;
 			for (u64 j = 0; j < out.size(); ++j)
-				out[j] = *(u32*)&in[j * n];
+			{
+				u32 v = 0;
+				std::memcpy(&v, in.data() + j * n, std::min<u64>(n, sizeof(v)));
+				out[j] = v;
+			}
 		}
 
 	}

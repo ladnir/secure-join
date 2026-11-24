@@ -1,7 +1,9 @@
 #pragma once
 #include "secure-join/Defines.h"
 #include "cryptoTools/Common/Defines.h"
+#include <bit>
 #include <cassert>
+#include <cstring>
 
 namespace secJoin
 {
@@ -74,12 +76,13 @@ namespace secJoin
 
 		u64 n32 = output.size() / sizeof(u32);
 
-		auto in0 = (u16*)input0.data();
-		auto in1 = (u16*)input1.data();
-		auto out = (u32*)output.data();
 		for (u64 i = 0; i < n32; ++i)
 		{
-			out[i] = cPerfectShuffle(in0[i], in1[i]);
+			u16 a = 0, b = 0;
+			std::memcpy(&a, input0.data() + i * sizeof(u16), sizeof(a));
+			std::memcpy(&b, input1.data() + i * sizeof(u16), sizeof(b));
+			u32 packed = cPerfectShuffle(a, b);
+			std::memcpy(output.data() + i * sizeof(u32), &packed, sizeof(packed));
 		}
 
 		auto n8 = n32 * sizeof(u32);
@@ -102,17 +105,16 @@ namespace secJoin
 		if(output0.size() != (input.size() + 1) / 2)
 			throw RTE_LOC;
 		u64 n32 = input.size() / sizeof(u32);
-		auto out0 = (u16*)output0.data();
-		auto out1 = (u16*)output1.data();
-		auto in = (u32*)input.data();
 		for (u64 i = 0; i < n32; ++i)
 		{
-			auto t = cPerfectUnshuffle(in[i]);
-			assert((u8*)&(out0[i]) < output0.data() + output0.size());
-			assert((u8*)&(out1[i]) < output1.data() + output1.size());
+			u32 word = 0;
+			std::memcpy(&word, input.data() + i * sizeof(u32), sizeof(word));
+			auto t = cPerfectUnshuffle(word);
+			assert(output0.data() + (i + 1) * sizeof(u16) <= output0.data() + output0.size());
+			assert(output1.data() + (i + 1) * sizeof(u16) <= output1.data() + output1.size());
 
-			out0[i] = ((u16*)&t)[0];
-			out1[i] = ((u16*)&t)[1];
+			std::memcpy(output0.data() + i * sizeof(u16), &t[0], sizeof(u16));
+			std::memcpy(output1.data() + i * sizeof(u16), &t[1], sizeof(u16));
 		}
 
 		auto n8 = n32 * sizeof(u32);
@@ -256,19 +258,29 @@ namespace secJoin
 		return std::bit_cast<std::array<u64, 2>>(y);
 	}
 
+	inline u64 blockLane(const oc::block& b, u64 lane)
+	{
+		return std::bit_cast<std::array<u64, 2>>(b)[lane];
+	}
+
+	inline oc::block blockFromLanes(u64 lo, u64 hi)
+	{
+		return std::bit_cast<oc::block>(std::array<u64, 2>{lo, hi});
+	}
+
 	// perfect shuffle 4 blocks on x0,x1 into 8 blocks of y.
 	inline void ssePerfectShuffle(const oc::block* x0, const oc::block* x1, oc::block* y)
 	{
 		// perfect shuffle the bytes.
 		const oc::block b = _mm_set_epi8(15, 7, 14, 6, 13, 5, 12, 4, 11, 3, 10, 2, 9, 1, 8, 0);
-		y[0] = _mm_set_epi64x(((u64*)x1)[0], ((u64*)x0)[0]);
-		y[1] = _mm_set_epi64x(((u64*)x1)[1], ((u64*)x0)[1]);
-		y[2] = _mm_set_epi64x(((u64*)x1)[2], ((u64*)x0)[2]);
-		y[3] = _mm_set_epi64x(((u64*)x1)[3], ((u64*)x0)[3]);
-		y[4] = _mm_set_epi64x(((u64*)x1)[4], ((u64*)x0)[4]);
-		y[5] = _mm_set_epi64x(((u64*)x1)[5], ((u64*)x0)[5]);
-		y[6] = _mm_set_epi64x(((u64*)x1)[6], ((u64*)x0)[6]);
-		y[7] = _mm_set_epi64x(((u64*)x1)[7], ((u64*)x0)[7]);
+		y[0] = _mm_set_epi64x(blockLane(x1[0], 0), blockLane(x0[0], 0));
+		y[1] = _mm_set_epi64x(blockLane(x1[0], 1), blockLane(x0[0], 1));
+		y[2] = _mm_set_epi64x(blockLane(x1[1], 0), blockLane(x0[1], 0));
+		y[3] = _mm_set_epi64x(blockLane(x1[1], 1), blockLane(x0[1], 1));
+		y[4] = _mm_set_epi64x(blockLane(x1[2], 0), blockLane(x0[2], 0));
+		y[5] = _mm_set_epi64x(blockLane(x1[2], 1), blockLane(x0[2], 1));
+		y[6] = _mm_set_epi64x(blockLane(x1[3], 0), blockLane(x0[3], 0));
+		y[7] = _mm_set_epi64x(blockLane(x1[3], 1), blockLane(x0[3], 1));
 		y[0] = _mm_shuffle_epi8(y[0], b);
 		y[1] = _mm_shuffle_epi8(y[1], b);
 		y[2] = _mm_shuffle_epi8(y[2], b);
@@ -308,26 +320,14 @@ namespace secJoin
 		y[7] = _mm_shuffle_epi8(y[7], b);
 
 		
-		u64* yyy = (u64*)y.data();
-		u64* xx1 = (u64*)x1;
-		u64* xx0 = (u64*)x0;
-		xx0[0] = yyy[0];
-		xx1[0] = yyy[1];
-		xx0[1] = yyy[2];
-		xx1[1] = yyy[3];
-		xx0[2] = yyy[4];
-		xx1[2] = yyy[5];
-		xx0[3] = yyy[6];
-		xx1[3] = yyy[7];
-
-		xx0[4] = yyy[8];
-		xx1[4] = yyy[9];
-		xx0[5] = yyy[10];
-		xx1[5] = yyy[11];
-		xx0[6] = yyy[12];
-		xx1[6] = yyy[13];
-		xx0[7] = yyy[14];
-		xx1[7] = yyy[15];
+		x0[0] = blockFromLanes(blockLane(y[0], 0), blockLane(y[1], 0));
+		x1[0] = blockFromLanes(blockLane(y[0], 1), blockLane(y[1], 1));
+		x0[1] = blockFromLanes(blockLane(y[2], 0), blockLane(y[3], 0));
+		x1[1] = blockFromLanes(blockLane(y[2], 1), blockLane(y[3], 1));
+		x0[2] = blockFromLanes(blockLane(y[4], 0), blockLane(y[5], 0));
+		x1[2] = blockFromLanes(blockLane(y[4], 1), blockLane(y[5], 1));
+		x0[3] = blockFromLanes(blockLane(y[6], 0), blockLane(y[7], 0));
+		x1[3] = blockFromLanes(blockLane(y[6], 1), blockLane(y[7], 1));
 	}
 
 	inline void ssePerfectShuffle(span<const u8> input0, span<const u8> input1, span<u8> output)

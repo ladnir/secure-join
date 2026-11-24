@@ -1,5 +1,6 @@
 #include "RadixSort.h"
 #include "secure-join/Sort/BitInjection.h"
+#include <cstring>
 
 namespace secJoin
 {
@@ -865,7 +866,8 @@ namespace secJoin
 
 		for (u64 i = 0; i < n; ++i)
 		{
-			u16 x = *(u16*)s0;
+			u16 x = 0;
+			std::memcpy(&x, s0, sizeof(x));
 			sk(i) = (x >> shift) & mask;
 			s0 += step;
 		}
