@@ -248,8 +248,6 @@ namespace secJoin
 
 		u64 nL = cmd.getOr("Ln", 1ull << cmd.getOr("Lnn", cmd.getOr("nn", 10)));
 		u64 nR = cmd.getOr("Rn", 1ull << cmd.getOr("Rnn", cmd.getOr("nn", 10)));
-		u64 dL = cmd.getOr("Ld", cmd.getOr("d", 10));
-		u64 dR = cmd.getOr("Rd", cmd.getOr("d", 10));
 
 		auto b = cmd.getOr("b", 16);
 		u64 keySize = cmd.getOr("m", 32);
@@ -302,6 +300,7 @@ namespace secJoin
 		sock2[1].setExecutor(pool1);
 
 		OmJoin join0, join1;
+		join0.mSort.mL = join1.mSort.mL = cmd.getOr("radixBits", join0.mSort.mL);
 
 		CorGenerator ole0, ole1;
 		ole0.init(sock2[0].fork(), prng, 0, nt, 1 << b, mock);
@@ -343,10 +342,14 @@ namespace secJoin
 		if (actual != exp)
 			throw std::runtime_error("Secure join disagrees with the plaintext result");
 
-		std::cout << "OmJoin Ln:" << nL << ", Rn:" << nR << " m:" << keySize << "  Ld: " << dL << ", Rd:" << dR << "  ~ " <<
-			std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "ms " <<
-			sock[0].bytesSent() / double(nL + nR) << "+" << sock[0].bytesReceived() / double(nL + nR) << "=" <<
-			(sock[0].bytesSent() + sock[0].bytesReceived()) / double(nL + nR) << " bytes/elem " << std::endl;
+		const double rows = double(nL + nR);
+		const u64 online = sock[0].bytesSent() + sock[0].bytesReceived();
+		const u64 preprocessing = sock2[0].bytesSent() + sock2[0].bytesReceived();
+		std::cout << "OmJoin Ln:" << nL << ", Rn:" << nR << " m:" << keySize
+			<< " radix bits:" << join0.mSort.mL << "  ~ "
+			<< std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "ms "
+			<< online / rows << " online + " << preprocessing / rows << " preprocessing = "
+			<< (online + preprocessing) / rows << " bytes/elem" << std::endl;
 
 		if (cmd.isSet("timing"))
 			std::cout << timer << std::endl;

@@ -850,16 +850,18 @@ namespace secJoin
 	BinMatrix RadixSort::extract(u64 begin, u64 size, const BinMatrix& k)
 	{
 		// we assume at most a byte size.
-		if (size > 8)
+		if (size == 0 || size > 8 || begin >= k.bitsPerEntry())
 			throw RTE_LOC;
-		size = std::min<u64>(size, k.cols() * 8 - begin);
+		BinMatrix sk(k.rows(), size);
+		if (k.rows() == 0)
+			return sk;
+		size = std::min<u64>(size, k.bitsPerEntry() - begin);
 
 
 		auto byteIdx = begin / 8;
 		auto shift = begin % 8;
 		auto step = k.cols();
-		u64 mask = (size % 64) ? (1ull << size) - 1 : ~0ull;
-		BinMatrix sk(k.rows(), oc::divCeil(size, 8));
+		u64 mask = (1ull << size) - 1;
 
 		auto n = k.rows() - 1;
 		auto s0 = (k.data() + byteIdx);
@@ -1008,6 +1010,8 @@ namespace secJoin
 		u64 bitCount,
 		CorGenerator& gen)
 	{
+		if (mL == 0 || mL > 8)
+			throw std::invalid_argument("Radix digit width must be between 1 and 8");
 		mRole = role;
 		mSize = n;
 		mBitCount = bitCount;

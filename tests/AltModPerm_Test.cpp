@@ -34,8 +34,8 @@ void AltModPerm_setup_test(const oc::CLP& cmd)
     //for (auto invPerm : { PermOp::Regular,PermOp::Inverse })
     {
 
-        ole0.init(sock[0].fork(), prng0, 0, 1, 1 << 18, cmd.getOr("mock", 1));
-        ole1.init(sock[1].fork(), prng1, 1, 1, 1 << 18, cmd.getOr("mock", 1));
+        ole0.init(sock[0].fork(), prng0, 0, 1, 1 << 18, cmd.getOr("mock", 0));
+        ole1.init(sock[1].fork(), prng1, 1, 1, 1 << 18, cmd.getOr("mock", 0));
 
         AltModPerm0.init(n, rowSize, ole0);
         AltModPerm1.init(n, rowSize, ole1);

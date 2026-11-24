@@ -43,19 +43,16 @@ namespace secJoin
 
     void RequestState::startReq()
     {
-        for (u64 i = 0; i < mBatches_.size(); ++i)
-        {
-            // the batch might have already finished. lets see if it exists
-            // and if it needs to be started.
-            auto batch = mBatches_[i].mWeakBatch.lock();
-            if(batch)
-                batch->start();
-        }
+        // The generator starts batches in index order. Starting the last
+        // segment also releases every preceding segment of this request.
+        if (!mBatches_.empty())
+            if (auto last = mBatches_.back().mWeakBatch.lock())
+                last->start();
     }
 
     u64 RequestState::batchCount()
     {
-        return oc::divCeil(mSize, mGenState->mBatchSize) + 1;
+        return mBatches_.size();
     }
 
     u64 RequestState::size() { return mSize; }

@@ -163,11 +163,6 @@ namespace secJoin
 		}
 	}
 
-	struct DebugCheckSums
-	{
-		block a, b, c, d;
-	};
-
 	// The basic protocol where the inputs are not shared:
 	// Sender has 
 	//   > input x
@@ -213,7 +208,8 @@ namespace secJoin
 		auto in = std::array<block*, 2>{};
 		auto out = (block*)nullptr;
 		auto ww = std::vector<block>{};
-		auto debugCheckSums = std::array<DebugCheckSums, 2>{};
+		auto peerC = oc::AlignedUnVector<block>{};
+		auto peerD = oc::AlignedUnVector<block>{};
 		auto print = coproto::unique_function<void(u64)>{};
 		auto a = oc::AlignedUnVector<block>{};
 		auto b = oc::AlignedUnVector<block>{};
@@ -255,7 +251,6 @@ namespace secJoin
 					mO.mWords(i, j) = mO.mWords(i, j) ^ mWords[i][j];
 			}
 
-			memset(&debugCheckSums, 0, sizeof(debugCheckSums));
 		}
 
 		for (roundIdx = 0; roundIdx < numRounds(); ++roundIdx)
@@ -336,15 +331,17 @@ namespace secJoin
 				j += min;
 			}
 
-			if (mO.mDebug)
+			if (mO.mDebug && a.size())
 			{
+				co_await chl.send(coproto::copy(c));
+				co_await chl.send(coproto::copy(d));
+				peerC.resize(a.size());
+				peerD.resize(a.size());
+				co_await chl.recv(peerC);
+				co_await chl.recv(peerD);
 				for (u64 i = 0; i < a.size(); ++i)
-				{
-					debugCheckSums[0].a ^= a[i];
-					debugCheckSums[0].b ^= b[i];
-					debugCheckSums[0].c ^= c[i];
-					debugCheckSums[0].d ^= d[i];
-				}
+					if ((b[i] ^ peerD[i]) != (a[i] & peerC[i]))
+						throw RTE_LOC;
 			}
 
 			// now process the round.
@@ -574,17 +571,9 @@ namespace secJoin
 					for (u64 j = 0; j < mN128; ++j)
 						ww[i * mN128 + j] = mWords[i][j];
 				co_await chl.send(std::move(ww));
-				co_await chl.send(std::move(debugCheckSums[0]));
 
 				ww.resize(mWords.size() * mN128);
 				co_await chl.recv(ww);
-				co_await chl.recv(debugCheckSums[1]);
-
-				if ((debugCheckSums[0].b ^ debugCheckSums[1].d) != (debugCheckSums[0].a & debugCheckSums[1].c))
-					throw RTE_LOC;
-				if ((debugCheckSums[1].b ^ debugCheckSums[0].d) != (debugCheckSums[1].a & debugCheckSums[0].c))
-					throw RTE_LOC;
-
 				for (u64 i = 0; i < mWords.size(); ++i)
 				{
 					for (u64 j = 0; j < mN128; ++j)

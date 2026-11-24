@@ -81,14 +81,15 @@ namespace secJoin
 		// randomized the blocks using AES. We only have a weak PRF.
 		aes.ecbEncBlocks(dst.mDelta, dst.mDelta);
 
+		oc::Matrix<block> debugInput;
+		if (mDebug)
+			debugInput = dst.mDelta;
 		co_await mPrfRecver.evaluate(dst.mDelta, dst.mDelta, chl, prng);
 
 		if (mDebug)
 		{
 			auto debugB = oc::Matrix<oc::block>{};
-			auto debugInput = oc::Matrix<oc::block>{};
 			auto debugKey = AltModPrf::KeyType{};
-			debugInput = dst.mDelta;
 
 			debugB.resize(dst.mDelta.rows(), dst.mDelta.cols());
 			co_await chl.recv(debugKey);
