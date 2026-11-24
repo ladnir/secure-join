@@ -175,6 +175,14 @@ namespace secJoin
         {
             mock(batchIdx, add, mult);
         }
+        else if (threadState.mStationary)
+        {
+            auto& worker = *threadState.mStationary;
+            auto& protocol = worker.begin(worker.recvOt, CorType::Ole, size, false);
+            co_await protocol.silentReceiveInplace(size, prng, sock, oc::ChoiceBitPacking::True);
+            compressRecver(protocol.mA, add, mult);
+            worker.finish(protocol);
+        }
         else
         {
 
@@ -230,6 +238,14 @@ namespace secJoin
         if (state->mMock)
         {
             mock(batchIdx, add, mult);
+        }
+        else if (threadState.mStationary)
+        {
+            auto& worker = *threadState.mStationary;
+            auto& protocol = worker.begin(worker.sendOt, CorType::Ole, size, true);
+            co_await protocol.silentSendInplace(protocol.mDelta, size, prng, sock);
+            compressSender(*protocol.mDelta, protocol.mB, add, mult);
+            worker.finish(protocol);
         }
         else
         {

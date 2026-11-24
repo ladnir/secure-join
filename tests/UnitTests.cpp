@@ -134,6 +134,8 @@ namespace secJoin_Tests
             t.add("WhereParser_BoolOps_Test                      ", WhereParser_BoolOps_Test);
             t.add("WhereParser_Big_Test                          ", WhereParser_Big_Test);
             
+            t.add("CorGenerator_SpinWorkers_Test                 ", CorGenerator_SpinWorkers_Test);
+
             //t.add("Where_genWhBundle_Test                        ", WhereParser_genWhBundle_Test);
             //t.add("WhereParser_ArrType_Equals_Test               ", WhereParser_ArrType_Equals_Test);
             //t.add("WhereParser_ArrType_Not_Equals_Test           ", WhereParser_ArrType_Not_Equals_Test);

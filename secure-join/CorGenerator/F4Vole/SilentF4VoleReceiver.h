@@ -12,6 +12,7 @@
 #include <cryptoTools/Common/Timer.h>
 #include <libOTe/Tools/Tools.h>
 #include "libOTe/Tools/Pprf/RegularPprf.h"
+#include "libOTe/Tools/Pprf/StationaryPprf.h"
 #include <libOTe/TwoChooseOne/TcoOtDefines.h>
 #include <libOTe/TwoChooseOne/OTExtInterface.h>
 #include <libOTe/TwoChooseOne/SoftSpokenOT/SoftSpokenMalOtExt.h>
@@ -87,6 +88,20 @@ namespace secJoin
 		// The multi-point punctured PRF for generating
 		// the sparse vectors.
 		oc::RegularPprfReceiver<F, Ctx> mGen;
+        std::unique_ptr<oc::StationaryPprfReceiver<F, Ctx>> mStationary;
+        block mCodeSeed = oc::ZeroBlock;
+
+        auto& gen() const {
+            using Base = oc::PprfReceiver<F, Ctx>;
+            return mStationary ? static_cast<const Base&>(*mStationary) : static_cast<const Base&>(mGen);
+        }
+        auto& gen() {
+            using Base = oc::PprfReceiver<F, Ctx>;
+            return mStationary ? static_cast<Base&>(*mStationary) : static_cast<Base&>(mGen);
+        }
+        auto format() const {
+            return mStationary ? oc::PprfOutputFormat::ByTreeIndex : oc::PprfOutputFormat::ByPhysicalIndex;
+        }
 
 		// The internal buffers for holding the expanded vectors.
 		// mA  = mB + mC * delta
@@ -131,7 +146,7 @@ namespace secJoin
 		//
 				// returns true if the silent base OTs are set.
 		bool hasSilentBaseOts() const {
-			return mGen.hasBaseOts();
+			return gen().hasBaseOts();
 		};
 		//
 		//        // Generate the IKNP base OTs
@@ -225,7 +240,11 @@ namespace secJoin
 					msg.resize(msg.size() - mOtExtSender->baseOtCount());
 					co_await nv.receive(noiseVals, baseAs, prng, *mOtExtSender, chl, mCtx);
 				}
-				else
+				else if (msg.empty())
+                {
+                    co_await nv.receive(noiseVals, baseAs, prng, *mOtExtSender, chl, mCtx);
+                }
+                else
 				{
 					chl2 = chl.fork();
 					prng2.SetSeed(prng.get());
@@ -273,7 +292,7 @@ namespace secJoin
 			u64 requestSize,
 			oc::SilentBaseType type = oc::SilentBaseType::BaseExtend,
 			u64 secParam = 128,
-			Ctx ctx = {})
+			Ctx ctx = {}, oc::SdNoiseDistribution noise = oc::SdNoiseDistribution::Regular)
 		{
 			mCtx = std::move(ctx);
 			mSecParam = secParam;
@@ -282,13 +301,21 @@ namespace secJoin
 			mBaseType = type;
 
 
-			const auto config = configureF4Code(mSecParam, mRequestSize, mMultType);
+			const auto config = configureF4Code(mSecParam, mRequestSize, mMultType, noise);
 			mNumPartitions = config.mNumPartitions;
 			mSizePer = config.mSizePer;
 			mNoiseVecSize = config.mNoiseVectorSize;
 
 
-			mGen.configure(mSizePer, mNumPartitions);
+			if (noise == oc::SdNoiseDistribution::Stationary)
+            {
+                mCodeSeed = block(12528943721987127, 98743297823479812);
+                mSpin.reset();
+                mStationary = std::make_unique<oc::StationaryPprfReceiver<F, Ctx>>();
+            }
+            else
+                mStationary.reset();
+            gen().configure(mSizePer, mNumPartitions);
 		}
 
 		// return true if this instance has been configured.
@@ -301,7 +328,7 @@ namespace secJoin
 			if (isConfigured() == false)
 				throw std::runtime_error("configure must be called first");
 
-			return mGen.baseOtCount();
+			return gen().baseOtCount();
 
 		}
 
@@ -314,7 +341,7 @@ namespace secJoin
 			if (isConfigured() == false)
 				throw std::runtime_error("configure(...) must be called first");
 
-			auto choice = mGen.sampleChoiceBits(prng);
+			auto choice = gen().sampleChoiceBits(prng);
 
 			return choice;
 		}
@@ -330,14 +357,21 @@ namespace secJoin
 
 			mCtx.resize(mBaseC, mNumPartitions + (mMalType == oc::SilentSecType::Malicious));
 
-			// Rejection sampling keeps the three nonzero coefficients equiprobable.
+			// Regular noise is uniform on the three nonzero values. Stationary includes zero.
 			for (u64 i = 0; i < mNumPartitions; ++i)
 			{
-				do { mBaseC[i].mVal = prng.get<u8>() & 3; } while (!mBaseC[i].mVal);
+				do { mBaseC[i].mVal = prng.get<u8>() & 3; } while (!mStationary && !mBaseC[i].mVal);
 			}
 
-			mS.resize(mNumPartitions);
-			mGen.getPoints(mS, oc::PprfOutputFormat::ByPhysicalIndex);
+			if (!mStationary || !mStationary->mExpanded)
+            {
+                mS.resize(mNumPartitions);
+                gen().getPoints(mS, format());
+                // Tree-index PPRF returns a local leaf for each contiguous tree.
+                if (mStationary)
+                    for (u64 i = 0; i < mNumPartitions; ++i)
+                        mS[i] += i * mSizePer;
+            }
 
 			if (mMalType == oc::SilentSecType::Malicious)
 			{
@@ -378,7 +412,7 @@ namespace secJoin
 
 			if (baseA.size() != baseVoleCount())
 				throw std::invalid_argument("Wrong number of base GF(4) VOLEs");
-			mGen.setBase(recvBaseOts);
+			gen().setBase(recvBaseOts);
 
 			mBaseA.resize(baseA.size());
 			for (u64 i = 0; i < baseA.size(); ++i)
@@ -473,7 +507,7 @@ namespace secJoin
 			if (mRequestSize < n)
 				throw std::invalid_argument("n does not match the requested number of OTs via configure(...). " LOCATION);
 
-			if (hasSilentBaseOts() == false)
+			if (!hasSilentBaseOts() || mBaseA.empty())
 			{
 				co_await genSilentBaseOts(prng, chl);
 			}
@@ -487,7 +521,7 @@ namespace secJoin
 			setTimePoint("SilentVoleReceiver.alloc.zero");
 
 			if (mTimer)
-				mGen.setTimer(*mTimer);
+				gen().setTimer(*mTimer);
 
 			// As part of the setup, we have generated 
 			//  
@@ -508,7 +542,7 @@ namespace secJoin
 			//    mA = mB + mS(mBaseC * mDelta)
 			//
 			mA.resize(mNumPartitions * mSizePer);
-			co_await mGen.expand(chl, mA, oc::PprfOutputFormat::ByPhysicalIndex, true, mNumThreads);
+			co_await gen().expand(chl, mA, format(), true, mNumThreads, mCtx);
 			for (auto& leaf : mA)
 			    leaf &= block(~0ull, ~3ull);
 			mA.resize(mNoiseVecSize);
@@ -560,7 +594,8 @@ namespace secJoin
 			switch (mMultType)
 			{
 			case oc::MultType::Spin:
-			    compressF4Spin(mSpin, mRequestSize, mA);
+			    compressF4Spin(mSpin, mRequestSize, mA, mStationary ?
+                    oc::SdNoiseDistribution::Stationary : oc::SdNoiseDistribution::Regular, mCodeSeed);
 			    break;
 			case osuCrypto::MultType::ExConv7x24:
 			case osuCrypto::MultType::ExConv21x24:
@@ -600,7 +635,7 @@ namespace secJoin
 
 			// make the protocol as done and that
 			// mA,mC are ready to be consumed.
-			mState = State::Default;
+			mState = mStationary ? State::Configured : State::Default;
 
 			if (mDebug)
 			{
@@ -790,7 +825,8 @@ namespace secJoin
 			mS = {};
 			mA = {};
 			//mC = {};
-			mGen.clear();
+			gen().clear();
+            mState = State::Default;
 		}
 	};
 }

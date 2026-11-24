@@ -153,6 +153,29 @@ namespace secJoin
                 }
             };
         }
+        else if (threadState.mStationary)
+        {
+            auto& worker = *threadState.mStationary;
+            if (mSendRecv.index() == 0)
+            {
+                auto& send = std::get<0>(mSendRecv);
+                auto& protocol = worker.begin(worker.sendOt, CorType::Ot, mSize, true);
+                co_await protocol.silentSendInplace(protocol.mDelta, mSize, mPrng, mSock);
+                send.mMsg2.resize(mSize);
+                protocol.hash(send.mMsg2, oc::ChoiceBitPacking::True);
+                worker.finish(protocol);
+            }
+            else
+            {
+                auto& recv = std::get<1>(mSendRecv);
+                auto& protocol = worker.begin(worker.recvOt, CorType::Ot, mSize, false);
+                co_await protocol.silentReceiveInplace(mSize, mPrng, mSock, oc::ChoiceBitPacking::True);
+                recv.mChoice.resize(mSize);
+                recv.mMsg.resize(mSize);
+                protocol.hash(recv.mChoice, recv.mMsg, oc::ChoiceBitPacking::True);
+                worker.finish(protocol);
+            }
+        }
         else
         {
             if (mGenState->mDebug)

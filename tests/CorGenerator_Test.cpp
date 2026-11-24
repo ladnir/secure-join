@@ -4,21 +4,30 @@
 #include "secure-join/Prf/AltModSimd.h"
 using namespace secJoin;
 
+namespace
+{
+    using Noise = oc::SdNoiseDistribution;
+    constexpr std::pair<bool, Noise> cases[] = {
+        {false, Noise::Regular}, {true, Noise::Regular}, {false, Noise::Stationary}
+    };
+}
+
 void CorGenerator_F4BitOt_Test(const oc::CLP& cmd)
 {
 
 	u64 n = (1ull << 16) + 3234;
 
-	for (auto mock : { false, true })
+	for (auto [mock, noise] : cases)
 	{
+		const u64 batch = noise == Noise::Stationary ? 8192 : 1 << 18;
 
 		PRNG prng(oc::ZeroBlock);
 
 		auto sock = coproto::LocalAsyncSocket::makePair();
 		CorGenerator send;
 		CorGenerator recv;
-		send.init(std::move(sock[0]), prng, 0, 2, 1 << 18, mock);
-		recv.init(std::move(sock[1]), prng, 1, 2, 1 << 18, mock);
+		send.init(std::move(sock[0]), prng, 0, 2, batch, mock, noise);
+		recv.init(std::move(sock[1]), prng, 1, 2, batch, mock, noise);
 
 		send.mGenState->mDebug = cmd.isSet("debug");
 		recv.mGenState->mDebug = cmd.isSet("debug");
@@ -84,8 +93,9 @@ void CorGenerator_Ot_Test(const oc::CLP& cmd)
 
 	u64 n = (1ull << 16) + 3234;
 
-	for (auto mock : { false, true })
+	for (auto [mock, noise] : cases)
 	{
+		const u64 batch = noise == Noise::Stationary ? 8192 : 1 << 18;
 
 		PRNG prng(oc::ZeroBlock);
 		//SendBase sBase;sBase.resize(128);
@@ -101,8 +111,8 @@ void CorGenerator_Ot_Test(const oc::CLP& cmd)
 		auto sock = coproto::LocalAsyncSocket::makePair();
 		CorGenerator send;
 		CorGenerator recv;
-		send.init(std::move(sock[0]), prng, 0, 2, 1 << 18, mock);
-		recv.init(std::move(sock[1]), prng, 1, 2, 1 << 18, mock);
+		send.init(std::move(sock[0]), prng, 0, 2, batch, mock, noise);
+		recv.init(std::move(sock[1]), prng, 1, 2, batch, mock, noise);
 
 		send.mGenState->mDebug = cmd.isSet("debug");
 		recv.mGenState->mDebug = cmd.isSet("debug");
@@ -162,8 +172,9 @@ void CorGenerator_BinOle_Test(const oc::CLP& cmd)
 
 	u64 n = cmd.getOr("n", (1ull << 16) + 3234);
 
-	for (auto mock : { false, true })
+	for (auto [mock, noise] : cases)
 	{
+		const u64 batch = noise == Noise::Stationary ? 8192 : 1 << 18;
 
 
 		PRNG prng(oc::ZeroBlock);
@@ -181,8 +192,8 @@ void CorGenerator_BinOle_Test(const oc::CLP& cmd)
 		CorGenerator  send;
 		CorGenerator  recv;
 
-		send.init(std::move(sock[0]), prng, 0, 1, 1 << 18, mock);
-		recv.init(std::move(sock[1]), prng, 1, 1, 1 << 18, mock);
+		send.init(std::move(sock[0]), prng, 0, 2, batch, mock, noise);
+		recv.init(std::move(sock[1]), prng, 1, 2, batch, mock, noise);
 		send.mGenState->mDebug = cmd.isSet("debug");
 		recv.mGenState->mDebug = cmd.isSet("debug");
 
@@ -244,15 +255,16 @@ void CorGenerator_TritOt_Test(const oc::CLP& cmd)
 			throw RTE_LOC;
 	}
 
-	for (auto mock : { false, true })
+	for (auto [mock, noise] : cases)
 	{
+		const u64 batch = noise == Noise::Stationary ? 8192 : 1 << 18;
 
 
 		auto sock = coproto::LocalAsyncSocket::makePair();
 		CorGenerator send;
 		CorGenerator recv;
-		send.init(std::move(sock[0]), prng, 0, 2, 1 << 18, mock);
-		recv.init(std::move(sock[1]), prng, 1, 2, 1 << 18, mock);
+		send.init(std::move(sock[0]), prng, 0, 2, batch, mock, noise);
+		recv.init(std::move(sock[1]), prng, 1, 2, batch, mock, noise);
 
 		send.mGenState->mDebug = cmd.isSet("debug");
 		recv.mGenState->mDebug = cmd.isSet("debug");
@@ -447,3 +459,102 @@ void CorGenerator_mixed_Test(const oc::CLP& cmd)
 	}
 }
 
+
+void CorGenerator_SpinWorkers_Test(const oc::CLP&)
+{
+    constexpr u64 k = 8192;
+    std::optional<oc::SpinCode> first, second;
+    prepareRegularSpin(first, k - 128);
+    prepareRegularSpin(second, k);
+    if (&first->encoder() != &second->encoder())
+        throw std::runtime_error("Regular workers rebuilt an identical padded code");
+
+    SpinBanks bank[2];
+    StationaryWorker sender(0, 0, oc::OneBlock, bank[0]), receiver(0, 1, oc::OneBlock, bank[1]);
+    PRNG random[2]{PRNG(oc::ZeroBlock), PRNG(oc::OneBlock)};
+    auto channel = coproto::LocalAsyncSocket::makePair();
+    auto nextSeed = sender.initialSeed(CorType::Ot, k, 0);
+    for (unsigned round = 0; round < 2; ++round)
+    {
+        auto& s = sender.begin(sender.sendOt, CorType::Ot, k, true);
+        auto& r = receiver.begin(receiver.recvOt, CorType::Ot, k, false);
+        if (s.mCodeSeed != nextSeed || r.mCodeSeed != nextSeed)
+            throw std::runtime_error("Stationary stream restarted");
+        auto done = macoro::sync_wait(macoro::when_all_ready(
+            s.silentSendInplace(s.mDelta, k, random[0], channel[0]),
+            r.silentReceiveInplace(k, random[1], channel[1], oc::ChoiceBitPacking::True)));
+        std::get<0>(done).result();
+        std::get<1>(done).result();
+        const auto spec = s.mSpin->encoder().specification();
+        if (s.mSpin->encoder().descriptor() != r.mSpin->encoder().descriptor() ||
+            spec.route_seed != nextSeed.get<u64>(0) || spec.inner_seed != nextSeed.get<u64>(1))
+            throw std::runtime_error("Peers used the wrong stationary round map");
+        nextSeed = oc::mAesFixedKey.hashBlock(nextSeed);
+        sender.finish(s);
+        receiver.finish(r);
+    }
+
+    // Four full batches exercise two rounds on each of two workers. Keep the
+    // public storage across init() and check private streams start afresh.
+    PRNG prng(oc::ZeroBlock);
+    std::array<CorGenerator, 2> peers;
+    std::array<std::optional<spin::PreparedEncoder::Workspace>, 2> identity;
+    std::array<std::array<std::byte, 56>, 2> previous{};
+    for (u64 join = 0; join < 2; ++join)
+    {
+        auto sockets = coproto::LocalAsyncSocket::makePair();
+        for (u64 party = 0; party < 2; ++party)
+            peers[party].init(std::move(sockets[party]), prng, party, 2, k, false, Noise::Stationary);
+        auto send = peers[0].sendOtRequest(4 * k);
+        auto recv = peers[1].recvOtRequest(4 * k);
+        send.start();
+        recv.start();
+        auto tasks = macoro::sync_wait(macoro::when_all_ready(peers[0].start(), peers[1].start()));
+        std::get<0>(tasks).result();
+        std::get<1>(tasks).result();
+
+        u64 seeds[2];
+        for (u64 w = 0; w < 2; ++w)
+        {
+            const auto& left = peers[0].mBanks->idle.at(0).at(w).codes.at(k)->encoder();
+            const auto& right = peers[1].mBanks->idle.at(0).at(w).codes.at(k)->encoder();
+            if (left.descriptor() != right.descriptor())
+                throw std::runtime_error("Stationary peer maps disagree");
+            if (join)
+            {
+                left.prepare_workspace(*identity[w]); // Checks the identity of the underlying bank.
+                if (left.descriptor() == previous[w])
+                    throw std::runtime_error("New peer session restarted the previous seed schedule");
+            }
+            else
+                identity[w].emplace(left.make_workspace());
+            previous[w] = left.descriptor();
+            seeds[w] = left.setup_options().bank_seed;
+        }
+        if (seeds[0] == seeds[1])
+            throw std::runtime_error("Concurrent workers sampled the same bank");
+    }
+
+    auto sockets = coproto::LocalAsyncSocket::makePair();
+    peers[0].init(std::move(sockets[0]), prng, 0, 2, k, false, Noise::Stationary);
+    peers[1].init(std::move(sockets[1]), prng, 1, 1, k, false, Noise::Stationary);
+    auto send = peers[0].sendOtRequest(k);
+    auto recv = peers[1].recvOtRequest(k);
+    auto tasks = macoro::sync_wait(macoro::when_all_ready(peers[0].start(), peers[1].start()));
+    auto expectMismatch = [](auto& t) {
+        try { t.result(); }
+        catch (const std::runtime_error& e) {
+            if (std::string(e.what()).find("Peer correlation") != std::string::npos)
+                return;
+            throw;
+        }
+        throw std::runtime_error("Mismatched worker counts accepted");
+    };
+    expectMismatch(std::get<0>(tasks));
+    expectMismatch(std::get<1>(tasks));
+    OtSend out;
+    OtRecv in;
+    auto requests = macoro::sync_wait(macoro::when_all_ready(send.get(out), recv.get(in)));
+    expectMismatch(std::get<0>(requests));
+    expectMismatch(std::get<1>(requests));
+}

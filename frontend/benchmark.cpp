@@ -6,7 +6,12 @@
 
 namespace secJoin
 {
-	void CorGen_benchmark(const oc::CLP& cmd)
+	static oc::SdNoiseDistribution benchmarkNoise(const oc::CLP& cmd)
+    {
+        return cmd.isSet("stationary") ? oc::SdNoiseDistribution::Stationary : oc::SdNoiseDistribution::Regular;
+    }
+
+    void CorGen_benchmark(const oc::CLP& cmd)
 	{
 		// request size
 		u64 n = cmd.getOr("n", 1ull << cmd.getOr("nn", 20));
@@ -48,8 +53,8 @@ namespace secJoin
 
 			CorGenerator g[2];
 			auto begin = timer.setTimePoint("begin trial ------------- ");
-			g[0].init(std::move(sock[0]), prng0, 0, nt, batch, false);
-			g[1].init(std::move(sock[1]), prng1, 1, nt, batch, false);
+			g[0].init(std::move(sock[0]), prng0, 0, nt, batch, false, benchmarkNoise(cmd));
+			g[1].init(std::move(sock[1]), prng1, 1, nt, batch, false, benchmarkNoise(cmd));
 
 			g[0].mGenState->mPool = &pool0;
 			g[1].mGenState->mPool = &pool1;
@@ -209,8 +214,8 @@ namespace secJoin
 		for (u64 t = 0; t < trials; ++t)
 		{
 
-			g[0].init(sock2[0].fork(), prng0, 0, nt, 1 << batch, mock);
-			g[1].init(sock2[1].fork(), prng1, 1, nt, 1 << batch, mock);
+			g[0].init(sock2[0].fork(), prng0, 0, nt, 1 << batch, mock, benchmarkNoise(cmd));
+			g[1].init(sock2[1].fork(), prng1, 1, nt, 1 << batch, mock, benchmarkNoise(cmd));
 			g[0].mGenState->mPool = &pool0;
 			g[1].mGenState->mPool = &pool1;
 
@@ -303,8 +308,8 @@ namespace secJoin
 		join0.mSort.mL = join1.mSort.mL = cmd.getOr("radixBits", join0.mSort.mL);
 
 		CorGenerator ole0, ole1;
-		ole0.init(sock2[0].fork(), prng, 0, nt, 1 << b, mock);
-		ole1.init(sock2[1].fork(), prng, 1, nt, 1 << b, mock);
+		ole0.init(sock2[0].fork(), prng, 0, nt, 1 << b, mock, benchmarkNoise(cmd));
+		ole1.init(sock2[1].fork(), prng, 1, nt, 1 << b, mock, benchmarkNoise(cmd));
 		ole0.mGenState->mPool = &pool0;
 		ole1.mGenState->mPool = &pool1;
 
@@ -403,8 +408,8 @@ namespace secJoin
 		//sender.setKey(kk);
 
 		CorGenerator ole0, ole1;
-		ole0.init(sock2[0].fork(), prng0, 0, nt, 1 << 18, cmd.getOr("mock", 1));
-		ole1.init(sock2[1].fork(), prng1, 1, nt, 1 << 18, cmd.getOr("mock", 1));
+		ole0.init(sock2[0].fork(), prng0, 0, nt, 1 << 18, cmd.getOr("mock", 1), benchmarkNoise(cmd));
+		ole1.init(sock2[1].fork(), prng1, 1, nt, 1 << 18, cmd.getOr("mock", 1), benchmarkNoise(cmd));
 
 
 		prng0.get(x.data(), x.size());
@@ -486,19 +491,33 @@ namespace secJoin
 
 		Timer sTimer;
 		Timer rTimer;
-		auto s = rTimer.setTimePoint("start");
+		const auto noise = benchmarkNoise(cmd);
+        auto s = rTimer.setTimePoint("start");
 		sender.setTimer(rTimer);
 		recver.setTimer(rTimer);
 		for (u64 t = 0; t < trials; ++t)
 		{
-			sender.configure(n, 2, 1, SilentSecType::SemiHonest, SdNoiseDistribution::Regular, multType);
-			recver.configure(n, 2, 1, SilentSecType::SemiHonest, SdNoiseDistribution::Regular, multType);
+            if (t == 0 || noise == SdNoiseDistribution::Regular)
+            {
+                sender.configure(n, 2, 1, SilentSecType::SemiHonest, noise, multType);
+                recver.configure(n, 2, 1, SilentSecType::SemiHonest, noise, multType);
+                if (noise == SdNoiseDistribution::Regular && multType == MultType::Spin)
+                {
+                    prepareRegularSpin(sender.mSpin, n);
+                    prepareRegularSpin(recver.mSpin, n);
+                }
+            }
 
 			auto choice = recver.sampleBaseChoiceBits(prng0);
 			std::vector<std::array<block, 2>> sendBase(sender.baseCount().mBaseOtCount);
 			std::vector<block> recvBase(recver.baseCount().mBaseOtCount);
-			sender.setBaseCors(sendBase, {}, delta);
-			recver.setBaseCors(recvBase, choice, {}, {});
+			oc::BitVector c(sender.baseCount().mBaseVoleCount);
+            c.randomize(prng0);
+            std::vector<block> b(c.size(), ZeroBlock), a(c.size());
+            for (u64 i = 0; i < c.size(); ++i)
+                a[i] = c[i] ? delta : ZeroBlock;
+            sender.setBaseCors(sendBase, b, delta);
+            recver.setBaseCors(recvBase, choice, a, c);
 
 			auto p0 = sender.silentSendInplace(delta, n, prng0, sock[0]);
 			auto p1 = recver.silentReceiveInplace(n, prng1, sock[1], oc::ChoiceBitPacking::True);
@@ -551,13 +570,17 @@ namespace secJoin
 
 		Timer sTimer;
 		Timer rTimer;
-		auto s = rTimer.setTimePoint("start");
+		const auto noise = benchmarkNoise(cmd);
+        auto s = rTimer.setTimePoint("start");
 		sender.setTimer(rTimer);
 		recver.setTimer(rTimer);
 		for (u64 t = 0; t < trials; ++t)
 		{
-			sender.configure(n);
-			recver.configure(n);
+			if (t == 0 || noise == SdNoiseDistribution::Regular)
+            {
+                sender.configure(n, SilentBaseType::BaseExtend, 128, {}, noise);
+                recver.configure(n, SilentBaseType::BaseExtend, 128, {}, noise);
+            }
 
 			auto choice = recver.sampleBaseChoiceBits(prng0);
 			auto cBase = recver.sampleBaseVoleVals(prng0);
@@ -649,8 +672,8 @@ namespace secJoin
 		CorGenerator ole0, ole1;
 
 
-		ole0.init(std::move(sock2[0]), prng0, 0, nt, 1 << b, cmd.getOr("mock", 1));
-		ole1.init(std::move(sock2[1]), prng1, 1, nt, 1 << b, cmd.getOr("mock", 1));
+		ole0.init(std::move(sock2[0]), prng0, 0, nt, 1 << b, cmd.getOr("mock", 1), benchmarkNoise(cmd));
+		ole1.init(std::move(sock2[1]), prng1, 1, nt, 1 << b, cmd.getOr("mock", 1), benchmarkNoise(cmd));
 		ole0.mGenState->mPool = &pool0;
 		ole1.mGenState->mPool = &pool1;
 

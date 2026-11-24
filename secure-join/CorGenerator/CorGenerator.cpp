@@ -14,9 +14,18 @@ namespace secJoin
 		u64 partyIdx,
 		u64 numConcurrent,
 		u64 batchSize,
-		bool mock)
+		bool mock, oc::SdNoiseDistribution noise)
 	{
-		mGenState = std::make_shared<GenState>(partyIdx, prng.fork(), std::move(sock), numConcurrent, batchSize, mock);
+		if (partyIdx > 1 || (noise != oc::SdNoiseDistribution::Regular && noise != oc::SdNoiseDistribution::Stationary))
+            throw std::invalid_argument("Invalid correlation party or noise mode");
+        mGenState = std::make_shared<GenState>(partyIdx, prng.fork(), std::move(sock), numConcurrent, batchSize, mock);
+        mGenState->mNoise = noise;
+        if (noise == oc::SdNoiseDistribution::Stationary)
+        {
+            if (!mBanks)
+                mBanks = std::make_shared<SpinBankPool>();
+            mGenState->mBanks = mBanks;
+        }
 	}
 
 
@@ -148,20 +157,48 @@ namespace secJoin
 		auto res = macoro::result<void>{};
 		auto reqChecks = std::map<CorType, oc::RandomOracle>{};
 		auto theirReq = std::vector<ReqInfo>{};
+		std::vector<SpinBanks> banks;
 		auto threadState = std::vector<BatchThreadState>{};
 
+		std::exception_ptr failure;
+		try
+		{
 		setTimePoint("GenState::start");
 		mOtBatch = {};
 		mOleBatch = {};
 
-		// make base OT requests
+		// Bind public worker IDs and the private stream lifetime to this peer session.
+        // The request schedule already fixes the batch index on both sides.
+        if (!mMock)
+        {
+            std::array<u64, 6> config{1, static_cast<u64>(mNoise), mNumConcurrent, mBatchSize,
+                mPartyIdx, mPrng.get<u64>()};
+            std::array<u64, 6> peer{};
+            auto exchanged = co_await macoro::when_all_ready(mSock.send(config), mSock.recv(peer));
+            std::get<0>(exchanged).result();
+            std::get<1>(exchanged).result();
+            if (peer[0] != config[0] || peer[1] != config[1] || peer[3] != mBatchSize ||
+                peer[4] != 1 - mPartyIdx || (mNoise == oc::SdNoiseDistribution::Stationary && peer[2] != mNumConcurrent))
+                throw std::runtime_error("Peer correlation mode, worker count, batch size or role mismatch");
+            if (mNoise == oc::SdNoiseDistribution::Stationary)
+            {
+                const block session(mPartyIdx ? peer[5] : config[5], mPartyIdx ? config[5] : peer[5]);
+                banks = mBanks->acquire(mNumConcurrent);
+                threadState.resize(mNumConcurrent);
+                for (u64 i = 0; i < mNumConcurrent; ++i)
+                    threadState[i].mStationary = std::make_unique<StationaryWorker>(i, mPartyIdx, session, banks[i]);
+            }
+        }
+
+        // make base OT requests
 		reqs.reserve(mBatches.size());
 		for (auto i = 0ull; i < mBatches.size();++i)
 		{
 			auto& batch = *mBatches[i];
 			if (!batch.mSize)
 				std::terminate();
-			reqs.push_back(batch.getBaseRequest());
+			if (mNoise == oc::SdNoiseDistribution::Regular)
+				reqs.push_back(batch.getBaseRequest());
 		}
 
 		if (mDebug)
@@ -298,7 +335,12 @@ namespace secJoin
 				if (mBatches[i]->mAbort == false)
 				{
 					auto& batch = *mBatches[i];
-					batch.setBase(base);
+					if (mNoise == oc::SdNoiseDistribution::Regular)
+                    {
+                        batch.setBase(base);
+                        if (!mMock)
+                            prepareRegularSpin(threadState[i % mNumConcurrent].mSpin, batch.mSize);
+                    }
 
 					setTimePoint("GenState::batch.begin " + std::to_string(i));
 
@@ -306,14 +348,14 @@ namespace secJoin
 					{
 						// launch the next batch
 						threadState[i % mNumConcurrent].mTask =
-							mBatches[i]->getTask(threadState[i % mNumConcurrent]) |
+							mBatches[i]->run(threadState[i % mNumConcurrent]) |
 							macoro::start_on(*mPool);
 					}
 					else
 					{
 						// launch the next batch
 						threadState[i % mNumConcurrent].mTask =
-							mBatches[i]->getTask(threadState[i % mNumConcurrent]) |
+							mBatches[i]->run(threadState[i % mNumConcurrent]) |
 							macoro::make_eager();
 					}
 				}
@@ -332,7 +374,35 @@ namespace secJoin
 		}
 
 		mBatches = {};
-		setTimePoint("GenState::done ");
+        if (!banks.empty())
+            mBanks->release(std::move(banks));
+        setTimePoint("GenState::done ");
+        co_return;
+        }
+        catch (...)
+        {
+            failure = std::current_exception();
+        }
+
+        // Keep worker and base storage alive until all suspended users unwind.
+        abort();
+        if (!mSock.closed())
+            co_await mSock.close();
+        for (auto& task : tasks)
+            if (task.handle() && !task.is_ready())
+                try { co_await task; } catch (...) {}
+        for (auto& worker : threadState)
+            if (worker.mTask.handle() && !worker.mTask.is_ready())
+                try { co_await worker.mTask; } catch (...) {}
+        for (auto& batch : mBatches)
+        {
+            if (batch && !batch->mCorReady.is_set())
+            {
+                batch->mError = failure;
+                batch->mCorReady.set();
+            }
+        }
+        std::rethrow_exception(failure);
 	}
 
 	//void GenState::set(SendBase& b) { auto v = b.get(); mRecvBase.setBaseOts(v); }

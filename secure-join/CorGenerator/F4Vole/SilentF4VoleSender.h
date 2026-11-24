@@ -14,6 +14,7 @@
 #include <cryptoTools/Common/Timer.h>
 #include <cryptoTools/Common/Aligned.h>
 #include "libOTe/Tools/Pprf/RegularPprf.h"
+#include "libOTe/Tools/Pprf/StationaryPprf.h"
 #include <libOTe/TwoChooseOne/TcoOtDefines.h>
 #include <libOTe/TwoChooseOne/OTExtInterface.h>
 #include <libOTe/TwoChooseOne/SoftSpokenOT/SoftSpokenMalOtExt.h>
@@ -59,6 +60,20 @@ namespace secJoin
 
         // the pprf used to generate the noise vector.
         oc::RegularPprfSender<F, Ctx> mGen;
+        std::unique_ptr<oc::StationaryPprfSender<F, Ctx>> mStationary;
+        block mCodeSeed = oc::ZeroBlock;
+
+        auto& gen() const {
+            using Base = oc::PprfSender<F, Ctx>;
+            return mStationary ? static_cast<const Base&>(*mStationary) : static_cast<const Base&>(mGen);
+        }
+        auto& gen() {
+            using Base = oc::PprfSender<F, Ctx>;
+            return mStationary ? static_cast<Base&>(*mStationary) : static_cast<Base&>(mGen);
+        }
+        auto format() const {
+            return mStationary ? oc::PprfOutputFormat::ByTreeIndex : oc::PprfOutputFormat::ByPhysicalIndex;
+        }
 
         // the number of correlations requested.
         u64 mRequestSize = 0;
@@ -113,7 +128,7 @@ namespace secJoin
 
         bool hasSilentBaseOts()const
         {
-            return mGen.hasBaseOts();
+            return gen().hasBaseOts();
         }
 
 
@@ -182,6 +197,10 @@ namespace secJoin
 
                     co_await nv.send(delta, b, prng, *mOtExtRecver, chl, mCtx);
                 }
+                else if (msg.empty())
+                {
+                    co_await nv.send(delta, b, prng, *mOtExtRecver, chl, mCtx);
+                }
                 else
                 {
                     chl2 = chl.fork();
@@ -227,7 +246,7 @@ namespace secJoin
             u64 requestSize,
             oc::SilentBaseType type = oc::SilentBaseType::BaseExtend,
             u64 secParam = 128,
-            Ctx ctx = {})
+            Ctx ctx = {}, oc::SdNoiseDistribution noise = oc::SdNoiseDistribution::Regular)
         {
             mCtx = std::move(ctx);
             mSecParam = secParam;
@@ -235,12 +254,20 @@ namespace secJoin
             mState = State::Configured;
             mBaseType = type;
 
-            const auto config = configureF4Code(mSecParam, mRequestSize, mMultType);
+            const auto config = configureF4Code(mSecParam, mRequestSize, mMultType, noise);
             mNumPartitions = config.mNumPartitions;
             mSizePer = config.mSizePer;
             mNoiseVecSize = config.mNoiseVectorSize;
 
-            mGen.configure(mSizePer, mNumPartitions);
+            if (noise == oc::SdNoiseDistribution::Stationary)
+            {
+                mCodeSeed = block(12528943721987127, 98743297823479812);
+                mSpin.reset();
+                mStationary = std::make_unique<oc::StationaryPprfSender<F, Ctx>>();
+            }
+            else
+                mStationary.reset();
+            gen().configure(mSizePer, mNumPartitions);
         }
 
         // return true if this instance has been configured.
@@ -253,7 +280,7 @@ namespace secJoin
             if (isConfigured() == false)
                 throw std::runtime_error("configure must be called first");
 
-            return mGen.baseOtCount();
+            return gen().baseOtCount();
         }
 
         // Set the externally generated base OTs. This choice
@@ -267,7 +294,7 @@ namespace secJoin
 
             if (b.size() != baseVoleCount())
                 throw std::invalid_argument("Wrong number of base GF(4) VOLEs");
-            mGen.setBase(sendBaseOts);
+            gen().setBase(sendBaseOts);
 
 
             // Negation in characteristic two is the identity. Reserve the
@@ -370,7 +397,7 @@ namespace secJoin
             if (mRequestSize < n)
                 throw std::invalid_argument("n does not match the requested number of OTs via configure(...). " LOCATION);
 
-            if (mGen.hasBaseOts() == false)
+            if (!gen().hasBaseOts() || mBaseB.empty())
             {
                 // recvs data
                 co_await genSilentBaseOts(prng, chl, delta);
@@ -383,7 +410,7 @@ namespace secJoin
             mB.reserve(mNoiseVecSize);
 
             if (mTimer)
-                mGen.setTimer(*mTimer);
+                gen().setTimer(*mTimer);
 
             // extract just the first mNumPartitions value of mBaseB. 
             // the last is for the malicious check (if present).
@@ -395,8 +422,8 @@ namespace secJoin
             // can then manually add their shares of this to the
             // output of the PPRF at the correct locations.
             mB.resize(mNumPartitions * mSizePer);
-            co_await mGen.expand(chl, baseB, prng.get(), mB,
-                oc::PprfOutputFormat::ByPhysicalIndex, true, 1);
+            co_await gen().expand(chl, baseB, prng.get(), mB,
+                format(), true, 1, mCtx);
             for (auto& leaf : mB)
                 leaf &= block(~0ull, ~3ull);
             mB.resize(mNoiseVecSize);
@@ -424,7 +451,8 @@ namespace secJoin
             switch (mMultType)
             {
             case oc::MultType::Spin:
-                compressF4Spin(mSpin, mRequestSize, mB);
+                compressF4Spin(mSpin, mRequestSize, mB, mStationary ?
+                    oc::SdNoiseDistribution::Stationary : oc::SdNoiseDistribution::Regular, mCodeSeed);
                 break;
             case osuCrypto::MultType::ExConv7x24:
             case osuCrypto::MultType::ExConv21x24:
@@ -456,7 +484,7 @@ namespace secJoin
             mCtx.resize(mB, mRequestSize);
 
 
-            mState = State::Default;
+            mState = mStationary ? State::Configured : State::Default;
             mBaseB.clear();
 
             if (mDebug)
@@ -557,7 +585,8 @@ namespace secJoin
         void clear()
         {
             mB = {};
-            mGen.clear();
+            gen().clear();
+            mState = State::Default;
         }
     };
 

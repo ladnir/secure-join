@@ -10,6 +10,7 @@
 #include "macoro/manual_reset_event.h"
 
 #include "Correlations.h"
+#include "SpinWorker.h"
 
 namespace secJoin
 {
@@ -20,6 +21,10 @@ namespace secJoin
         oc::AlignedUnVector<block> mA, mB;
         oc::pprf::ExpandTreeBuffer mPprfTemp;
         std::optional<oc::SpinCode> mSpin;
+        std::unique_ptr<StationaryWorker> mStationary;
+        BatchThreadState() = default;
+        BatchThreadState(const BatchThreadState&) = delete;
+        BatchThreadState(BatchThreadState&&) = default;
         macoro::eager_task<> mTask;
     };
 
@@ -61,6 +66,9 @@ namespace secJoin
         // multiple requests might try to start it. This flag 
         // decides who is first.
         std::atomic_bool mStarted = false;
+
+        std::exception_ptr mError;
+        macoro::task<> run(BatchThreadState& worker);
 
         virtual BaseRequest getBaseRequest() = 0;
 
