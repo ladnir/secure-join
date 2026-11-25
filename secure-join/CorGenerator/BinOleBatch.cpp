@@ -288,6 +288,9 @@ namespace secJoin
         if (A.size() % 128 || add.size() != A.size() / 128 || mult.size() != add.size())
             throw RTE_LOC;
 
+#if defined(ENABLE_SSE) && defined(__VAES__) && defined(__AVX2__) && !defined(__AVX512F__)
+        packedOt::compressReceiver256<1>(A, add, {&mult});
+#else
         for (u64 i = 0; i < A.size(); i += packedOt::groupSize)
         {
             const packedOt::Group group(A.data() + i);
@@ -296,6 +299,7 @@ namespace secJoin
             packedOt::store(mult.data(), i, choices);
             packedOt::store(add.data(), i, bits);
         }
+#endif
     }
 
     void OleBatch::SendBatch::compressSender(

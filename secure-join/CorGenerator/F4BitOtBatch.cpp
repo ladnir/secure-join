@@ -503,40 +503,7 @@ namespace secJoin
 		mChoiceLsb.resize(A.size() / 128);
 		mChoiceMsb.resize(A.size() / 128);
 #if defined(ENABLE_SSE) && defined(__VAES__) && defined(__AVX2__) && !defined(__AVX512F__)
-		const auto& keys = oc::mAesFixedKey.mRoundKey;
-		__m256i roundKeys[11];
-		for (unsigned r = 0; r < 11; ++r)
-			roundKeys[r] = _mm256_broadcastsi128_si256(keys[r].mData);
-		const auto messageMask = _mm256_broadcastsi128_si256(block(~0ull, ~3ull).mData);
-
-		for (u64 i = 0; i < A.size(); i += 16)
-		{
-			__m256i state[8];
-			for (unsigned j = 0; j < 8; j += 4)
-			{
-				__m256i raw[4];
-				for (unsigned k = 0; k < 4; ++k)
-				{
-					raw[k] = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(A.data() + i + 2 * (j + k)));
-					state[j + k] = _mm256_xor_si256(_mm256_and_si256(raw[k], messageMask), roundKeys[0]);
-				}
-				const auto choices = inInputOrder(lowWords(raw[0], raw[1], raw[2], raw[3]));
-				reinterpret_cast<u8*>(mChoiceLsb.data())[i / 8 + j / 4] = packBit<0>(choices);
-				reinterpret_cast<u8*>(mChoiceMsb.data())[i / 8 + j / 4] = packBit<1>(choices);
-			}
-#pragma GCC unroll 9
-			for (unsigned r = 1; r < 10; ++r)
-				for (auto& v : state)
-					v = _mm256_aesenc_epi128(v, roundKeys[r]);
-			// The cleared choice bits make the Davies-Meyer feed-forward bit zero.
-			for (unsigned j = 0; j < 8; j += 4)
-			{
-				for (unsigned k = 0; k < 4; ++k)
-					state[j + k] = _mm256_aesenclast_epi128(state[j + k], roundKeys[10]);
-				const auto words = lowWords(state[j], state[j + 1], state[j + 2], state[j + 3]);
-				reinterpret_cast<u8*>(mOts.data())[i / 8 + j / 4] = packBit<0>(inInputOrder(words));
-			}
-		}
+		packedOt::compressReceiver256<2>(A, mOts, {&mChoiceLsb, &mChoiceMsb});
 #else
 		for (u64 i = 0; i < A.size(); i += packedOt::groupSize)
 		{

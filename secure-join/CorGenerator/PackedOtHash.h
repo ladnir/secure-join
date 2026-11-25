@@ -1,6 +1,7 @@
 #pragma once
 #include "secure-join/Util/Simd.h"
 #include "cryptoTools/Crypto/AES.h"
+#include <array>
 
 // Pack one output bit per input block in the protocol's little-endian bit order.
 namespace secJoin::packedOt
@@ -21,6 +22,48 @@ namespace secJoin::packedOt
     OC_FORCEINLINE u8 packBit(__m256i ordered)
     {
         return static_cast<u8>(_mm256_movemask_ps(_mm256_castsi256_ps(_mm256_slli_epi32(ordered, 31 - bit))));
+    }
+
+    template<std::size_t choiceBits, typename Output>
+    OC_FORCEINLINE void compressReceiver256(span<const block> input, Output& hashes,
+        std::array<Output*, choiceBits> choices)
+    {
+        static_assert(choiceBits == 1 || choiceBits == 2);
+        const auto& keys = oc::mAesFixedKey.mRoundKey;
+        __m256i roundKeys[11];
+        for (unsigned r = 0; r < 11; ++r)
+            roundKeys[r] = _mm256_broadcastsi128_si256(keys[r].mData);
+        const auto messageMask = _mm256_broadcastsi128_si256(block(~0ull, ~((1ull << choiceBits) - 1)).mData);
+
+        for (u64 i = 0; i < input.size(); i += 16)
+        {
+            __m256i state[8];
+            for (unsigned j = 0; j < 8; j += 4)
+            {
+                __m256i raw[4];
+                for (unsigned k = 0; k < 4; ++k)
+                {
+                    raw[k] = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(input.data() + i + 2 * (j + k)));
+                    state[j + k] = _mm256_xor_si256(_mm256_and_si256(raw[k], messageMask), roundKeys[0]);
+                }
+                const auto words = inInputOrder(lowWords(raw[0], raw[1], raw[2], raw[3]));
+                reinterpret_cast<u8*>(choices[0]->data())[i / 8 + j / 4] = packBit<0>(words);
+                if constexpr (choiceBits == 2)
+                    reinterpret_cast<u8*>(choices[1]->data())[i / 8 + j / 4] = packBit<1>(words);
+            }
+#pragma GCC unroll 9
+            for (unsigned r = 1; r < 10; ++r)
+                for (auto& v : state)
+                    v = _mm256_aesenc_epi128(v, roundKeys[r]);
+            // The cleared choice bits make the Davies-Meyer feed-forward bit zero.
+            for (unsigned j = 0; j < 8; j += 4)
+            {
+                for (unsigned k = 0; k < 4; ++k)
+                    state[j + k] = _mm256_aesenclast_epi128(state[j + k], roundKeys[10]);
+                const auto words = lowWords(state[j], state[j + 1], state[j + 2], state[j + 3]);
+                reinterpret_cast<u8*>(hashes.data())[i / 8 + j / 4] = packBit<0>(inInputOrder(words));
+            }
+        }
     }
 #endif
 #if defined(ENABLE_SSE) && defined(__VAES__) && defined(__AVX512F__)
