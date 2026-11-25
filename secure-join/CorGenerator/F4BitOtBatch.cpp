@@ -488,7 +488,27 @@ namespace secJoin
 		corReady.set();
 	}
 
-	// the first two bits of A is the choice bit of the VOLE.
+#if defined(ENABLE_SSE) && defined(__VAES__) && defined(__AVX2__) && !defined(__AVX512F__)
+	namespace
+	{
+		// The two 128-bit lanes gather the low words of the even and odd inputs.
+		OC_FORCEINLINE __m256i lowWords(__m256i a, __m256i b, __m256i c, __m256i d)
+		{
+			return _mm256_unpacklo_epi64(_mm256_unpacklo_epi32(a, b), _mm256_unpacklo_epi32(c, d));
+		}
+
+		OC_FORCEINLINE __m256i inInputOrder(__m256i words)
+		{
+			return _mm256_permutevar8x32_epi32(words, _mm256_setr_epi32(0, 4, 1, 5, 2, 6, 3, 7));
+		}
+
+		template<unsigned bit>
+		OC_FORCEINLINE u8 packBit(__m256i ordered)
+		{
+			return static_cast<u8>(_mm256_movemask_ps(_mm256_castsi256_ps(_mm256_slli_epi32(ordered, 31 - bit))));
+		}
+	}
+#endif
 
 	void F4BitOtBatch::RecvBatch::compressRecver(
 		span<oc::block> A)
@@ -498,6 +518,42 @@ namespace secJoin
 		mOts.resize(A.size() / 128);
 		mChoiceLsb.resize(A.size() / 128);
 		mChoiceMsb.resize(A.size() / 128);
+#if defined(ENABLE_SSE) && defined(__VAES__) && defined(__AVX2__) && !defined(__AVX512F__)
+		const auto& keys = oc::mAesFixedKey.mRoundKey;
+		__m256i roundKeys[11];
+		for (unsigned r = 0; r < 11; ++r)
+			roundKeys[r] = _mm256_broadcastsi128_si256(keys[r].mData);
+		const auto messageMask = _mm256_broadcastsi128_si256(block(~0ull, ~3ull).mData);
+
+		for (u64 i = 0; i < A.size(); i += 16)
+		{
+			__m256i state[8];
+			for (unsigned j = 0; j < 8; j += 4)
+			{
+				__m256i raw[4];
+				for (unsigned k = 0; k < 4; ++k)
+				{
+					raw[k] = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(A.data() + i + 2 * (j + k)));
+					state[j + k] = _mm256_xor_si256(_mm256_and_si256(raw[k], messageMask), roundKeys[0]);
+				}
+				const auto choices = inInputOrder(lowWords(raw[0], raw[1], raw[2], raw[3]));
+				reinterpret_cast<u8*>(mChoiceLsb.data())[i / 8 + j / 4] = packBit<0>(choices);
+				reinterpret_cast<u8*>(mChoiceMsb.data())[i / 8 + j / 4] = packBit<1>(choices);
+			}
+#pragma GCC unroll 9
+			for (unsigned r = 1; r < 10; ++r)
+				for (auto& v : state)
+					v = _mm256_aesenc_epi128(v, roundKeys[r]);
+			// The cleared choice bits make the Davies-Meyer feed-forward bit zero.
+			for (unsigned j = 0; j < 8; j += 4)
+			{
+				for (unsigned k = 0; k < 4; ++k)
+					state[j + k] = _mm256_aesenclast_epi128(state[j + k], roundKeys[10]);
+				const auto words = lowWords(state[j], state[j + 1], state[j + 2], state[j + 3]);
+				reinterpret_cast<u8*>(mOts.data())[i / 8 + j / 4] = packBit<0>(inInputOrder(words));
+			}
+		}
+#else
 		for (u64 i = 0; i < A.size(); i += packedOt::groupSize)
 		{
 			const packedOt::Group group(A.data() + i);
@@ -508,6 +564,7 @@ namespace secJoin
 			packedOt::store(mChoiceMsb.data(), i, msb);
 			packedOt::store(mOts.data(), i, bits);
 		}
+#endif
 	}
 
 	void F4BitOtBatch::SendBatch::compressSender(
@@ -593,12 +650,6 @@ namespace secJoin
 		for (unsigned choice = 0; choice < 4; ++choice)
 			first[choice] = _mm256_broadcastsi128_si256((keys[0] ^ deltas[choice]).mData);
 
-		// Gather the low word of each AES block. The two 128-bit lanes hold
-		// the even-indexed and odd-indexed inputs, respectively.
-		auto lowWords = [](__m256i a, __m256i b, __m256i c, __m256i d) {
-			return _mm256_unpacklo_epi64(_mm256_unpacklo_epi32(a, b), _mm256_unpacklo_epi32(c, d));
-		};
-		const auto inputOrder = _mm256_setr_epi32(0, 4, 1, 5, 2, 6, 3, 7);
 		for (u64 i = 0; i < B.size(); i += 8)
 		{
 			__m256i raw[4];
@@ -626,9 +677,7 @@ namespace secJoin
 						v = _mm256_aesenclast_epi128(v, roundKeys[9]);
 					// Each delta has low bit zero, so the feed-forward bit is B's bit zero.
 					const auto hashed = _mm256_xor_si256(lowWords(plane[0], plane[1], plane[2], plane[3]), inputWords);
-					const auto ordered = _mm256_permutevar8x32_epi32(hashed, inputOrder);
-					const auto bits = _mm256_movemask_ps(_mm256_castsi256_ps(_mm256_slli_epi32(ordered, 31)));
-					reinterpret_cast<u8*>(mOts[choice + c].data())[i / 8] = static_cast<u8>(bits);
+					reinterpret_cast<u8*>(mOts[choice + c].data())[i / 8] = packBit<0>(inInputOrder(hashed));
 				}
 			}
 		}
