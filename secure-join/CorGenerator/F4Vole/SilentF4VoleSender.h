@@ -426,7 +426,13 @@ namespace secJoin
             mB.resize(mNumPartitions * mSizePer);
             co_await gen().expand(chl, baseB, prng.get(), mB,
                 format(), true, 1, mCtx);
-            clearF4ChoiceBits(mB);
+            // The SPIN transpose applies the same binary map to every payload bit.
+            // When no check reads the expanded shares, clear the two reserved
+            // bits on the shorter output instead.
+            const bool maskAfterSpin = mMultType == oc::MultType::Spin && !mDebug &&
+                mMalType == oc::SilentSecType::SemiHonest;
+            if (!maskAfterSpin)
+                clearF4ChoiceBits(mB);
             mB.resize(mNoiseVecSize);
             std::fill(mB.begin() + mNumPartitions * mSizePer, mB.end(), oc::ZeroBlock);
             setTimePoint("SilentVoleSender.expand.pprf");
@@ -483,6 +489,8 @@ namespace secJoin
             }
 
             mCtx.resize(mB, mRequestSize);
+            if (maskAfterSpin)
+                clearF4ChoiceBits(mB);
 
 
             mState = mStationary ? State::Configured : State::Default;
