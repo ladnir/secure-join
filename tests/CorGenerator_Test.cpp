@@ -31,7 +31,7 @@ void CorGenerator_F4BitOt_Test(const oc::CLP& cmd)
 		sender.mDelta = prng.get<block>();
 		const block mask(~0ull, ~3ull);
 		for (auto& value : input)
-			value = prng.get<block>() & mask;
+			value = prng.get<block>();
 		sender.compressSender(input);
 		for (u8 choice = 0; choice < 4; ++choice)
 		{

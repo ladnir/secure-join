@@ -525,11 +525,73 @@ namespace secJoin
 		CoeffCtxGF4{}.mul(deltas[2], deltas[1], F4{ 2 });
 		CoeffCtxGF4{}.mul(deltas[3], deltas[1], F4{ 3 });
 
+#if defined(ENABLE_SSE) && defined(__VAES__) && defined(__AVX512F__) && defined(__AVX512VBMI__)
+		// Round nine needs only bytes 0, 5, 10 and 15 of each message to
+		// compute byte zero. Pack four such diagonals per AES lane, arranging
+		// them so ShiftRows puts each message in its own MixColumns column.
+		alignas(64) static constexpr auto diagonal = [] {
+			std::array<u8, 64> indices{};
+			for (unsigned i = 0; i < indices.size(); ++i)
+			{
+				const unsigned row = i % 4, column = i / 4 % 4;
+				const unsigned message = (column + 4 - row) % 4;
+				indices[i] = 64 * (i / 16 % 2) + 16 * message + 5 * row;
+			}
+			return indices;
+		}();
+		const auto diagonalIndex = _mm512_load_si512(diagonal.data());
+		const auto lowWords = _mm512_setr_epi32(0, 4, 8, 12, 16, 20, 24, 28, 0, 4, 8, 12, 16, 20, 24, 28);
+		const auto& keys = oc::mAesFixedKey.mRoundKey;
+		__m512i roundKeys[8];
+		for (unsigned r = 0; r < 8; ++r)
+			roundKeys[r] = _mm512_broadcast_i32x4(keys[r + 1].mData);
+		__m512i first[4];
+		for (unsigned choice = 0; choice < 4; ++choice)
+			first[choice] = _mm512_broadcast_i32x4((keys[0] ^ deltas[choice]).mData);
+		const auto key9 = _mm512_set1_epi32(keys[9].get<u8>(0));
+		const auto key10 = _mm512_set1_epi32(keys[10].get<u8>(0));
+		const auto one = _mm512_set1_epi32(1);
+
+		for (u64 i = 0; i < B.size(); i += 16)
+		{
+			__m512i raw[4], state[4][4];
+			for (unsigned j = 0; j < 4; ++j)
+				raw[j] = _mm512_loadu_si512(B.data() + i + 4 * j);
+			// Every offset has low bit zero, so all four hashes XOR the same input bit.
+			const auto lo = _mm512_permutex2var_epi32(raw[0], lowWords, raw[1]);
+			const auto hi = _mm512_permutex2var_epi32(raw[2], lowWords, raw[3]);
+			const auto inputBits = _mm512_test_epi32_mask(_mm512_shuffle_i32x4(lo, hi, 0x44), one);
+
+			for (unsigned choice = 0; choice < 4; ++choice)
+				for (unsigned j = 0; j < 4; ++j)
+					state[choice][j] = _mm512_xor_si512(raw[j], first[choice]);
+#pragma GCC unroll 8
+			for (unsigned r = 0; r < 8; ++r)
+			{
+				for (auto& plane : state)
+					for (auto& v : plane)
+						v = _mm512_aesenc_epi128(v, roundKeys[r]);
+			}
+			for (unsigned choice = 0; choice < 4; ++choice)
+			{
+				const auto& v = state[choice];
+				const auto a = _mm512_permutex2var_epi8(v[0], diagonalIndex, v[1]);
+				const auto b = _mm512_permutex2var_epi8(v[2], diagonalIndex, v[3]);
+				auto columns = _mm512_shuffle_i32x4(a, b, 0x44);
+				columns = _mm512_aesenc_epi128(columns, key9);
+				// The final round leaves row zero in place and omits MixColumns.
+				columns = _mm512_aesenclast_epi128(columns, key10);
+				const u16 bits = _mm512_test_epi32_mask(columns, one) ^ inputBits;
+				std::memcpy(reinterpret_cast<u8*>(mOts[choice].data()) + i / 8, &bits, sizeof(bits));
+			}
+		}
+#else
 		for (u64 i = 0; i < B.size(); i += packedOt::groupSize)
 		{
 			const packedOt::Group group(B.data() + i);
 			for (unsigned choice = 0; choice < 4; ++choice)
 				packedOt::store(mOts[choice].data(), i, group.hashes<0>(deltas[choice]));
 		}
+#endif
 	}
 }
