@@ -166,8 +166,12 @@ void AltModWPrf_sampleMod3_test(const oc::CLP& cmd)
 	{
 		// The 65th output block crosses the 128-block random buffer refill.
 		PRNG prng(oc::ZeroBlock);
+		const auto firstBlock = prng.mBlockIdx;
 		std::array<block, 65> msb, lsb;
 		sampleMod3Lookup(prng, msb, lsb);
+		// This seed uses two 128-block fills and one 8-block rejection refill.
+		if (prng.mBlockIdx != firstBlock + 2 * 128 + 8 || prng.mBytesIdx != 0)
+			throw RTE_LOC;
 		if (msb.front() != block(0x4891092ad0281014ull, 0xb804758096382277ull) ||
 			lsb.front() != block(0x1648668104450b62ull, 0x439b084468069488ull) ||
 			msb.back() != block(0x850452644220150bull, 0x089706388b014672ull) ||

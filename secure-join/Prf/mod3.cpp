@@ -538,9 +538,13 @@ namespace secJoin
 					auto indexes = indexBase & SampleBlock256::set32(255);
 					indexBase = indexBase.srli_epi32<8>();
 
-					v_[j] =   SampleBlock256::i32gather_epi32<4>((const i32*)mod3TableV.data(), indexes);
-					lsb_[j] = SampleBlock256::i32gather_epi32<4>((const i32*)mod3TableLsb.data(), indexes);
-					msb_[j] = SampleBlock256::i32gather_epi32<4>((const i32*)mod3TableMsb.data(), indexes);
+					const auto entry = SampleBlock256::i32gather_epi32<4>(
+						reinterpret_cast<const i32*>(mod3Table.data()), indexes);
+					lsb_[j] = entry & SampleBlock256::set32(31);
+					msb_[j] = entry.srli_epi32<8>() & SampleBlock256::set32(31);
+					// Bits 14 and 15 are zero. Copy the valid bit (16) to bits 0 and 2
+					// to append five trits for an accepted byte and zero for a rejection.
+					v_[j] = entry.srli_epi32<16>() | entry.srli_epi32<14>();
 				}
 
 				// shift the sum if we have a valid sample
