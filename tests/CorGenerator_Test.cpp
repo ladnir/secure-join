@@ -1,5 +1,6 @@
 #include "CorGenerator_Test.h"
 #include "secure-join/CorGenerator/CorGenerator.h"
+#include "secure-join/CorGenerator/F4BitOtBatch.h"
 #include "secure-join/Prf/AltModPrfProto.h"
 #include "secure-join/Prf/AltModSimd.h"
 using namespace secJoin;
@@ -14,6 +15,32 @@ namespace
 
 void CorGenerator_F4BitOt_Test(const oc::CLP& cmd)
 {
+	// Verify all four packed planes against single-block Davies-Meyer hashing.
+	{
+		constexpr u64 count = 384;
+		alignas(32) std::array<block, count + 1> storage;
+		span<block> input(storage.data() + 1, count);
+		PRNG prng(block(13, 27));
+		F4BitOtBatch::SendBatch sender;
+		sender.mDelta = prng.get<block>();
+		const block mask(~0ull, ~3ull);
+		for (auto& value : input)
+			value = prng.get<block>() & mask;
+		sender.compressSender(input);
+		for (u8 choice = 0; choice < 4; ++choice)
+		{
+			block offset = oc::ZeroBlock;
+			CoeffCtxGF4{}.mul(offset, sender.mDelta & mask, F4{choice});
+			for (u64 i = 0; i < count; ++i)
+			{
+				const auto expected = oc::mAesFixedKey.hashBlock(input[i] ^ offset).get<u8>(0) & 1;
+				const auto packed = sender.mOts[choice][i / 128].get<u64>((i % 128) / 64);
+				if (((packed >> (i % 64)) & 1) != expected)
+					throw std::runtime_error("Packed GF(4) sender hash mismatch");
+			}
+		}
+	}
+
 
 	u64 n = (1ull << 16) + 3234;
 

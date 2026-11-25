@@ -545,6 +545,52 @@ namespace secJoin
 	}
 
 
+#if defined(ENABLE_SSE) && defined(__VAES__) && defined(__AVX2__) && defined(__AVX512F__) && defined(__AVX512VL__)
+#define SECJOIN_F4_VAES_PACK
+	namespace
+	{
+		// Hash 16 blocks with the fixed key and pack bit zero of each result.
+		// Each YMM register holds two independent AES inputs for the same OT choice.
+		OC_FORCEINLINE u16 hashF4SenderBits(const block* messages, block delta)
+		{
+			const auto& keys = oc::mAesFixedKey.mRoundKey;
+			const auto offset = _mm256_broadcastsi128_si256(delta.mData);
+			const auto first = _mm256_broadcastsi128_si256(keys[0].mData);
+			__m256i input[8], state[8];
+#pragma GCC unroll 8
+			for (unsigned j = 0; j < 8; ++j)
+			{
+				const auto pair = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(messages + 2 * j));
+				input[j] = _mm256_xor_si256(pair, offset);
+				state[j] = _mm256_xor_si256(input[j], first);
+			}
+#pragma GCC unroll 9
+			for (unsigned round = 1; round < 10; ++round)
+			{
+				const auto key = _mm256_broadcastsi128_si256(keys[round].mData);
+#pragma GCC unroll 8
+				for (unsigned j = 0; j < 8; ++j)
+					state[j] = _mm256_aesenc_epi128(state[j], key);
+			}
+			const auto last = _mm256_broadcastsi128_si256(keys[10].mData);
+#pragma GCC unroll 8
+			for (unsigned j = 0; j < 8; ++j)
+				state[j] = _mm256_xor_si256(input[j], _mm256_aesenclast_epi128(state[j], last));
+
+			u16 bits = 0;
+			// Collect the low 64-bit word of four hashes into the four mask lanes.
+			const auto lowWords = _mm256_setr_epi64x(0, 2, 4, 6);
+#pragma GCC unroll 4
+			for (unsigned j = 0; j < 4; ++j)
+			{
+				const auto words = _mm256_permutex2var_epi64(state[2 * j], lowWords, state[2 * j + 1]);
+				bits |= u16(_mm256_test_epi64_mask(words, _mm256_set1_epi64x(1))) << (4 * j);
+			}
+			return bits;
+		}
+	}
+#endif
+
 	void F4BitOtBatch::SendBatch::compressSender(
 		span<oc::block> B)
 	{
@@ -560,17 +606,6 @@ namespace secJoin
 			reinterpret_cast<u8*>(mOts[2].data()),
 			reinterpret_cast<u8*>(mOts[3].data())
 		};
-		//auto bIter16 = (u16*)add.data();
-		//auto aIter16 = (u16*)mult.data();
-		//if (add.size() * 128 != B.size())
-		//    throw RTE_LOC;
-		//if (mult.size() * 128 != B.size())
-		//    throw RTE_LOC;
-		using block = oc::block;
-
-		std::array<block, 16> sendMsg;
-		//auto m = B.data();
-
 		block mask = block(~0ull, ~3ull);
 		std::array<block, 4> deltas;
 		deltas[0] = block(0, 0);
@@ -578,6 +613,18 @@ namespace secJoin
 		CoeffCtxGF4{}.mul(deltas[2], deltas[1], F4{ 2 });
 		CoeffCtxGF4{}.mul(deltas[3], deltas[1], F4{ 3 });
 
+#ifdef SECJOIN_F4_VAES_PACK
+		for (u64 i = 0; i < B.size(); i += 16)
+		{
+			for (u64 choice = 0; choice < 4; ++choice)
+			{
+				const u16 bits = hashF4SenderBits(B.data() + i, deltas[choice]);
+				std::memcpy(iters[choice], &bits, sizeof(bits));
+				iters[choice] += sizeof(bits);
+			}
+		}
+#else
+		std::array<block, 16> sendMsg;
 		for (u64 i = 0; i < B.size(); i += 16)
 		{
 			for (u64 b = 0; b < 4; ++b)
@@ -634,6 +681,7 @@ namespace secJoin
 				iters[b] += sizeof(ap);
 			}
 		}
+#endif
 	}
 
 
