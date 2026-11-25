@@ -1,9 +1,31 @@
 #pragma once
 #include "secure-join/Defines.h"
+#include <libOTe/Tools/CompilerHints.h>
 #include <libOTe/Tools/Spin/SpinCode.h>
+#if defined(ENABLE_SSE) && defined(__AVX2__)
+#include <immintrin.h>
+#endif
 
 namespace secJoin
 {
+    // Reserve the two GF(4) choice bits in each expanded leaf. Keep this scan
+    // outside the protocol coroutine so the loop state stays in registers.
+    OC_NOINLINE inline void clearF4ChoiceBits(span<block> leaves)
+    {
+        const block mask(~0ull, ~3ull);
+        u64 i = 0;
+#if defined(ENABLE_SSE) && defined(__AVX2__)
+        const auto wideMask = _mm256_broadcastsi128_si256(mask.mData);
+        for (; i + 2 <= leaves.size(); i += 2)
+        {
+            auto* p = reinterpret_cast<__m256i*>(leaves.data() + i);
+            _mm256_storeu_si256(p, _mm256_and_si256(_mm256_loadu_si256(p), wideMask));
+        }
+#endif
+        for (; i < leaves.size(); ++i)
+            leaves[i] &= mask;
+    }
+
     inline oc::SdConfig configureF4Code(u64 security, u64 size, oc::MultType type,
         oc::SdNoiseDistribution noise = oc::SdNoiseDistribution::Regular)
     {

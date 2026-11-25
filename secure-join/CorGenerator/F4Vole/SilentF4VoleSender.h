@@ -426,8 +426,7 @@ namespace secJoin
             mB.resize(mNumPartitions * mSizePer);
             co_await gen().expand(chl, baseB, prng.get(), mB,
                 format(), true, 1, mCtx);
-            for (auto& leaf : mB)
-                leaf &= block(~0ull, ~3ull);
+            clearF4ChoiceBits(mB);
             mB.resize(mNoiseVecSize);
             std::fill(mB.begin() + mNumPartitions * mSizePer, mB.end(), oc::ZeroBlock);
             setTimePoint("SilentVoleSender.expand.pprf");

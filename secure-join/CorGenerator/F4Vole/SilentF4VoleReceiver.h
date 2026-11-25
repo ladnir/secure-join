@@ -548,8 +548,7 @@ namespace secJoin
 			//
 			mA.resize(mNumPartitions * mSizePer);
 			co_await gen().expand(chl, mA, format(), true, mNumThreads, mCtx);
-			for (auto& leaf : mA)
-			    leaf &= block(~0ull, ~3ull);
+			clearF4ChoiceBits(mA);
 			mA.resize(mNoiseVecSize);
 			std::fill(mA.begin() + mNumPartitions * mSizePer, mA.end(), oc::ZeroBlock);
 
