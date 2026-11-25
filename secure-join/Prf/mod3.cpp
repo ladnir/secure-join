@@ -370,6 +370,12 @@ namespace secJoin
 			return _mm256_testz_si256(mVal, o.mVal);
 		}
 
+		u32 refillMask() const
+		{
+			const auto shortLanes = _mm256_cmpgt_epi32(_mm256_set1_epi32(32), mVal);
+			return static_cast<u32>(_mm256_movemask_ps(_mm256_castsi256_ps(shortLanes)));
+		}
+
 
 		SampleBlock256 add_epi32(const SampleBlock256& s) const
 		{
@@ -591,49 +597,64 @@ namespace secJoin
 				size[3] = size[3].add_epi32(v_[3]);
 			}
 
-			for (u64 j = 0; j < lsbSum.size(); ++j)
-			{
-				auto lsbLanes = std::bit_cast<std::array<u32, 8>>(lsbSum[j]);
-				auto msbLanes = std::bit_cast<std::array<u32, 8>>(msbSum[j]);
-				auto sizeLanes = std::bit_cast<std::array<u32, 8>>(size[j]);
-
-				for (u64 k = 0; k < 8; ++k)
+			auto refillLane = [&](u32& lsb, u32& msb, u32 count) {
+				do
 				{
-					auto& lsbk = lsbLanes[k];
-					auto& msbk = msbLanes[k];
-					auto& sizek = sizeLanes[k];
-
-					while (sizek < 32)
+					if (rands2Ptr == e2)
 					{
-						if (rands2Ptr == e2)
-						{
-							prng.mAes.ecbEncCounterMode(prng.mBlockIdx, rands2.size(), rands2.data());
-							prng.mBlockIdx += rands2.size();
-							rands2Ptr = (u8*)rands2.data();
-						}
-
-						auto b = *rands2Ptr++;
-						auto v = mod3Table[b];
-
-						auto lsbj = v & 255ull;
-						auto msbj = (v >> 8) & 255ull;
-						auto flag = 5 * (v >> 16);
-						lsbk = (lsbk << flag) | lsbj;
-						msbk = (msbk << flag) | msbj;
-
-						sizek += flag;
+						prng.mAes.ecbEncCounterMode(prng.mBlockIdx, rands2.size(), rands2.data());
+						prng.mBlockIdx += rands2.size();
+						rands2Ptr = (u8*)rands2.data();
 					}
-				}
+
+					const auto entry = mod3Table[*rands2Ptr++];
+					const auto trits = 5 * (entry >> 16);
+					lsb = (lsb << trits) | (entry & 255);
+					msb = (msb << trits) | ((entry >> 8) & 255);
+					count += trits;
+				} while (count < 32);
+			};
+
+#ifdef ENABLE_SSE
+			u32 missing = 0;
+			for (unsigned j = 0; j < size.size(); ++j)
+				missing |= size[j].refillMask() << (8 * j);
+
+			using Lanes = std::array<u32, 32>;
+			auto lsbLanes = std::bit_cast<Lanes>(lsbSum);
+			auto msbLanes = std::bit_cast<Lanes>(msbSum);
+			const auto sizeLanes = std::bit_cast<Lanes>(size);
+			// Consume refill bytes in the original group and lane order, including tail lanes.
+			for (; missing; missing &= missing - 1)
+			{
+				const auto lane = std::countr_zero(missing);
+				refillLane(lsbLanes[lane], msbLanes[lane], sizeLanes[lane]);
+			}
+			const auto* lsbData = lsbLanes.data();
+			const auto* msbData = msbLanes.data();
+#else
+			using Lanes = std::array<u32, 8>;
+			for (unsigned j = 0; j < size.size(); ++j)
+			{
+				auto lsbLanes = std::bit_cast<Lanes>(lsbSum[j]);
+				auto msbLanes = std::bit_cast<Lanes>(msbSum[j]);
+				const auto sizeLanes = std::bit_cast<Lanes>(size[j]);
+				for (unsigned lane = 0; lane < sizeLanes.size(); ++lane)
+					if (sizeLanes[lane] < 32)
+						refillLane(lsbLanes[lane], msbLanes[lane], sizeLanes[lane]);
 
 				lsbSum[j] = std::bit_cast<SampleBlock256>(lsbLanes);
 				msbSum[j] = std::bit_cast<SampleBlock256>(msbLanes);
 			}
+			const auto* lsbData = lsbSum.data();
+			const auto* msbData = msbSum.data();
+#endif
 
 			auto s = std::min<u64>(msbVec.size() - i, lsbSum.size() * 2);
 			assert(lsbIter + s <= lsbVec.data() + lsbVec.size());
 			assert(msbIter + s <= msbVec.data() + msbVec.size());
-			std::copy((u8*)lsbSum.data(), (u8*)lsbSum.data() + s * sizeof(block), (u8*)lsbIter);
-			std::copy((u8*)msbSum.data(), (u8*)msbSum.data() + s * sizeof(block), (u8*)msbIter);
+			std::memcpy(lsbIter, lsbData, s * sizeof(block));
+			std::memcpy(msbIter, msbData, s * sizeof(block));
 			lsbIter += s;
 			msbIter += s;
 
