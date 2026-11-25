@@ -501,9 +501,12 @@ namespace secJoin
 		for (u64 i = 0; i < A.size(); i += packedOt::groupSize)
 		{
 			const packedOt::Group group(A.data() + i);
-			packedOt::store(mChoiceLsb.data(), i, group.choices<0>());
-			packedOt::store(mChoiceMsb.data(), i, group.choices<1>());
-			packedOt::store(mOts.data(), i, group.hashes<2>(oc::ZeroBlock));
+			const auto lsb = group.choices<0>();
+			const auto msb = group.choices<1>();
+			const auto bits = group.hashes<2>();
+			packedOt::store(mChoiceLsb.data(), i, lsb);
+			packedOt::store(mChoiceMsb.data(), i, msb);
+			packedOt::store(mOts.data(), i, bits);
 		}
 	}
 

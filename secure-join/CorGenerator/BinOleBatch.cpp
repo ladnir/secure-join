@@ -291,8 +291,10 @@ namespace secJoin
         for (u64 i = 0; i < A.size(); i += packedOt::groupSize)
         {
             const packedOt::Group group(A.data() + i);
-            packedOt::store(mult.data(), i, group.choices<0>());
-            packedOt::store(add.data(), i, group.hashes<1>(oc::ZeroBlock));
+            const auto choices = group.choices<0>();
+            const auto bits = group.hashes<1>();
+            packedOt::store(mult.data(), i, choices);
+            packedOt::store(add.data(), i, bits);
         }
     }
 
@@ -308,7 +310,7 @@ namespace secJoin
         for (u64 i = 0; i < B.size(); i += packedOt::groupSize)
         {
             const packedOt::Group group(B.data() + i);
-            const auto zero = group.hashes<1>(oc::ZeroBlock);
+            const auto zero = group.hashes<1>();
             const auto one = group.hashes<1>(delta);
             packedOt::store(add.data(), i, zero);
             packedOt::store(mult.data(), i, zero ^ one);

@@ -41,7 +41,7 @@ namespace secJoin::packedOt
         // Return bit zero of H(x) = AES(x) ^ x, where x is message ^ delta
         // with the low clearBits bits cleared.
         template<unsigned clearBits>
-        OC_FORCEINLINE Word hashes(block delta) const
+        OC_FORCEINLINE Word hashes(block delta = block(0, 0)) const
         {
             const auto& keys = oc::mAesFixedKey.mRoundKey;
             const block messageMask(~0ull, ~((1ull << clearBits) - 1));
@@ -85,7 +85,7 @@ namespace secJoin::packedOt
         OC_FORCEINLINE Word choices() const { return packByteBits<bit>(gatherLowBytes(messages)); }
 
         template<unsigned clearBits>
-        OC_FORCEINLINE Word hashes(block delta) const
+        OC_FORCEINLINE Word hashes(block delta = block(0, 0)) const
         {
             const block mask(~0ull, ~((1ull << clearBits) - 1));
             block hashed[groupSize];
