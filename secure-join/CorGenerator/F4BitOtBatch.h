@@ -121,11 +121,7 @@ namespace secJoin
 
         void clear() override
         {
-            if (mSendRecv.index())
-                std::get<1>(mSendRecv).clear();
-            else
-                std::get<1>(mSendRecv).clear();
-            //mSendRecv = SendBatch{};
+            std::visit([](auto& side) { side.clear(); }, mSendRecv);
         }
     };
 

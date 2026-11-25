@@ -27,7 +27,8 @@ void CorGenerator_F4BitOt_Test(const oc::CLP& cmd)
 		alignas(64) std::array<block, count + 1> storage;
 		span<block> input(storage.data() + 1, count);
 		PRNG prng(block(13, 27));
-		F4BitOtBatch::SendBatch sender;
+		F4BitOtBatch batch(nullptr, true, oc::Socket{}, PRNG(oc::ZeroBlock));
+		auto& sender = std::get<F4BitOtBatch::SendBatch>(batch.mSendRecv);
 		sender.mDelta = prng.get<block>();
 		const block mask(~0ull, ~3ull);
 		for (auto& value : input)
@@ -44,6 +45,13 @@ void CorGenerator_F4BitOt_Test(const oc::CLP& cmd)
 					throw std::runtime_error("Packed GF(4) sender hash mismatch");
 			}
 		}
+		batch.clear();
+		if (sender.mDelta != oc::ZeroBlock)
+			throw std::runtime_error("GF(4) sender delta survived clear");
+		for (const auto& plane : sender.mOts)
+			if (plane.size())
+				throw std::runtime_error("GF(4) sender output survived clear");
+
 		F4BitOtBatch::RecvBatch receiver;
 		for (auto& value : input)
 			value = prng.get<block>();
