@@ -1,7 +1,7 @@
 #include "F4BitOtBatch.h"
 #include "CorGenerator.h"
 #include "secure-join/Util/match.h"
-#include "secure-join/Util/Simd.h"
+#include "PackedOtHash.h"
 #include <cstring>
 
 namespace secJoin
@@ -498,98 +498,14 @@ namespace secJoin
 		mOts.resize(A.size() / 128);
 		mChoiceLsb.resize(A.size() / 128);
 		mChoiceMsb.resize(A.size() / 128);
-		auto aIter = reinterpret_cast<u8*>(mOts.data());
-		auto lsbIter8 = (u8*)mChoiceLsb.data();
-		auto msbIter8 = (u8*)mChoiceMsb.data();
-
-		block mask = block(~0ull, ~3ull);
-
-		auto m = A.data();
-
-		for (u64 i = 0; i < A.size(); i += 16)
+		for (u64 i = 0; i < A.size(); i += packedOt::groupSize)
 		{
-			const block bytes = gatherLowBytes(m);
-			const u16 lsb = packByteBits<0>(bytes);
-			const u16 msb = packByteBits<1>(bytes);
-			std::memcpy(lsbIter8, &lsb, sizeof(lsb));
-			std::memcpy(msbIter8, &msb, sizeof(msb));
-			lsbIter8 += sizeof(lsb);
-			msbIter8 += sizeof(msb);
-			for (u64 j = 0; j < 2; ++j)
-			{
-				// mask of the choice bits which is stored in the LSB
-				m[0] = m[0] & mask;
-				m[1] = m[1] & mask;
-				m[2] = m[2] & mask;
-				m[3] = m[3] & mask;
-				m[4] = m[4] & mask;
-				m[5] = m[5] & mask;
-				m[6] = m[6] & mask;
-				m[7] = m[7] & mask;
-
-				oc::mAesFixedKey.hashBlocks<8>(m, m);
-
-				m += 8;
-
-
-			}
-			m -= 16;
-
-			const u16 ap = packByteBits<0>(gatherLowBytes(m));
-
-			std::memcpy(aIter, &ap, sizeof(ap));
-			aIter += sizeof(ap);
-			m += 16;
-
+			const packedOt::Group group(A.data() + i);
+			packedOt::store(mChoiceLsb.data(), i, group.choices<0>());
+			packedOt::store(mChoiceMsb.data(), i, group.choices<1>());
+			packedOt::store(mOts.data(), i, group.hashes<2>(oc::ZeroBlock));
 		}
 	}
-
-
-#if defined(ENABLE_SSE) && defined(__VAES__) && defined(__AVX2__) && defined(__AVX512F__) && defined(__AVX512VL__)
-#define SECJOIN_F4_VAES_PACK
-	namespace
-	{
-		// Hash 16 blocks with the fixed key and pack bit zero of each result.
-		// Each YMM register holds two independent AES inputs for the same OT choice.
-		OC_FORCEINLINE u16 hashF4SenderBits(const block* messages, block delta)
-		{
-			const auto& keys = oc::mAesFixedKey.mRoundKey;
-			const auto offset = _mm256_broadcastsi128_si256(delta.mData);
-			const auto first = _mm256_broadcastsi128_si256(keys[0].mData);
-			__m256i input[8], state[8];
-#pragma GCC unroll 8
-			for (unsigned j = 0; j < 8; ++j)
-			{
-				const auto pair = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(messages + 2 * j));
-				input[j] = _mm256_xor_si256(pair, offset);
-				state[j] = _mm256_xor_si256(input[j], first);
-			}
-#pragma GCC unroll 9
-			for (unsigned round = 1; round < 10; ++round)
-			{
-				const auto key = _mm256_broadcastsi128_si256(keys[round].mData);
-#pragma GCC unroll 8
-				for (unsigned j = 0; j < 8; ++j)
-					state[j] = _mm256_aesenc_epi128(state[j], key);
-			}
-			const auto last = _mm256_broadcastsi128_si256(keys[10].mData);
-#pragma GCC unroll 8
-			for (unsigned j = 0; j < 8; ++j)
-				state[j] = _mm256_xor_si256(input[j], _mm256_aesenclast_epi128(state[j], last));
-
-			u16 bits = 0;
-			// Collect the low 64-bit word of four hashes into the four mask lanes.
-			const auto lowWords = _mm256_setr_epi64x(0, 2, 4, 6);
-#pragma GCC unroll 4
-			for (unsigned j = 0; j < 4; ++j)
-			{
-				const auto words = _mm256_permutex2var_epi64(state[2 * j], lowWords, state[2 * j + 1]);
-				bits |= u16(_mm256_test_epi64_mask(words, _mm256_set1_epi64x(1))) << (4 * j);
-			}
-			return bits;
-		}
-	}
-#endif
 
 	void F4BitOtBatch::SendBatch::compressSender(
 		span<oc::block> B)
@@ -599,13 +515,6 @@ namespace secJoin
 		for (auto& ots : mOts)
 			ots.resize(B.size() / 128);
 
-		std::array<u8*, 4> iters
-		{
-			reinterpret_cast<u8*>(mOts[0].data()),
-			reinterpret_cast<u8*>(mOts[1].data()),
-			reinterpret_cast<u8*>(mOts[2].data()),
-			reinterpret_cast<u8*>(mOts[3].data())
-		};
 		block mask = block(~0ull, ~3ull);
 		std::array<block, 4> deltas;
 		deltas[0] = block(0, 0);
@@ -613,76 +522,11 @@ namespace secJoin
 		CoeffCtxGF4{}.mul(deltas[2], deltas[1], F4{ 2 });
 		CoeffCtxGF4{}.mul(deltas[3], deltas[1], F4{ 3 });
 
-#ifdef SECJOIN_F4_VAES_PACK
-		for (u64 i = 0; i < B.size(); i += 16)
+		for (u64 i = 0; i < B.size(); i += packedOt::groupSize)
 		{
-			for (u64 choice = 0; choice < 4; ++choice)
-			{
-				const u16 bits = hashF4SenderBits(B.data() + i, deltas[choice]);
-				std::memcpy(iters[choice], &bits, sizeof(bits));
-				iters[choice] += sizeof(bits);
-			}
+			const packedOt::Group group(B.data() + i);
+			for (unsigned choice = 0; choice < 4; ++choice)
+				packedOt::store(mOts[choice].data(), i, group.hashes<0>(deltas[choice]));
 		}
-#else
-		std::array<block, 16> sendMsg;
-		for (u64 i = 0; i < B.size(); i += 16)
-		{
-			for (u64 b = 0; b < 4; ++b)
-			{
-				auto s = sendMsg.data();
-				auto m = B.data() + i;
-
-				switch (b)
-				{
-				case 0:
-				{
-					for (u64 j = 0; j < 2; ++j)
-					{
-						assert((m[0].get<u64>(0) & 3) == 0);
-
-						oc::mAesFixedKey.hashBlocks<8>(m, s);
-
-						s += 8;
-						m += 8;
-					}
-
-					break;
-				}
-				case 1:
-				case 2:
-				case 3:
-					for (u64 j = 0; j < 2; ++j)
-					{
-						s[0] = m[0] ^ deltas[b];
-						s[1] = m[1] ^ deltas[b];
-						s[2] = m[2] ^ deltas[b];
-						s[3] = m[3] ^ deltas[b];
-						s[4] = m[4] ^ deltas[b];
-						s[5] = m[5] ^ deltas[b];
-						s[6] = m[6] ^ deltas[b];
-						s[7] = m[7] ^ deltas[b];
-
-						oc::mAesFixedKey.hashBlocks<8>(s, s);
-
-						s += 8;
-						m += 8;
-					}
-					break;
-				default:
-					assert(0);
-					//__assume(0);
-					break;
-				}
-
-				const u16 ap = packByteBits<0>(gatherLowBytes(sendMsg.data()));
-
-				assert(iters[b] + sizeof(ap) <= reinterpret_cast<u8*>(mOts[b].data() + mOts[b].size()));
-				std::memcpy(iters[b], &ap, sizeof(ap));
-				iters[b] += sizeof(ap);
-			}
-		}
-#endif
 	}
-
-
 }

@@ -1,5 +1,6 @@
 #include "CorGenerator_Test.h"
 #include "secure-join/CorGenerator/CorGenerator.h"
+#include "secure-join/CorGenerator/BinOleBatch.h"
 #include "secure-join/CorGenerator/F4BitOtBatch.h"
 #include "secure-join/Prf/AltModPrfProto.h"
 #include "secure-join/Prf/AltModSimd.h"
@@ -11,6 +12,11 @@ namespace
     constexpr std::pair<bool, Noise> cases[] = {
         {false, Noise::Regular}, {true, Noise::Regular}, {false, Noise::Stationary}
     };
+
+    u8 packedBit(span<const block> plane, u64 i)
+    {
+        return (plane[i / 128].get<u64>((i % 128) / 64) >> (i % 64)) & 1;
+    }
 }
 
 void CorGenerator_F4BitOt_Test(const oc::CLP& cmd)
@@ -18,7 +24,7 @@ void CorGenerator_F4BitOt_Test(const oc::CLP& cmd)
 	// Verify all four packed planes against single-block Davies-Meyer hashing.
 	{
 		constexpr u64 count = 384;
-		alignas(32) std::array<block, count + 1> storage;
+		alignas(64) std::array<block, count + 1> storage;
 		span<block> input(storage.data() + 1, count);
 		PRNG prng(block(13, 27));
 		F4BitOtBatch::SendBatch sender;
@@ -34,10 +40,22 @@ void CorGenerator_F4BitOt_Test(const oc::CLP& cmd)
 			for (u64 i = 0; i < count; ++i)
 			{
 				const auto expected = oc::mAesFixedKey.hashBlock(input[i] ^ offset).get<u8>(0) & 1;
-				const auto packed = sender.mOts[choice][i / 128].get<u64>((i % 128) / 64);
-				if (((packed >> (i % 64)) & 1) != expected)
+				if (packedBit(sender.mOts[choice], i) != expected)
 					throw std::runtime_error("Packed GF(4) sender hash mismatch");
 			}
+		}
+		F4BitOtBatch::RecvBatch receiver;
+		for (auto& value : input)
+			value = prng.get<block>();
+		receiver.compressRecver(input);
+		for (u64 i = 0; i < count; ++i)
+		{
+			const auto choices = input[i].get<u8>(0);
+			const auto expected = oc::mAesFixedKey.hashBlock(input[i] & mask).get<u8>(0) & 1;
+			if (packedBit(receiver.mChoiceLsb, i) != (choices & 1) ||
+				packedBit(receiver.mChoiceMsb, i) != ((choices >> 1) & 1) ||
+				packedBit(receiver.mOts, i) != expected)
+				throw std::runtime_error("Packed GF(4) receiver mismatch");
 		}
 	}
 
@@ -210,6 +228,30 @@ void CorGenerator_Ot_Test(const oc::CLP& cmd)
 
 void CorGenerator_BinOle_Test(const oc::CLP& cmd)
 {
+	{
+		constexpr u64 count = 384;
+		alignas(64) std::array<block, count + 1> storage;
+		span<block> input(storage.data() + 1, count);
+		PRNG prng(block(47, 81));
+		for (auto& value : input)
+			value = prng.get<block>();
+		const block delta = prng.get<block>() | oc::OneBlock;
+		const block mask(~0ull, ~1ull);
+		OleBatch::SendBatch sender;
+		OleBatch::RecvBatch receiver;
+		std::array<block, count / 128> sAdd, sMult, rAdd, rMult;
+		sender.compressSender(delta, input, sAdd, sMult);
+		receiver.compressRecver(input, rAdd, rMult);
+		for (u64 i = 0; i < count; ++i)
+		{
+			const auto x = input[i] & mask;
+			const auto zero = oc::mAesFixedKey.hashBlock(x).get<u8>(0) & 1;
+			const auto one = oc::mAesFixedKey.hashBlock(x ^ (delta & mask)).get<u8>(0) & 1;
+			if (packedBit(sAdd, i) != zero || packedBit(sMult, i) != (zero ^ one) ||
+				packedBit(rAdd, i) != zero || packedBit(rMult, i) != (input[i].get<u8>(0) & 1))
+				throw std::runtime_error("Packed binary OLE mismatch");
+		}
+	}
 
 	u64 n = cmd.getOr("n", (1ull << 16) + 3234);
 

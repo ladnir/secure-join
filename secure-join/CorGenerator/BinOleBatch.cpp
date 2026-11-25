@@ -1,7 +1,7 @@
 #include "BinOleBatch.h"
 #include "CorGenerator.h"
 #include "secure-join/Util/match.h"
-#include "secure-join/Util/Simd.h"
+#include "PackedOtHash.h"
 #include <cstring>
 
 namespace secJoin
@@ -285,52 +285,16 @@ namespace secJoin
         span<oc::block> add,
         span<oc::block> mult)
     {
-        auto aIter = reinterpret_cast<u8*>(add.data());
-        auto bIter8 = (u8*)mult.data();
-
-
-        if (add.size() * 128 != A.size())
-            throw RTE_LOC;
-        if (mult.size() * 128 != A.size())
+        if (A.size() % 128 || add.size() != A.size() / 128 || mult.size() != add.size())
             throw RTE_LOC;
 
-        auto OneBlock = block(1);
-        auto AllOneBlock = block(~0ull, ~0ull);
-        block mask = OneBlock ^ AllOneBlock;
-
-        auto m = A.data();
-
-        for (u64 i = 0; i < A.size(); i += 16)
+        for (u64 i = 0; i < A.size(); i += packedOt::groupSize)
         {
-            const u16 choices = packByteBits<0>(gatherLowBytes(m));
-            std::memcpy(bIter8, &choices, sizeof(choices));
-            bIter8 += sizeof(choices);
-            for (u64 j = 0; j < 2; ++j)
-            {
-                // mask of the choice bit which is stored in the LSB
-                m[0] = m[0] & mask;
-                m[1] = m[1] & mask;
-                m[2] = m[2] & mask;
-                m[3] = m[3] & mask;
-                m[4] = m[4] & mask;
-                m[5] = m[5] & mask;
-                m[6] = m[6] & mask;
-                m[7] = m[7] & mask;
-
-                oc::mAesFixedKey.hashBlocks<8>(m, m);
-
-                m += 8;
-            }
-            m -= 16;
-
-            const u16 ap = packByteBits<0>(gatherLowBytes(m));
-            std::memcpy(aIter, &ap, sizeof(ap));
-            aIter += sizeof(ap);
-            m += 16;
-
+            const packedOt::Group group(A.data() + i);
+            packedOt::store(mult.data(), i, group.choices<0>());
+            packedOt::store(add.data(), i, group.hashes<1>(oc::ZeroBlock));
         }
     }
-
 
     void OleBatch::SendBatch::compressSender(
         block delta,
@@ -338,79 +302,16 @@ namespace secJoin
         span<oc::block> add,
         span<oc::block> mult)
     {
-
-        auto bIter = reinterpret_cast<u8*>(add.data());
-        auto aIter = reinterpret_cast<u8*>(mult.data());
-
-        if (add.size() * 128 != B.size())
+        if (B.size() % 128 || add.size() != B.size() / 128 || mult.size() != add.size())
             throw RTE_LOC;
-        if (mult.size() * 128 != B.size())
-            throw RTE_LOC;
-        using block = oc::block;
 
-        std::array<block, 16> sendMsg;
-        auto m = B.data();
-
-        auto OneBlock = block(1);
-        auto AllOneBlock = block(~0ull, ~0ull);
-        block mask = OneBlock ^ AllOneBlock;
-        delta = delta & mask;
-
-        for (u64 i = 0; i < B.size(); i += 16)
+        for (u64 i = 0; i < B.size(); i += packedOt::groupSize)
         {
-            auto s = sendMsg.data();
-
-            for (u64 j = 0; j < 2; ++j)
-            {
-                m[0] = m[0] & mask;
-                m[1] = m[1] & mask;
-                m[2] = m[2] & mask;
-                m[3] = m[3] & mask;
-                m[4] = m[4] & mask;
-                m[5] = m[5] & mask;
-                m[6] = m[6] & mask;
-                m[7] = m[7] & mask;
-
-                oc::mAesFixedKey.hashBlocks<8>(m, s);
-
-                s += 8;
-                m += 8;
-            }
-
-
-            const u16 ap = packByteBits<0>(gatherLowBytes(sendMsg.data()));
-
-            s = sendMsg.data();
-            m -= 16;
-            for (u64 j = 0; j < 2; ++j)
-            {
-                s[0] = m[0] ^ delta;
-                s[1] = m[1] ^ delta;
-                s[2] = m[2] ^ delta;
-                s[3] = m[3] ^ delta;
-                s[4] = m[4] ^ delta;
-                s[5] = m[5] ^ delta;
-                s[6] = m[6] ^ delta;
-                s[7] = m[7] ^ delta;
-
-                oc::mAesFixedKey.hashBlocks<8>(s, s);
-
-                s += 8;
-                m += 8;
-            }
-
-            const u16 bp = packByteBits<0>(gatherLowBytes(sendMsg.data()));
-
-            assert(aIter + sizeof(u16) <= reinterpret_cast<u8*>(mult.data() + mult.size()));
-            assert(bIter + sizeof(u16) <= reinterpret_cast<u8*>(add.data() + add.size()));
-
-            u16 mixed = ap ^ bp;
-            std::memcpy(aIter, &mixed, sizeof(mixed));
-            aIter += sizeof(mixed);
-            std::memcpy(bIter, &ap, sizeof(ap));
-            bIter += sizeof(ap);
+            const packedOt::Group group(B.data() + i);
+            const auto zero = group.hashes<1>(oc::ZeroBlock);
+            const auto one = group.hashes<1>(delta);
+            packedOt::store(add.data(), i, zero);
+            packedOt::store(mult.data(), i, zero ^ one);
         }
     }
-
-
 }
