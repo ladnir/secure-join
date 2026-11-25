@@ -585,6 +585,53 @@ namespace secJoin
 				std::memcpy(reinterpret_cast<u8*>(mOts[choice].data()) + i / 8, &bits, sizeof(bits));
 			}
 		}
+#elif defined(ENABLE_SSE) && defined(__VAES__) && defined(__AVX2__) && !defined(__AVX512F__)
+		const auto& keys = oc::mAesFixedKey.mRoundKey;
+		__m256i roundKeys[10], first[4];
+		for (unsigned r = 0; r < 10; ++r)
+			roundKeys[r] = _mm256_broadcastsi128_si256(keys[r + 1].mData);
+		for (unsigned choice = 0; choice < 4; ++choice)
+			first[choice] = _mm256_broadcastsi128_si256((keys[0] ^ deltas[choice]).mData);
+
+		// Gather the low word of each AES block. The two 128-bit lanes hold
+		// the even-indexed and odd-indexed inputs, respectively.
+		auto lowWords = [](__m256i a, __m256i b, __m256i c, __m256i d) {
+			return _mm256_unpacklo_epi64(_mm256_unpacklo_epi32(a, b), _mm256_unpacklo_epi32(c, d));
+		};
+		const auto inputOrder = _mm256_setr_epi32(0, 4, 1, 5, 2, 6, 3, 7);
+		for (u64 i = 0; i < B.size(); i += 8)
+		{
+			__m256i raw[4];
+			for (unsigned j = 0; j < 4; ++j)
+				raw[j] = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(B.data() + i + 2 * j));
+			const auto inputWords = lowWords(raw[0], raw[1], raw[2], raw[3]);
+
+			// Two choices keep eight independent VAES chains in flight.
+			for (unsigned choice = 0; choice < 4; choice += 2)
+			{
+				__m256i state[2][4];
+				for (unsigned c = 0; c < 2; ++c)
+					for (unsigned j = 0; j < 4; ++j)
+						state[c][j] = _mm256_xor_si256(raw[j], first[choice + c]);
+#pragma GCC unroll 9
+				for (unsigned r = 0; r < 9; ++r)
+					for (auto& plane : state)
+						for (auto& v : plane)
+							v = _mm256_aesenc_epi128(v, roundKeys[r]);
+
+				for (unsigned c = 0; c < 2; ++c)
+				{
+					auto& plane = state[c];
+					for (auto& v : plane)
+						v = _mm256_aesenclast_epi128(v, roundKeys[9]);
+					// Each delta has low bit zero, so the feed-forward bit is B's bit zero.
+					const auto hashed = _mm256_xor_si256(lowWords(plane[0], plane[1], plane[2], plane[3]), inputWords);
+					const auto ordered = _mm256_permutevar8x32_epi32(hashed, inputOrder);
+					const auto bits = _mm256_movemask_ps(_mm256_castsi256_ps(_mm256_slli_epi32(ordered, 31)));
+					reinterpret_cast<u8*>(mOts[choice + c].data())[i / 8] = static_cast<u8>(bits);
+				}
+			}
+		}
 #else
 		for (u64 i = 0; i < B.size(); i += packedOt::groupSize)
 		{
