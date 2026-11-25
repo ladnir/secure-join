@@ -54,8 +54,11 @@ namespace secJoin
 	{
 		BaseRequest r;
 
-		if (mGenState->mMock || worker)
+		if (mGenState->mMock)
 			return r;
+
+		if (worker)
+			return worker->requestOtBase(CorType::TritOt, mSize, mSendRecv.index() == 0, mPrng);
 
 		mSendRecv | match{
 			[&](SendBatch& send) {
@@ -74,8 +77,11 @@ namespace secJoin
 	void TritOtBatch::setBase(BaseCor& base, StationaryWorker* worker)
 	{
 
-		if (mGenState->mMock || worker)
+		if (mGenState->mMock)
 			return;
+
+		if (worker)
+			return worker->setOtBase(CorType::TritOt, mSize, mSendRecv.index() == 0, base);
 
 		mSendRecv | match{
 			[&](SendBatch& send) {

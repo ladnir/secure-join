@@ -1,4 +1,5 @@
 #include "SpinWorker.h"
+#include "Base.h"
 #include <cryptoTools/Crypto/RandomOracle.h>
 
 namespace secJoin
@@ -48,6 +49,47 @@ namespace secJoin
     {
         std::lock_guard lock(mutex);
         idle.push_back(std::move(banks));
+    }
+
+    BaseRequest StationaryWorker::requestOtBase(CorType type, u64 size, bool sending, PRNG& prng)
+    {
+        BaseRequest request;
+        if (sending)
+        {
+            auto [protocol, fresh] = stream(sendOt, type, size, true);
+            const auto counts = protocol.baseCount();
+            if (fresh)
+                request.mSendSize = counts.mBaseOtCount;
+            request.mSendBinaryVoles = counts.mBaseVoleCount;
+        }
+        else
+        {
+            auto [protocol, fresh] = stream(recvOt, type, size, false);
+            if (fresh)
+                request.mChoice = protocol.sampleBaseChoiceBits(prng);
+            request.mRecvBinaryVoles = protocol.baseCount().mBaseVoleCount;
+        }
+        return request;
+    }
+
+    void StationaryWorker::setOtBase(CorType type, u64 size, bool sending, BaseCor& base)
+    {
+        if (sending)
+        {
+            auto& protocol = sendOt.at({type, size});
+            const auto counts = protocol.baseCount();
+            auto noise = base.get<block>(base.mBinaryB, base.mBinarySendIndex, counts.mBaseVoleCount);
+            protocol.setBaseCors(base.getSendOt(counts.mBaseOtCount), noise, base.mBinaryDelta);
+        }
+        else
+        {
+            auto& protocol = recvOt.at({type, size});
+            const auto counts = protocol.baseCount();
+            auto points = base.mOtRecvChoice.subvec(base.mOtRecvIndex, counts.mBaseOtCount);
+            auto choices = base.mBinaryChoice.subvec(base.mBinaryRecvIndex, counts.mBaseVoleCount);
+            auto noise = base.get<block>(base.mBinaryA, base.mBinaryRecvIndex, counts.mBaseVoleCount);
+            protocol.setBaseCors(base.getRecvOt(counts.mBaseOtCount), points, noise, choices);
+        }
     }
 
     u64 StationaryWorker::bankSeed(u64 size) const

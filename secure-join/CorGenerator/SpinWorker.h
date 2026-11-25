@@ -11,6 +11,9 @@
 
 namespace secJoin
 {
+    struct BaseRequest;
+    struct BaseCor;
+
     struct SpinBanks
     {
         SpinBanks() = default;
@@ -75,6 +78,9 @@ namespace secJoin
             bank = std::exchange(protocol.mSpin, std::nullopt);
             blocks = std::move(buffer(protocol));
         }
+
+        BaseRequest requestOtBase(CorType type, u64 size, bool sending, PRNG& prng);
+        void setOtBase(CorType type, u64 size, bool sending, BaseCor& base);
 
         u64 bankSeed(u64 size) const;
         block initialSeed(CorType type, u64 size, u64 senderParty) const;

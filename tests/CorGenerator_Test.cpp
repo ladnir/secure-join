@@ -487,6 +487,18 @@ void CorGenerator_SpinWorkers_Test(const oc::CLP&)
     StationaryWorker sender(0, 0, oc::OneBlock, bank[0]), receiver(0, 1, oc::OneBlock, bank[1]);
     PRNG random[2]{PRNG(oc::ZeroBlock), PRNG(oc::OneBlock)};
     auto channel = coproto::LocalAsyncSocket::makePair();
+    // Requests are collected for all batches before any worker expands.
+    for (auto type : {CorType::Ot, CorType::Ole, CorType::TritOt})
+    {
+        for (unsigned round = 0; round < 2; ++round)
+        {
+            auto left = sender.requestOtBase(type, k, true, random[0]);
+            auto right = receiver.requestOtBase(type, k, false, random[1]);
+            if ((left.mSendSize != 0) != (round == 0) || left.mSendSize != right.mChoice.size() ||
+                !left.mSendBinaryVoles || left.mSendBinaryVoles != right.mRecvBinaryVoles)
+                throw std::runtime_error("Stationary binary setup requested incorrect location OTs or noise VOLEs");
+        }
+    }
     auto nextSeed = sender.initialSeed(CorType::Ot, k, 0);
     for (unsigned round = 0; round < 2; ++round)
     {
@@ -552,6 +564,8 @@ void CorGenerator_SpinWorkers_Test(const oc::CLP&)
         auto sockets = coproto::LocalAsyncSocket::makePair();
         for (u64 party = 0; party < 2; ++party)
             peers[party].init(std::move(sockets[party]), prng, party, 2, k, false, Noise::Stationary);
+        auto sendState = peers[0].mGenState;
+        auto recvState = peers[1].mGenState;
         auto send = peers[0].sendOtRequest(4 * k);
         auto recv = peers[1].recvOtRequest(4 * k);
         send.start();
@@ -559,6 +573,10 @@ void CorGenerator_SpinWorkers_Test(const oc::CLP&)
         auto tasks = macoro::sync_wait(macoro::when_all_ready(peers[0].start(), peers[1].start()));
         std::get<0>(tasks).result();
         std::get<1>(tasks).result();
+
+        if (!sendState->mSendOtBase.hasBaseOts() || !recvState->mRecvOtBase.hasBaseOts() ||
+            sendState->mSendOtBase.mRandomOt || recvState->mRecvOtBase.mRandomOt)
+            throw std::runtime_error("Stationary binary batches bypassed the common noise provider");
 
         u64 seeds[2];
         for (u64 w = 0; w < 2; ++w)

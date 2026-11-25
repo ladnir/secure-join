@@ -32,8 +32,11 @@ namespace secJoin
     {
         BaseRequest r;
 
-        if (mGenState->mMock || worker)
+        if (mGenState->mMock)
             return r;
+
+        if (worker)
+            return worker->requestOtBase(CorType::Ole, mSize, mSendRecv.index() == 0, mPrng);
 
         mSendRecv | match{
             [&](SendBatch& send) {
@@ -52,8 +55,11 @@ namespace secJoin
     void OleBatch::setBase(BaseCor& sMsg, StationaryWorker* worker)
     {
 
-        if (mGenState->mMock || worker)
+        if (mGenState->mMock)
             return;
+
+        if (worker)
+            return worker->setOtBase(CorType::Ole, mSize, mSendRecv.index() == 0, sMsg);
 
         mSendRecv | match{
             [&](SendBatch& send) {

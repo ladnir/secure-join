@@ -6,6 +6,43 @@
 
 namespace secJoin
 {
+    namespace
+    {
+        // The extension first produces hashed location OTs. Its subsequent raw
+        // correlated OTs supply A = B xor (choice * delta) for binary noise.
+        macoro::task<> sendOtBases(oc::SoftSpokenShOtSender<>& ot, BaseCor& base,
+            u64 noiseCount, PRNG& prng, oc::Socket& sock)
+        {
+            if (base.mOtSendMsg.size())
+                co_await ot.send(base.mOtSendMsg, prng, sock);
+            if (noiseCount)
+            {
+                ot.mRandomOt = false;
+                oc::AlignedUnVector<std::array<block, 2>> noise(noiseCount);
+                co_await ot.send(noise, prng, sock);
+                base.mBinaryDelta = ot.delta();
+                base.mBinaryB.resize(noiseCount);
+                for (u64 i = 0; i < noiseCount; ++i)
+                    base.mBinaryB[i] = noise[i][0];
+            }
+        }
+
+        macoro::task<> receiveOtBases(oc::SoftSpokenShOtReceiver<>& ot, BaseCor& base,
+            u64 noiseCount, PRNG& prng, oc::Socket& sock)
+        {
+            if (base.mOtRecvMsg.size())
+                co_await ot.receive(base.mOtRecvChoice, base.mOtRecvMsg, prng, sock);
+            if (noiseCount)
+            {
+                ot.mRandomOt = false;
+                base.mBinaryChoice.resize(noiseCount);
+                base.mBinaryChoice.randomize(prng);
+                base.mBinaryA.resize(noiseCount);
+                co_await ot.receive(base.mBinaryChoice, base.mBinaryA, prng, sock);
+            }
+        }
+    }
+
 
 
 	void CorGenerator::init(
@@ -174,7 +211,7 @@ namespace secJoin
         // The request schedule already fixes the batch index on both sides.
         if (!mMock && !mBatches.empty())
         {
-            const u64 version = mNoise == oc::SdNoiseDistribution::Stationary ? 2 : 1;
+            const u64 version = mNoise == oc::SdNoiseDistribution::Stationary ? 3 : 1;
             std::array<u64, 6> config{version, static_cast<u64>(mNoise), mNumConcurrent, mBatchSize,
                 mPartyIdx, mPrng.get<u64>()};
             std::array<u64, 6> peer{};
@@ -275,12 +312,12 @@ namespace secJoin
 		{
 			if (i ^ mPartyIdx)
 			{
-				if (req.mSendSize)
+				if (req.mSendSize || req.mSendBinaryVoles)
 				{
 					socks.push_back(mSock.fork());
 					prngs.push_back(mPrng.fork());
 					base.mOtSendMsg.resize(req.mSendSize);
-					protos.push_back(mSendOtBase.send(base.mOtSendMsg, prngs.back(), socks.back()));
+					protos.push_back(sendOtBases(mSendOtBase, base, req.mSendBinaryVoles, prngs.back(), socks.back()));
 				}
 
 				if (req.mSendVoleSize)
@@ -297,13 +334,13 @@ namespace secJoin
 			else
 			{
 				// perform recv base OTs
-				if (req.mChoice.size())
+				if (req.mChoice.size() || req.mRecvBinaryVoles)
 				{
 					socks.push_back(mSock.fork());
 					prngs.push_back(mPrng.fork());
 					base.mOtRecvMsg.resize(req.mChoice.size());
 					base.mOtRecvChoice = std::move(req.mChoice);
-					protos.push_back(mRecvOtBase.receive(base.mOtRecvChoice, base.mOtRecvMsg, prngs.back(), socks.back()));
+					protos.push_back(receiveOtBases(mRecvOtBase, base, req.mRecvBinaryVoles, prngs.back(), socks.back()));
 				}
 
 				if (req.mVoleChoice.size())
