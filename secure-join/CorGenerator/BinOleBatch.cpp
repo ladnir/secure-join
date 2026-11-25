@@ -307,6 +307,43 @@ namespace secJoin
         if (B.size() % 128 || add.size() != B.size() / 128 || mult.size() != add.size())
             throw RTE_LOC;
 
+#if defined(ENABLE_SSE) && defined(__VAES__) && defined(__AVX2__) && !defined(__AVX512F__)
+        const auto& keys = oc::mAesFixedKey.mRoundKey;
+        const block mask(~0ull, ~1ull);
+        const auto messageMask = _mm256_broadcastsi128_si256(mask.mData);
+        const auto firstZero = _mm256_broadcastsi128_si256(keys[0].mData);
+        const auto firstOne = _mm256_broadcastsi128_si256((keys[0] ^ (delta & mask)).mData);
+        __m256i roundKeys[10];
+        for (unsigned r = 0; r < 10; ++r)
+            roundKeys[r] = _mm256_broadcastsi128_si256(keys[r + 1].mData);
+
+        for (u64 i = 0; i < B.size(); i += 8)
+        {
+            // Four pairs of input blocks, with both choices in flight.
+            __m256i state[8];
+            for (unsigned j = 0; j < 4; ++j)
+            {
+                const auto x = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(B.data() + i + 2 * j));
+                const auto masked = _mm256_and_si256(x, messageMask);
+                state[j] = _mm256_xor_si256(masked, firstZero);
+                state[j + 4] = _mm256_xor_si256(masked, firstOne);
+            }
+#pragma GCC unroll 9
+            for (unsigned r = 0; r < 9; ++r)
+                for (auto& v : state)
+                    v = _mm256_aesenc_epi128(v, roundKeys[r]);
+            for (auto& v : state)
+                v = _mm256_aesenclast_epi128(v, roundKeys[9]);
+
+            // Both hash inputs have bit zero cleared, so AES supplies the output bit.
+            const auto zero = packedOt::lowWords(state[0], state[1], state[2], state[3]);
+            const auto one = packedOt::lowWords(state[4], state[5], state[6], state[7]);
+            const auto z = packedOt::packBit<0>(packedOt::inInputOrder(zero));
+            const auto o = packedOt::packBit<0>(packedOt::inInputOrder(one));
+            reinterpret_cast<u8*>(add.data())[i / 8] = z;
+            reinterpret_cast<u8*>(mult.data())[i / 8] = z ^ o;
+        }
+#else
         for (u64 i = 0; i < B.size(); i += packedOt::groupSize)
         {
             const packedOt::Group group(B.data() + i);
@@ -315,5 +352,6 @@ namespace secJoin
             packedOt::store(add.data(), i, zero);
             packedOt::store(mult.data(), i, zero ^ one);
         }
+#endif
     }
 }
