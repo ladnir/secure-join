@@ -37,7 +37,7 @@ namespace secJoin
         // One stream per exact request geometry, correlation family and direction.
         // The batch borrows the returned stream until its conversion finishes.
         template<class Protocol>
-        Protocol& begin(std::map<std::pair<CorType, u64>, Protocol>& streams,
+        std::pair<Protocol&, bool> stream(std::map<std::pair<CorType, u64>, Protocol>& streams,
             CorType type, u64 size, bool sending)
         {
             auto [it, fresh] = streams.try_emplace({type, size});
@@ -52,6 +52,14 @@ namespace secJoin
                         oc::SdNoiseDistribution::Stationary, oc::MultType::Spin);
                 protocol.mCodeSeed = initialSeed(type, size, sending ? party : 1 - party);
             }
+            return {protocol, fresh};
+        }
+
+        template<class Protocol>
+        Protocol& begin(std::map<std::pair<CorType, u64>, Protocol>& streams,
+            CorType type, u64 size, bool sending)
+        {
+            auto& protocol = stream(streams, type, size, sending).first;
             auto& bank = banks.codes[oc::SpinCode::messageSize(size)];
             if (!bank)
                 bank.emplace(size, protocol.mCodeSeed, oc::SdNoiseDistribution::Stationary, bankSeed(size));

@@ -99,11 +99,11 @@ namespace secJoin
         };
     }
 
-    BaseRequest OtBatch::getBaseRequest()
+    BaseRequest OtBatch::getBaseRequest(StationaryWorker* worker)
     {
         BaseRequest r;
 
-        if (mGenState->mMock)
+        if (mGenState->mMock || worker)
             return r;
 
         mSendRecv | match{
@@ -120,9 +120,9 @@ namespace secJoin
         return r;
     }
 
-    void OtBatch::setBase(BaseCor& base)
+    void OtBatch::setBase(BaseCor& base, StationaryWorker* worker)
     {
-        if (mGenState->mMock)
+        if (mGenState->mMock || worker)
             return;
 
         mSendRecv | match{

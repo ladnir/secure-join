@@ -47,7 +47,7 @@ namespace secJoin
 		};
 	}
 
-	BaseRequest F4BitOtBatch::getBaseRequest()
+	BaseRequest F4BitOtBatch::getBaseRequest(StationaryWorker* worker)
 	{
 		BaseRequest r;
 
@@ -56,21 +56,46 @@ namespace secJoin
 
 		mSendRecv | match{
 			[&](SendBatch& send) {
-				send.mSender.configure(mSize);
-				r.mSendSize = send.mSender.silentBaseOtCount();
-				r.mSendVoleSize = send.mSender.baseVoleCount();
+				if (worker)
+				{
+					auto [protocol, fresh] = worker->stream(worker->sendF4, CorType::F4BitOt, mSize, true);
+					if (fresh)
+						r.mSendSize = protocol.silentBaseOtCount();
+					r.mSendVoleSize = protocol.baseVoleCount();
+				}
+				else
+				{
+					send.mSender.configure(mSize);
+					r.mSendSize = send.mSender.silentBaseOtCount();
+					r.mSendVoleSize = send.mSender.baseVoleCount();
+				}
 			},
-
 			[&](RecvBatch& recv) {
-				recv.mReceiver.configure(mSize);
-				r.mChoice = recv.mReceiver.sampleBaseChoiceBits(mPrng);
-				r.mVoleChoice = recv.mReceiver.sampleBaseVoleVals(mPrng);
+				if (worker)
+				{
+					auto [protocol, fresh] = worker->stream(worker->recvF4, CorType::F4BitOt, mSize, false);
+					if (fresh)
+					{
+						r.mChoice = protocol.sampleBaseChoiceBits(mPrng);
+						protocol.recordPoints();
+					}
+					// Every round gets new uniform coefficients, including zero.
+					r.mVoleChoice.resize(protocol.baseVoleCount());
+					for (auto& c : r.mVoleChoice)
+						c.mVal = mPrng.get<u8>() & 3;
+				}
+				else
+				{
+					recv.mReceiver.configure(mSize);
+					r.mChoice = recv.mReceiver.sampleBaseChoiceBits(mPrng);
+					r.mVoleChoice = recv.mReceiver.sampleBaseVoleVals(mPrng);
+				}
 			}
 		};
 		return r;
 	}
 
-	void F4BitOtBatch::setBase(BaseCor& base)
+	void F4BitOtBatch::setBase(BaseCor& base, StationaryWorker* worker)
 	{
 
 		if (mGenState->mMock)
@@ -79,14 +104,21 @@ namespace secJoin
 		mSendRecv | match{
 			[&](SendBatch& send) {
 				send.mDelta = base.mVoleDelta;
-				send.mSender.setSilentBaseOts(
-					base.getSendOt(send.mSender.silentBaseOtCount()),
-					base.getSendVole(send.mSender.baseVoleCount()));
+				auto& protocol = worker ? worker->sendF4.at({CorType::F4BitOt, mSize}) : send.mSender;
+				protocol.setSilentBaseOts(base.getSendOt(protocol.silentBaseOtCount()),
+					base.getSendVole(protocol.baseVoleCount()));
 			},
 			[&](RecvBatch& recv) {
-				recv.mReceiver.setSilentBaseOts(
-					base.getRecvOt(recv.mReceiver.silentBaseOtCount()),
-					base.getRecvVole(recv.mReceiver.baseVoleCount()));
+				auto& protocol = worker ? worker->recvF4.at({CorType::F4BitOt, mSize}) : recv.mReceiver;
+				const auto count = protocol.baseVoleCount();
+				const auto offset = base.mVoleRecvIndex;
+				auto shares = base.getRecvVole(count);
+				if (worker)
+				{
+					protocol.mBaseC.resize(count);
+					std::copy_n(base.mVoleChoice.begin() + offset, count, protocol.mBaseC.begin());
+				}
+				protocol.setSilentBaseOts(base.getRecvOt(protocol.silentBaseOtCount()), shares);
 			}
 		};
 	}
@@ -417,7 +449,6 @@ namespace secJoin
         {
             auto& worker = *threadState.mStationary;
             auto& protocol = worker.begin(worker.sendF4, CorType::F4BitOt, size, true);
-            mDelta = prng.get<block>() & block(~0ull, ~3ull);
             co_await protocol.silentSendInplace(mDelta, size, prng, sock);
             compressSender(protocol.mB);
             worker.finish(protocol);

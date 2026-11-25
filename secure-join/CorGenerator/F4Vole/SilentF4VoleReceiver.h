@@ -346,6 +346,16 @@ namespace secJoin
 			return choice;
 		}
 
+        void recordPoints()
+        {
+            mS.resize(mNumPartitions);
+            gen().getPoints(mS, format());
+            // Tree-index PPRF returns a local leaf for each contiguous tree.
+            if (mStationary)
+                for (u64 i = 0; i < mNumPartitions; ++i)
+                    mS[i] += i * mSizePer;
+        }
+
 		VecG sampleBaseVoleVals(PRNG& prng)
 		{
 			if (isConfigured() == false)
@@ -364,14 +374,7 @@ namespace secJoin
 			}
 
 			if (!mStationary || !mStationary->mExpanded)
-            {
-                mS.resize(mNumPartitions);
-                gen().getPoints(mS, format());
-                // Tree-index PPRF returns a local leaf for each contiguous tree.
-                if (mStationary)
-                    for (u64 i = 0; i < mNumPartitions; ++i)
-                        mS[i] += i * mSizePer;
-            }
+                recordPoints();
 
 			if (mMalType == oc::SilentSecType::Malicious)
 			{

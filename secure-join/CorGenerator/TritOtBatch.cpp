@@ -50,11 +50,11 @@ namespace secJoin
 		};
 	}
 
-	BaseRequest TritOtBatch::getBaseRequest()
+	BaseRequest TritOtBatch::getBaseRequest(StationaryWorker* worker)
 	{
 		BaseRequest r;
 
-		if (mGenState->mMock)
+		if (mGenState->mMock || worker)
 			return r;
 
 		mSendRecv | match{
@@ -71,10 +71,10 @@ namespace secJoin
 		return r;
 	}
 
-	void TritOtBatch::setBase(BaseCor& base)
+	void TritOtBatch::setBase(BaseCor& base, StationaryWorker* worker)
 	{
 
-		if (mGenState->mMock)
+		if (mGenState->mMock || worker)
 			return;
 
 		mSendRecv | match{

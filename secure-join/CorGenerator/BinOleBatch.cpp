@@ -28,11 +28,11 @@ namespace secJoin
         d.mMult = mMult.subspan(begin / 128, size / 128);
     }
 
-    BaseRequest OleBatch::getBaseRequest()
+    BaseRequest OleBatch::getBaseRequest(StationaryWorker* worker)
     {
         BaseRequest r;
 
-        if (mGenState->mMock)
+        if (mGenState->mMock || worker)
             return r;
 
         mSendRecv | match{
@@ -49,10 +49,10 @@ namespace secJoin
         return r;
     }
 
-    void OleBatch::setBase(BaseCor& sMsg)
+    void OleBatch::setBase(BaseCor& sMsg, StationaryWorker* worker)
     {
 
-        if (mGenState->mMock)
+        if (mGenState->mMock || worker)
             return;
 
         mSendRecv | match{

@@ -24,6 +24,7 @@ void CorGenerator_F4BitOt_Test(const oc::CLP& cmd)
 		PRNG prng(oc::ZeroBlock);
 
 		auto sock = coproto::LocalAsyncSocket::makePair();
+		auto meter = sock[0];
 		CorGenerator send;
 		CorGenerator recv;
 		send.init(std::move(sock[0]), prng, 0, 2, batch, mock, noise);
@@ -76,6 +77,16 @@ void CorGenerator_F4BitOt_Test(const oc::CLP& cmd)
 
 		std::get<0>(r).result();
 		std::get<1>(r).result();
+		if (noise == Noise::Stationary && !cmd.isSet("debug"))
+		{
+			// Direct noisy VOLE sends 128 blocks per partition on every round.
+			// Even including cold PPRFs, the aggregated provider should beat
+			// that payload alone for the eight full batches in this workload.
+			const auto partitions = configureF4Code(128, batch, oc::MultType::Spin, noise).mNumPartitions;
+			const auto direct = (n / batch) * partitions * 128 * sizeof(block);
+			if (meter.bytesSent() + meter.bytesReceived() >= direct)
+				throw std::runtime_error("Stationary GF(4) repeated the direct base-VOLE payload");
+		}
 
 	}
 
@@ -86,6 +97,9 @@ void CorGenerator_F4BitOt_Test(const oc::CLP& cmd)
 
 	//std::get<0>(r).result();
 	//std::get<1>(r).result();
+
+
+
 }
 
 void CorGenerator_Ot_Test(const oc::CLP& cmd)

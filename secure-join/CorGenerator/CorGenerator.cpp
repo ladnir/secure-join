@@ -158,7 +158,10 @@ namespace secJoin
 		auto reqChecks = std::map<CorType, oc::RandomOracle>{};
 		auto theirReq = std::vector<ReqInfo>{};
 		std::vector<SpinBanks> banks;
-		auto threadState = std::vector<BatchThreadState>{};
+		auto threadState = std::vector<BatchThreadState>(mNumConcurrent);
+        std::array<std::unique_ptr<StationaryWorker>, 2> baseWorkers;
+        auto* sendVole = &mSendVoleBase;
+        auto* recvVole = &mRecvVoleBase;
 
 		std::exception_ptr failure;
 		try
@@ -171,7 +174,8 @@ namespace secJoin
         // The request schedule already fixes the batch index on both sides.
         if (!mMock && !mBatches.empty())
         {
-            std::array<u64, 6> config{1, static_cast<u64>(mNoise), mNumConcurrent, mBatchSize,
+            const u64 version = mNoise == oc::SdNoiseDistribution::Stationary ? 2 : 1;
+            std::array<u64, 6> config{version, static_cast<u64>(mNoise), mNumConcurrent, mBatchSize,
                 mPartyIdx, mPrng.get<u64>()};
             std::array<u64, 6> peer{};
             auto exchanged = co_await macoro::when_all_ready(mSock.send(config), mSock.recv(peer));
@@ -183,8 +187,13 @@ namespace secJoin
             if (mNoise == oc::SdNoiseDistribution::Stationary)
             {
                 const block session(mPartyIdx ? peer[5] : config[5], mPartyIdx ? config[5] : peer[5]);
-                banks = mBanks->acquire(mNumConcurrent);
-                threadState.resize(mNumConcurrent);
+                // The base VOLE generators in opposite directions can run concurrently.
+                banks = mBanks->acquire(mNumConcurrent + 2);
+                for (u64 sender = 0; sender < 2; ++sender)
+                {
+                    const u64 index = mNumConcurrent + sender;
+                    baseWorkers[sender] = std::make_unique<StationaryWorker>(index, mPartyIdx, session, banks[index]);
+                }
                 for (u64 i = 0; i < mNumConcurrent; ++i)
                     threadState[i].mStationary = std::make_unique<StationaryWorker>(i, mPartyIdx, session, banks[i]);
             }
@@ -197,8 +206,7 @@ namespace secJoin
 			auto& batch = *mBatches[i];
 			if (!batch.mSize)
 				std::terminate();
-			if (mNoise == oc::SdNoiseDistribution::Regular)
-				reqs.push_back(batch.getBaseRequest());
+			reqs.push_back(batch.getBaseRequest(threadState[i % mNumConcurrent].mStationary.get()));
 		}
 
 		if (mDebug)
@@ -281,7 +289,9 @@ namespace secJoin
 					prngs.push_back(mPrng.fork());
 					base.mVoleDelta = mPrng.get();
 					base.mVoleB.resize(req.mSendVoleSize);
-					protos.push_back(mSendVoleBase.sendChosen(base.mVoleDelta, base.mVoleB, prngs.back(), socks.back()));
+					if (auto& w = baseWorkers[mPartyIdx])
+						sendVole = &w->begin(w->sendF4, CorType::F4BitOt, req.mSendVoleSize, true);
+					protos.push_back(sendVole->sendChosen(base.mVoleDelta, base.mVoleB, prngs.back(), socks.back()));
 				}
 			}
 			else
@@ -302,7 +312,9 @@ namespace secJoin
 					prngs.push_back(mPrng.fork());
 					base.mVoleA.resize(req.mVoleChoice.size());
 					base.mVoleChoice = std::move(req.mVoleChoice);
-					protos.push_back(mRecvVoleBase.receiveChosen(base.mVoleChoice, base.mVoleA, prngs.back(), socks.back()));
+					if (auto& w = baseWorkers[1 - mPartyIdx])
+						recvVole = &w->begin(w->recvF4, CorType::F4BitOt, base.mVoleA.size(), false);
+					protos.push_back(recvVole->receiveChosen(base.mVoleChoice, base.mVoleA, prngs.back(), socks.back()));
 				}
 			}
 		}
@@ -322,7 +334,11 @@ namespace secJoin
 
 		setTimePoint("GenState::base");
 
-		threadState.resize(mNumConcurrent);
+		if (sendVole != &mSendVoleBase)
+			baseWorkers[mPartyIdx]->finish(*sendVole);
+		if (recvVole != &mRecvVoleBase)
+			baseWorkers[1 - mPartyIdx]->finish(*recvVole);
+		baseWorkers = {};
 
 
 
@@ -335,12 +351,10 @@ namespace secJoin
 				if (mBatches[i]->mAbort == false)
 				{
 					auto& batch = *mBatches[i];
-					if (mNoise == oc::SdNoiseDistribution::Regular)
-                    {
-                        batch.setBase(base);
-                        if (!mMock)
-                            prepareRegularSpin(threadState[i % mNumConcurrent].mSpin, batch.mSize);
-                    }
+					auto& worker = threadState[i % mNumConcurrent];
+					batch.setBase(base, worker.mStationary.get());
+					if (!mMock && !worker.mStationary)
+						prepareRegularSpin(worker.mSpin, batch.mSize);
 
 					setTimePoint("GenState::batch.begin " + std::to_string(i));
 

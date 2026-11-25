@@ -70,9 +70,9 @@ namespace secJoin
         std::exception_ptr mError;
         macoro::task<> run(BatchThreadState& worker);
 
-        virtual BaseRequest getBaseRequest() = 0;
+        virtual BaseRequest getBaseRequest(StationaryWorker* worker) = 0;
 
-        virtual void setBase(BaseCor& cor) = 0;
+        virtual void setBase(BaseCor& cor, StationaryWorker* worker) = 0;
 
         // Get the task associated with this batch. If the task
         // has already been retrieved, this will be empty.
