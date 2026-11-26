@@ -554,6 +554,19 @@ void CorGenerator_mixed_Test(const oc::CLP& cmd)
 void CorGenerator_SpinWorkers_Test(const oc::CLP&)
 {
     constexpr u64 k = 8192;
+    {
+        CorGenerator gen;
+        PRNG prng(oc::ZeroBlock);
+        gen.init(oc::Socket{}, prng, 0, 1);
+        if (gen.mGenState->mNoise != Noise::Stationary || gen.mGenState->mBatchSize != (1ull << 15))
+            throw std::runtime_error("Incorrect stationary defaults");
+        gen.init(oc::Socket{}, prng, 0, 1, Noise::Regular);
+        if (gen.mGenState->mNoise != Noise::Regular || gen.mGenState->mBatchSize != (1ull << 20))
+            throw std::runtime_error("Incorrect regular defaults");
+        gen.init(oc::Socket{}, prng, 0, 1, k, false);
+        if (gen.mGenState->mNoise != Noise::Stationary || gen.mGenState->mBatchSize != k)
+            throw std::runtime_error("Incorrect defaults with explicit batch size");
+    }
     std::optional<oc::SpinCode> first, second;
     prepareRegularSpin(first, k - 128);
     prepareRegularSpin(second, k);

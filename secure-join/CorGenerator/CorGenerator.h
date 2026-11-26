@@ -21,12 +21,14 @@ namespace secJoin
 	struct GenState : oc::TimerAdapter
 	{
 		GenState() = delete;
-		GenState(u64 partyIdx, PRNG&& prng, oc::Socket s, u64 numConcurrent, u64 batchSize, bool mock)
+		GenState(u64 partyIdx, PRNG&& prng, oc::Socket s, u64 numConcurrent, u64 batchSize, bool mock,
+			oc::SdNoiseDistribution noise)
 			: mPrng(std::move(prng))
 			, mSock(std::move(s))
 			, mNumConcurrent(numConcurrent)
 			, mBatchSize(batchSize)
 			, mMock(mock)
+			, mNoise(noise)
 			, mPartyIdx(partyIdx)
 		{
 			if (batchSize < (1ull << 10))
@@ -99,7 +101,7 @@ namespace secJoin
 
 		// true if we should just fake the correlation generation
 		bool mMock = false;
-        oc::SdNoiseDistribution mNoise = oc::SdNoiseDistribution::Regular;
+        oc::SdNoiseDistribution mNoise;
         std::shared_ptr<SpinBankPool> mBanks;
 
 		// used to determine which party should go first when its ambiguous.
@@ -162,6 +164,19 @@ namespace secJoin
 		std::vector<std::weak_ptr<GenState>> mStarted;
         std::shared_ptr<SpinBankPool> mBanks;
 
+		static constexpr auto defaultNoise = oc::SdNoiseDistribution::Stationary;
+
+		static constexpr u64 defaultBatchSize(oc::SdNoiseDistribution noise)
+		{
+			return noise == oc::SdNoiseDistribution::Stationary ? 1ull << 15 : 1ull << 20;
+		}
+
+		void init(coproto::Socket&& sock, PRNG& prng, u64 partyIdx, u64 numConcurrent,
+			oc::SdNoiseDistribution noise = defaultNoise)
+		{
+			init(std::move(sock), prng, partyIdx, numConcurrent, defaultBatchSize(noise), false, noise);
+		}
+
 		void init(
 			coproto::Socket&& sock,
 			PRNG& prng,
@@ -169,7 +184,7 @@ namespace secJoin
 			u64 numConcurrent,
 			u64 batchSize,
 			bool mock,
-            oc::SdNoiseDistribution noise = oc::SdNoiseDistribution::Regular);
+			oc::SdNoiseDistribution noise = defaultNoise);
 
 
 		template<typename T>

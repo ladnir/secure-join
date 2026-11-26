@@ -15,9 +15,13 @@ The output library `secure-join` and executable `frontend` will be written to `o
 
 ### Correlation modes
 
-Both peers select the noise mode in the final argument of `CorGenerator::init`. The default, `oc::SdNoiseDistribution::Regular`, samples fresh PPRF noise for each batch and shares one immutable full SPIN map per padded size within a process. Each worker owns its scratch.
+`gen.init(std::move(socket), prng, party, workers)` selects stationary noise with 32,768 correlations per batch. Each worker keeps its own SPIN bank per padded size, and each stream refreshes its active code every round. Banked SPIN uses the heuristic setup. Reusing the generator across joins retains the public banks and starts a fresh private session.
 
-With `oc::SdNoiseDistribution::Stationary`, use the same logical worker count and batch size on both peers. Each worker keeps its own bank per padded size, and each stream refreshes its active code every round. Banked SPIN uses the heuristic setup. Reusing the generator across joins retains public banks and starts a fresh private session. To benchmark a join with stationary noise, run `secJoinfrontend -bench -join -nn 12 -nt 2 -mock 0 -stationary`.
+Pass `oc::SdNoiseDistribution::Regular` as the fifth argument for regular noise with 1,048,576 correlations per batch. This mode samples fresh PPRF noise for each batch and shares one immutable full SPIN map per padded size within a process. Each worker owns its scratch.
+
+To override the batch size, pass `batchSize, mock, noise` after `workers`. Both peers must use the same mode and batch size. Stationary mode also requires the same worker count on both peers.
+
+Run `secJoinfrontend -bench -join -nn 12 -nt 2 -mock 0` for the stationary default. Add `-regular` for the regular default. In either mode, `-b k` sets the batch size to 2^k correlations.
 
 ### Installing
 

@@ -6,10 +6,27 @@
 
 namespace secJoin
 {
-	static oc::SdNoiseDistribution benchmarkNoise(const oc::CLP& cmd)
-    {
-        return cmd.isSet("stationary") ? oc::SdNoiseDistribution::Stationary : oc::SdNoiseDistribution::Regular;
-    }
+	static oc::SdNoiseDistribution benchmarkNoise(const oc::CLP& cmd, oc::SdNoiseDistribution fallback)
+	{
+		if (cmd.isSet("regular") && cmd.isSet("stationary"))
+			throw std::invalid_argument("Choose one noise mode: -regular or -stationary");
+		if (cmd.isSet("regular"))
+			return oc::SdNoiseDistribution::Regular;
+		if (cmd.isSet("stationary"))
+			return oc::SdNoiseDistribution::Stationary;
+		return fallback;
+	}
+
+	static std::pair<oc::SdNoiseDistribution, u64> correlationOptions(const oc::CLP& cmd)
+	{
+		const auto noise = benchmarkNoise(cmd, CorGenerator::defaultNoise);
+		if (!cmd.isSet("b"))
+			return { noise, CorGenerator::defaultBatchSize(noise) };
+		const auto exponent = cmd.get<int>("b");
+		if (exponent < 10 || exponent > 26)
+			throw std::invalid_argument("Correlation batch exponent -b must be between 10 and 26");
+		return { noise, 1ull << exponent };
+	}
 
     void CorGen_benchmark(const oc::CLP& cmd)
 	{
@@ -23,7 +40,7 @@ namespace secJoin
 		u64 ot = cmd.getOr("ot", 0);
 
 		// batch size
-		u64 batch = 1ull << cmd.getOr("b", 16);
+		const auto [noise, batch] = correlationOptions(cmd);
 
 		u64 trials = cmd.getOr("trials", 1);
 
@@ -53,8 +70,8 @@ namespace secJoin
 
 			CorGenerator g[2];
 			auto begin = timer.setTimePoint("begin trial ------------- ");
-			g[0].init(std::move(sock[0]), prng0, 0, nt, batch, false, benchmarkNoise(cmd));
-			g[1].init(std::move(sock[1]), prng1, 1, nt, batch, false, benchmarkNoise(cmd));
+			g[0].init(std::move(sock[0]), prng0, 0, nt, batch, false, noise);
+			g[1].init(std::move(sock[1]), prng1, 1, nt, batch, false, noise);
 
 			g[0].mGenState->mPool = &pool0;
 			g[1].mGenState->mPool = &pool1;
@@ -167,7 +184,7 @@ namespace secJoin
 
 		u64 n = cmd.getOr("n", 1ull << cmd.getOr("nn", 10));
 		u64 m = cmd.getOr("m", 32);
-		u64 batch = cmd.getOr("b", 16);
+		const auto [noise, batch] = correlationOptions(cmd);
 		u64 trials = cmd.getOr("trials", 1);
 		u64 nt = cmd.getOr("nt", 1);
 		bool mock = cmd.getOr("mock", 0);
@@ -207,15 +224,13 @@ namespace secJoin
 
 		CorGenerator g[2];
 
-		//g[0].init(sock[0].fork(), prng0, 0, 1 << batch, !gen);
-		//g[1].init(sock[1].fork(), prng1, 1, 1 << batch, !gen);
 
 		auto begin = timer.setTimePoint("begin");
 		for (u64 t = 0; t < trials; ++t)
 		{
 
-			g[0].init(sock2[0].fork(), prng0, 0, nt, 1 << batch, mock, benchmarkNoise(cmd));
-			g[1].init(sock2[1].fork(), prng1, 1, nt, 1 << batch, mock, benchmarkNoise(cmd));
+			g[0].init(sock2[0].fork(), prng0, 0, nt, batch, mock, noise);
+			g[1].init(sock2[1].fork(), prng1, 1, nt, batch, mock, noise);
 			g[0].mGenState->mPool = &pool0;
 			g[1].mGenState->mPool = &pool1;
 
@@ -254,7 +269,7 @@ namespace secJoin
 		u64 nL = cmd.getOr("Ln", 1ull << cmd.getOr("Lnn", cmd.getOr("nn", 10)));
 		u64 nR = cmd.getOr("Rn", 1ull << cmd.getOr("Rnn", cmd.getOr("nn", 10)));
 
-		auto b = cmd.getOr("b", 16);
+		const auto [noise, batch] = correlationOptions(cmd);
 		u64 keySize = cmd.getOr("m", 32);
 		bool mock = cmd.getOr("mock", 1);
 		u64 nt = cmd.getOr("nt", 1);
@@ -308,8 +323,8 @@ namespace secJoin
 		join0.mSort.mL = join1.mSort.mL = cmd.getOr("radixBits", join0.mSort.mL);
 
 		CorGenerator ole0, ole1;
-		ole0.init(sock2[0].fork(), prng, 0, nt, 1 << b, mock, benchmarkNoise(cmd));
-		ole1.init(sock2[1].fork(), prng, 1, nt, 1 << b, mock, benchmarkNoise(cmd));
+		ole0.init(sock2[0].fork(), prng, 0, nt, batch, mock, noise);
+		ole1.init(sock2[1].fork(), prng, 1, nt, batch, mock, noise);
 		ole0.mGenState->mPool = &pool0;
 		ole1.mGenState->mPool = &pool1;
 
@@ -368,6 +383,7 @@ namespace secJoin
 		u64 n = cmd.getOr("n", 1ull << cmd.getOr("nn", 10));
 		u64 trials = cmd.getOr("trials", 1);
 		u64 nt = cmd.getOr("nt", 1);
+		const auto [noise, batch] = correlationOptions(cmd);
 		auto useOle = cmd.isSet("ole");
 
 		oc::Timer timer;
@@ -408,8 +424,8 @@ namespace secJoin
 		//sender.setKey(kk);
 
 		CorGenerator ole0, ole1;
-		ole0.init(sock2[0].fork(), prng0, 0, nt, 1 << 18, cmd.getOr("mock", 1), benchmarkNoise(cmd));
-		ole1.init(sock2[1].fork(), prng1, 1, nt, 1 << 18, cmd.getOr("mock", 1), benchmarkNoise(cmd));
+		ole0.init(sock2[0].fork(), prng0, 0, nt, batch, cmd.getOr("mock", 1), noise);
+		ole1.init(sock2[1].fork(), prng1, 1, nt, batch, cmd.getOr("mock", 1), noise);
 
 
 		prng0.get(x.data(), x.size());
@@ -491,7 +507,8 @@ namespace secJoin
 
 		Timer sTimer;
 		Timer rTimer;
-		const auto noise = benchmarkNoise(cmd);
+		const auto noise = benchmarkNoise(cmd, multType == MultType::Spin ?
+			CorGenerator::defaultNoise : SdNoiseDistribution::Regular);
         auto s = rTimer.setTimePoint("start");
 		sender.setTimer(rTimer);
 		recver.setTimer(rTimer);
@@ -570,7 +587,8 @@ namespace secJoin
 
 		Timer sTimer;
 		Timer rTimer;
-		const auto noise = benchmarkNoise(cmd);
+		const auto noise = benchmarkNoise(cmd, multType == MultType::Spin ?
+			CorGenerator::defaultNoise : SdNoiseDistribution::Regular);
         auto s = rTimer.setTimePoint("start");
 		sender.setTimer(rTimer);
 		recver.setTimer(rTimer);
@@ -636,7 +654,7 @@ namespace secJoin
 
 		u64 n = cmd.getOr("n", 1ull << cmd.getOr("nn", 10));
 		u64 rowSize = cmd.getOr("m", 16);
-		u64 b = cmd.getOr("b", 16);
+		const auto [noise, batch] = correlationOptions(cmd);
 		//bool debug = cmd.isSet("debug");
 		u64 nt = cmd.getOr("nt", 1);
 		// bool invPerm = false;
@@ -672,8 +690,8 @@ namespace secJoin
 		CorGenerator ole0, ole1;
 
 
-		ole0.init(std::move(sock2[0]), prng0, 0, nt, 1 << b, cmd.getOr("mock", 1), benchmarkNoise(cmd));
-		ole1.init(std::move(sock2[1]), prng1, 1, nt, 1 << b, cmd.getOr("mock", 1), benchmarkNoise(cmd));
+		ole0.init(std::move(sock2[0]), prng0, 0, nt, batch, cmd.getOr("mock", 1), noise);
+		ole1.init(std::move(sock2[1]), prng1, 1, nt, batch, cmd.getOr("mock", 1), noise);
 		ole0.mGenState->mPool = &pool0;
 		ole1.mGenState->mPool = &pool1;
 
@@ -1007,4 +1025,3 @@ namespace secJoin
 	}
 
 }
-

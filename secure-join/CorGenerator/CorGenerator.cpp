@@ -55,8 +55,7 @@ namespace secJoin
 	{
 		if (partyIdx > 1 || (noise != oc::SdNoiseDistribution::Regular && noise != oc::SdNoiseDistribution::Stationary))
             throw std::invalid_argument("Invalid correlation party or noise mode");
-        mGenState = std::make_shared<GenState>(partyIdx, prng.fork(), std::move(sock), numConcurrent, batchSize, mock);
-        mGenState->mNoise = noise;
+        mGenState = std::make_shared<GenState>(partyIdx, prng.fork(), std::move(sock), numConcurrent, batchSize, mock, noise);
         if (noise == oc::SdNoiseDistribution::Stationary)
         {
             if (!mBanks)
