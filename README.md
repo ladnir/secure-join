@@ -4,9 +4,9 @@ Secure Join implements oblivious two party database joins on secret shared table
 
 ### Join performance
 
-The full join went from **2.360 s with Tungsten to 0.794 s with stationary SPIN** (2.97× speedup). Total communication fell from **43,870 to 8,018 bytes per input row** (82% less). Four-bit radix passes halve the number of sorting passes, and stationary SPIN cuts preprocessing communication by reusing correlation setup across batches.
+The full join went from **2.360 s in v1.0 (Tungsten) to 0.794 s in v1.1 (stationary SPIN)** (2.97× speedup). Total communication fell from **43,870 to 8,018 bytes per input row** (82% less). Four-bit radix passes halve the number of sorting passes, and stationary SPIN cuts preprocessing communication by reusing correlation setup across batches.
 
-Both times are medians of 12 runs on an AMD Ryzen 9 7950X with 16,384 rows per party, four workers per party, 32,768 correlations per batch, local sockets, and real base OTs. The Tungsten baseline was commit `7211d17`.
+Both times are medians of 12 runs on an AMD Ryzen 9 7950X with 16,384 rows per party, four workers per party, 32,768 correlations per batch, local sockets, and real base OTs. The v1.0 baseline was commit `7211d17`.
 
 ### Build
 

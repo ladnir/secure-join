@@ -21,20 +21,18 @@ configure_package_config_file(
   NO_CHECK_REQUIRED_COMPONENTS_MACRO
 )
 
-if(NOT DEFINED SECUREJOIN_VERSION_MAJOR)
-    message("\n\n\n\n warning, SECUREJOIN_VERSION_MAJOR not defined ${SECUREJOIN_VERSION_MAJOR}")
-endif()
-set_property(TARGET secureJoin PROPERTY VERSION ${SECUREJOIN_VERSION})
+set_property(TARGET secureJoin PROPERTY VERSION ${secureJoin_VERSION})
 # generate the version file for the config file
 write_basic_package_version_file(
-  "${CMAKE_CURRENT_BINARY_DIR}/SECUREJOINConfigVersion.cmake"
-  VERSION "${SECUREJOIN_VERSION_MAJOR}.${SECUREJOIN_VERSION_MINOR}.${SECUREJOIN_VERSION_PATCH}"
+  "${CMAKE_CURRENT_BINARY_DIR}/secureJoinConfigVersion.cmake"
+  VERSION "${secureJoin_VERSION}"
   COMPATIBILITY AnyNewerVersion
 )
 
 # install the configuration file
 install(FILES
           "${CMAKE_CURRENT_BINARY_DIR}/secureJoinConfig.cmake"
+          "${CMAKE_CURRENT_BINARY_DIR}/secureJoinConfigVersion.cmake"
           "${CMAKE_CURRENT_BINARY_DIR}/findDependancies.cmake"
           "${CMAKE_CURRENT_BINARY_DIR}/preamble.cmake"
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/secureJoin
