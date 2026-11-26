@@ -21,10 +21,10 @@ namespace secJoin
     {
         mMsg.resize(mReceiver.mRequestNumOts);
         mChoice.resize(mReceiver.mRequestNumOts);
-        assert(mReceiver.mGen.hasBaseOts());
-        mReceiver.mMultType = oc::MultType::Tungsten;
+        assert(mReceiver.hasBaseCors());
 
-        return mReceiver.silentReceive(mChoice, mMsg, prng, sock);
+        co_await mReceiver.silentReceiveInplace(mMsg.size(), prng, sock, oc::ChoiceBitPacking::True);
+        mReceiver.hash(mChoice, mMsg, oc::ChoiceBitPacking::True);
     }
 
     void OtBatch::RecvOtBatch::mock(u64 batchIdx)
@@ -46,10 +46,10 @@ namespace secJoin
     macoro::task<> OtBatch::SendOtBatch::sendTask(PRNG& prng, oc::Socket& sock)
     {
         mMsg2.resize(mSender.mRequestNumOts);
-        assert(mSender.hasSilentBaseOts());
-        mSender.mMultType = oc::MultType::Tungsten;
+        assert(mSender.hasBaseCors());
 
-        return mSender.silentSend(mMsg2, prng, sock);
+        co_await mSender.silentSendInplace(mSender.mDelta, mMsg2.size(), prng, sock);
+        mSender.hash(mMsg2, oc::ChoiceBitPacking::True);
     }
 
     void OtBatch::SendOtBatch::mock(u64 batchIdx)
@@ -99,20 +99,23 @@ namespace secJoin
         };
     }
 
-    BaseRequest OtBatch::getBaseRequest()
+    BaseRequest OtBatch::getBaseRequest(StationaryWorker* worker)
     {
         BaseRequest r;
 
         if (mGenState->mMock)
             return r;
 
+        if (worker)
+            return worker->requestOtBase(CorType::Ot, mSize, mSendRecv.index() == 0, mPrng);
+
         mSendRecv | match{
             [&](SendOtBatch& send) {
-                send.mSender.configure(mSize);
-                r.mSendSize = send.mSender.silentBaseOtCount();
+                configureBatchOt(send.mSender, mSize);
+                r.mSendSize = send.mSender.baseCount().mBaseOtCount;
             },
             [&](RecvOtBatch& recv) {
-                recv.mReceiver.configure(mSize);
+                configureBatchOt(recv.mReceiver, mSize);
                 r.mChoice = recv.mReceiver.sampleBaseChoiceBits(mPrng);
             }
         };
@@ -120,17 +123,20 @@ namespace secJoin
         return r;
     }
 
-    void OtBatch::setBase(BaseCor& base)
+    void OtBatch::setBase(BaseCor& base, StationaryWorker* worker)
     {
         if (mGenState->mMock)
             return;
 
+        if (worker)
+            return worker->setOtBase(CorType::Ot, mSize, mSendRecv.index() == 0, base);
+
         mSendRecv | match{
             [&](SendOtBatch& send) {
-                send.mSender.setSilentBaseOts(base.getSendOt(send.mSender.silentBaseOtCount()));
+                send.mSender.setBaseCors(base.getSendOt(send.mSender.baseCount().mBaseOtCount), {}, mPrng.get<block>());
             },
             [&](RecvOtBatch& recv) {
-                recv.mReceiver.setSilentBaseOts(base.getRecvOt(recv.mReceiver.silentBaseOtCount()));
+                base.setOtBase(recv.mReceiver);
             }
         };
     }
@@ -153,26 +159,49 @@ namespace secJoin
                 }
             };
         }
+        else if (threadState.mStationary)
+        {
+            auto& worker = *threadState.mStationary;
+            if (mSendRecv.index() == 0)
+            {
+                auto& send = std::get<0>(mSendRecv);
+                auto& protocol = worker.begin(worker.sendOt, CorType::Ot, mSize, true);
+                co_await protocol.silentSendInplace(protocol.mDelta, mSize, mPrng, mSock);
+                send.mMsg2.resize(mSize);
+                protocol.hash(send.mMsg2, oc::ChoiceBitPacking::True);
+                worker.finish(protocol);
+            }
+            else
+            {
+                auto& recv = std::get<1>(mSendRecv);
+                auto& protocol = worker.begin(worker.recvOt, CorType::Ot, mSize, false);
+                co_await protocol.silentReceiveInplace(mSize, mPrng, mSock, oc::ChoiceBitPacking::True);
+                recv.mChoice.resize(mSize);
+                recv.mMsg.resize(mSize);
+                protocol.hash(recv.mChoice, recv.mMsg, oc::ChoiceBitPacking::True);
+                worker.finish(protocol);
+            }
+        }
         else
         {
             if (mGenState->mDebug)
             {
                 if (mSendRecv.index() == 0)
                 {
-                    co_await mSock.send(coproto::copy(std::get<0>(mSendRecv).mSender.mGen.mBaseOTs));
+                    co_await mSock.send(coproto::copy(std::get<0>(std::get<0>(mSendRecv).mSender.mGenVar).mBaseOTs));
 
                 }
                 else
                 {
 
-                    msg.resize(std::get<1>(mSendRecv).mReceiver.silentBaseOtCount());
+                    msg.resize(std::get<1>(mSendRecv).mReceiver.baseCount().mBaseOtCount);
                     co_await mSock.recv(msg);
 
                     {
                         auto& recv = std::get<1>(mSendRecv);
                         for (u64 i = 0; i < msg.size(); ++i)
                         {
-                            if (recv.mReceiver.mGen.mBaseOTs(i) != msg[i][recv.mReceiver.mGen.mBaseChoices(i)])
+                            if (std::get<0>(recv.mReceiver.mGenVar).mBaseOTs(i) != msg[i][std::get<0>(recv.mReceiver.mGenVar).mBaseChoices(i)])
                             {
                                 std::cout << "OtBatch::getTask() base OTs do not match. " << LOCATION << std::endl;
                                 std::terminate();
@@ -185,13 +214,15 @@ namespace secJoin
                 [&](SendOtBatch& send) {
 
                     send.mSender.mB = std::move(threadState.mB);
-                    send.mSender.mEncodeTemp = std::move(threadState.mEncodeTemp);
+                    send.mSender.mSpin = std::move(threadState.mSpin);
+                    std::get<0>(send.mSender.mGenVar).mTempBuffer = std::move(threadState.mPprfTemp);
                     //send.mMsg2 = std::move(threadState.mMsg2);
                     return send.sendTask(mPrng, mSock);
                 },
                 [&](RecvOtBatch& recv) {
                     recv.mReceiver.mA = std::move(threadState.mA);
-                    recv.mReceiver.mEncodeTemp = std::move(threadState.mEncodeTemp);
+                    recv.mReceiver.mSpin = std::move(threadState.mSpin);
+                    std::get<0>(recv.mReceiver.mGenVar).mTempBuffer = std::move(threadState.mPprfTemp);
                     //recv.mChoice = std::move(threadState.mChoice);
                     //recv.mMsg = std::move(threadState.mMsg);
                     return recv.recvTask(mPrng, mSock);
@@ -204,12 +235,16 @@ namespace secJoin
             mSendRecv | match{
                 [&](SendOtBatch& send) {
                     threadState.mB = std::move(send.mSender.mB);
-                    threadState.mEncodeTemp = std::move(send.mSender.mEncodeTemp);
+                    threadState.mSpin = std::move(send.mSender.mSpin);
+                    threadState.mPprfTemp = std::move(std::get<0>(send.mSender.mGenVar).mTempBuffer);
+                    send.mSender.clear();
                     //threadState.mMsg2 = std::move(send.mMsg2);
                 },
                 [&](RecvOtBatch& recv) {
                     threadState.mA = std::move(recv.mReceiver.mA);
-                    threadState.mEncodeTemp = std::move(recv.mReceiver.mEncodeTemp);
+                    threadState.mSpin = std::move(recv.mReceiver.mSpin);
+                    threadState.mPprfTemp = std::move(std::get<0>(recv.mReceiver.mGenVar).mTempBuffer);
+                    recv.mReceiver.clear();
                     //threadState.mChoice = std::move(recv.mChoice);
                     //threadState.mMsg = std::move(recv.mMsg);
                 }

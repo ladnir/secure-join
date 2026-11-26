@@ -18,6 +18,13 @@
 
 namespace secJoin
 {
+    template<typename SilentOt>
+    void configureBatchOt(SilentOt& ot, u64 size)
+    {
+        ot.configure(size, 2, 1, oc::SilentSecType::SemiHonest,
+            oc::SdNoiseDistribution::Regular, oc::MultType::Spin);
+    }
+
     // A struct used to track base correlations requests.
     // These requests will be used as inputs to the batches
     // that will generate the end user correlations.
@@ -28,6 +35,9 @@ namespace secJoin
 
         // the number of send OTs requested
         u64 mSendSize = 0;
+
+        // Fresh binary VOLEs requested for stationary noise.
+        u64 mSendBinaryVoles = 0, mRecvBinaryVoles = 0;
 
         // the number of F4 voles.
         u64 mSendVoleSize = 0;
@@ -45,7 +55,11 @@ namespace secJoin
         {
             u64 s = 0;
             for (u64 i = 0; i < reqs.size(); ++i)
+            {
                 s += reqs[i].mChoice.size();
+                mSendBinaryVoles += reqs[i].mSendBinaryVoles;
+                mRecvBinaryVoles += reqs[i].mRecvBinaryVoles;
+            }
             mChoice.reserve(s);
             for (u64 i = 0; i < reqs.size(); ++i)
                 mChoice.append(reqs[i].mChoice);
@@ -88,7 +102,12 @@ namespace secJoin
         // the index of the next recv VOLE that can be consumed.
         u64 mVoleRecvIndex = 0;
         
-        // the recv VOLE delta.
+        u64 mBinarySendIndex = 0, mBinaryRecvIndex = 0;
+        block mBinaryDelta;
+        oc::AlignedUnVector<block> mBinaryA, mBinaryB;
+        oc::BitVector mBinaryChoice;
+
+        // the GF(4) sender delta.
         block mVoleDelta;
 
         // mVoleA = mVoleB + mVoleChoice * mVoleDelta
@@ -117,6 +136,13 @@ namespace secJoin
         span<block> getRecvOt(u64 n)
         {
             return get<block>(mOtRecvMsg, mOtRecvIndex, n);
+        }
+
+        void setOtBase(oc::SilentOtExtReceiver& receiver)
+        {
+            const auto n = receiver.baseCount().mBaseOtCount;
+            auto choices = mOtRecvChoice.subvec(mOtRecvIndex, n);
+            receiver.setBaseCors(getRecvOt(n), choices, {}, {});
         }
 
         span<block> getRecvVole(u64 n)

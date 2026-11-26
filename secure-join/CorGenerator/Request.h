@@ -76,6 +76,8 @@ namespace secJoin
             auto batch = &mReqState->mBatches_[mReqState->mNextBatchIdx++];
             co_await batch->mBatch->mCorReady;
 
+            if (batch->mBatch->mError)
+                std::rethrow_exception(batch->mBatch->mError);
             batch->mBatch->getCor(&d, batch->mBegin, batch->mSize);
             d.mBatch = std::move(batch->mBatch);
         }

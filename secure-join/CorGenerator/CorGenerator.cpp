@@ -6,6 +6,43 @@
 
 namespace secJoin
 {
+    namespace
+    {
+        // The extension first produces hashed location OTs. Its subsequent raw
+        // correlated OTs supply A = B xor (choice * delta) for binary noise.
+        macoro::task<> sendOtBases(oc::SoftSpokenShOtSender<>& ot, BaseCor& base,
+            u64 noiseCount, PRNG& prng, oc::Socket& sock)
+        {
+            if (base.mOtSendMsg.size())
+                co_await ot.send(base.mOtSendMsg, prng, sock);
+            if (noiseCount)
+            {
+                ot.mRandomOt = false;
+                oc::AlignedUnVector<std::array<block, 2>> noise(noiseCount);
+                co_await ot.send(noise, prng, sock);
+                base.mBinaryDelta = ot.delta();
+                base.mBinaryB.resize(noiseCount);
+                for (u64 i = 0; i < noiseCount; ++i)
+                    base.mBinaryB[i] = noise[i][0];
+            }
+        }
+
+        macoro::task<> receiveOtBases(oc::SoftSpokenShOtReceiver<>& ot, BaseCor& base,
+            u64 noiseCount, PRNG& prng, oc::Socket& sock)
+        {
+            if (base.mOtRecvMsg.size())
+                co_await ot.receive(base.mOtRecvChoice, base.mOtRecvMsg, prng, sock);
+            if (noiseCount)
+            {
+                ot.mRandomOt = false;
+                base.mBinaryChoice.resize(noiseCount);
+                base.mBinaryChoice.randomize(prng);
+                base.mBinaryA.resize(noiseCount);
+                co_await ot.receive(base.mBinaryChoice, base.mBinaryA, prng, sock);
+            }
+        }
+    }
+
 
 
 	void CorGenerator::init(
@@ -14,9 +51,18 @@ namespace secJoin
 		u64 partyIdx,
 		u64 numConcurrent,
 		u64 batchSize,
-		bool mock)
+		bool mock, oc::SdNoiseDistribution noise)
 	{
-		mGenState = std::make_shared<GenState>(partyIdx, prng.fork(), std::move(sock), numConcurrent, batchSize, mock);
+		if (partyIdx > 1 || (noise != oc::SdNoiseDistribution::Regular && noise != oc::SdNoiseDistribution::Stationary))
+            throw std::invalid_argument("Invalid correlation party or noise mode");
+        mGenState = std::make_shared<GenState>(partyIdx, prng.fork(), std::move(sock), numConcurrent, batchSize, mock);
+        mGenState->mNoise = noise;
+        if (noise == oc::SdNoiseDistribution::Stationary)
+        {
+            if (!mBanks)
+                mBanks = std::make_shared<SpinBankPool>();
+            mGenState->mBanks = mBanks;
+        }
 	}
 
 
@@ -148,20 +194,56 @@ namespace secJoin
 		auto res = macoro::result<void>{};
 		auto reqChecks = std::map<CorType, oc::RandomOracle>{};
 		auto theirReq = std::vector<ReqInfo>{};
-		auto threadState = std::vector<BatchThreadState>{};
+		std::vector<SpinBanks> banks;
+		auto threadState = std::vector<BatchThreadState>(mNumConcurrent);
+        std::array<std::unique_ptr<StationaryWorker>, 2> baseWorkers;
+        auto* sendVole = &mSendVoleBase;
+        auto* recvVole = &mRecvVoleBase;
 
+		std::exception_ptr failure;
+		try
+		{
 		setTimePoint("GenState::start");
 		mOtBatch = {};
 		mOleBatch = {};
 
-		// make base OT requests
+		// Bind public worker IDs and the private stream lifetime to this peer session.
+        // The request schedule already fixes the batch index on both sides.
+        if (!mMock && !mBatches.empty())
+        {
+            const u64 version = mNoise == oc::SdNoiseDistribution::Stationary ? 3 : 1;
+            std::array<u64, 6> config{version, static_cast<u64>(mNoise), mNumConcurrent, mBatchSize,
+                mPartyIdx, mPrng.get<u64>()};
+            std::array<u64, 6> peer{};
+            auto exchanged = co_await macoro::when_all_ready(mSock.send(config), mSock.recv(peer));
+            std::get<0>(exchanged).result();
+            std::get<1>(exchanged).result();
+            if (peer[0] != config[0] || peer[1] != config[1] || peer[3] != mBatchSize ||
+                peer[4] != 1 - mPartyIdx || (mNoise == oc::SdNoiseDistribution::Stationary && peer[2] != mNumConcurrent))
+                throw std::runtime_error("Peer correlation mode, worker count, batch size or role mismatch");
+            if (mNoise == oc::SdNoiseDistribution::Stationary)
+            {
+                const block session(mPartyIdx ? peer[5] : config[5], mPartyIdx ? config[5] : peer[5]);
+                // The base VOLE generators in opposite directions can run concurrently.
+                banks = mBanks->acquire(mNumConcurrent + 2);
+                for (u64 sender = 0; sender < 2; ++sender)
+                {
+                    const u64 index = mNumConcurrent + sender;
+                    baseWorkers[sender] = std::make_unique<StationaryWorker>(index, mPartyIdx, session, banks[index]);
+                }
+                for (u64 i = 0; i < mNumConcurrent; ++i)
+                    threadState[i].mStationary = std::make_unique<StationaryWorker>(i, mPartyIdx, session, banks[i]);
+            }
+        }
+
+        // make base OT requests
 		reqs.reserve(mBatches.size());
 		for (auto i = 0ull; i < mBatches.size();++i)
 		{
 			auto& batch = *mBatches[i];
 			if (!batch.mSize)
 				std::terminate();
-			reqs.push_back(batch.getBaseRequest());
+			reqs.push_back(batch.getBaseRequest(threadState[i % mNumConcurrent].mStationary.get()));
 		}
 
 		if (mDebug)
@@ -230,12 +312,12 @@ namespace secJoin
 		{
 			if (i ^ mPartyIdx)
 			{
-				if (req.mSendSize)
+				if (req.mSendSize || req.mSendBinaryVoles)
 				{
 					socks.push_back(mSock.fork());
 					prngs.push_back(mPrng.fork());
 					base.mOtSendMsg.resize(req.mSendSize);
-					protos.push_back(mSendOtBase.send(base.mOtSendMsg, prngs.back(), socks.back()));
+					protos.push_back(sendOtBases(mSendOtBase, base, req.mSendBinaryVoles, prngs.back(), socks.back()));
 				}
 
 				if (req.mSendVoleSize)
@@ -244,19 +326,21 @@ namespace secJoin
 					prngs.push_back(mPrng.fork());
 					base.mVoleDelta = mPrng.get();
 					base.mVoleB.resize(req.mSendVoleSize);
-					protos.push_back(mSendVoleBase.sendChosen(base.mVoleDelta, base.mVoleB, prngs.back(), socks.back()));
+					if (auto& w = baseWorkers[mPartyIdx])
+						sendVole = &w->begin(w->sendF4, CorType::F4BitOt, req.mSendVoleSize, true);
+					protos.push_back(sendVole->sendChosen(base.mVoleDelta, base.mVoleB, prngs.back(), socks.back()));
 				}
 			}
 			else
 			{
 				// perform recv base OTs
-				if (req.mChoice.size())
+				if (req.mChoice.size() || req.mRecvBinaryVoles)
 				{
 					socks.push_back(mSock.fork());
 					prngs.push_back(mPrng.fork());
 					base.mOtRecvMsg.resize(req.mChoice.size());
 					base.mOtRecvChoice = std::move(req.mChoice);
-					protos.push_back(mRecvOtBase.receive(base.mOtRecvChoice, base.mOtRecvMsg, prngs.back(), socks.back()));
+					protos.push_back(receiveOtBases(mRecvOtBase, base, req.mRecvBinaryVoles, prngs.back(), socks.back()));
 				}
 
 				if (req.mVoleChoice.size())
@@ -265,7 +349,9 @@ namespace secJoin
 					prngs.push_back(mPrng.fork());
 					base.mVoleA.resize(req.mVoleChoice.size());
 					base.mVoleChoice = std::move(req.mVoleChoice);
-					protos.push_back(mRecvVoleBase.receiveChosen(base.mVoleChoice, base.mVoleA, prngs.back(), socks.back()));
+					if (auto& w = baseWorkers[1 - mPartyIdx])
+						recvVole = &w->begin(w->recvF4, CorType::F4BitOt, base.mVoleA.size(), false);
+					protos.push_back(recvVole->receiveChosen(base.mVoleChoice, base.mVoleA, prngs.back(), socks.back()));
 				}
 			}
 		}
@@ -285,7 +371,11 @@ namespace secJoin
 
 		setTimePoint("GenState::base");
 
-		threadState.resize(mNumConcurrent);
+		if (sendVole != &mSendVoleBase)
+			baseWorkers[mPartyIdx]->finish(*sendVole);
+		if (recvVole != &mRecvVoleBase)
+			baseWorkers[1 - mPartyIdx]->finish(*recvVole);
+		baseWorkers = {};
 
 
 
@@ -298,7 +388,10 @@ namespace secJoin
 				if (mBatches[i]->mAbort == false)
 				{
 					auto& batch = *mBatches[i];
-					batch.setBase(base);
+					auto& worker = threadState[i % mNumConcurrent];
+					batch.setBase(base, worker.mStationary.get());
+					if (!mMock && !worker.mStationary)
+						prepareRegularSpin(worker.mSpin, batch.mSize);
 
 					setTimePoint("GenState::batch.begin " + std::to_string(i));
 
@@ -306,14 +399,14 @@ namespace secJoin
 					{
 						// launch the next batch
 						threadState[i % mNumConcurrent].mTask =
-							mBatches[i]->getTask(threadState[i % mNumConcurrent]) |
+							mBatches[i]->run(threadState[i % mNumConcurrent]) |
 							macoro::start_on(*mPool);
 					}
 					else
 					{
 						// launch the next batch
 						threadState[i % mNumConcurrent].mTask =
-							mBatches[i]->getTask(threadState[i % mNumConcurrent]) |
+							mBatches[i]->run(threadState[i % mNumConcurrent]) |
 							macoro::make_eager();
 					}
 				}
@@ -332,7 +425,35 @@ namespace secJoin
 		}
 
 		mBatches = {};
-		setTimePoint("GenState::done ");
+        if (!banks.empty())
+            mBanks->release(std::move(banks));
+        setTimePoint("GenState::done ");
+        co_return;
+        }
+        catch (...)
+        {
+            failure = std::current_exception();
+        }
+
+        // Keep worker and base storage alive until all suspended users unwind.
+        abort();
+        if (!mSock.closed())
+            co_await mSock.close();
+        for (auto& task : tasks)
+            if (task.handle() && !task.is_ready())
+                try { co_await task; } catch (...) {}
+        for (auto& worker : threadState)
+            if (worker.mTask.handle() && !worker.mTask.is_ready())
+                try { co_await worker.mTask; } catch (...) {}
+        for (auto& batch : mBatches)
+        {
+            if (batch && !batch->mCorReady.is_set())
+            {
+                batch->mError = failure;
+                batch->mCorReady.set();
+            }
+        }
+        std::rethrow_exception(failure);
 	}
 
 	//void GenState::set(SendBase& b) { auto v = b.get(); mRecvBase.setBaseOts(v); }

@@ -4,6 +4,17 @@
 namespace secJoin
 {
 
+	macoro::task<> sampleCompressionSeed(u64 party, PRNG& prng, coproto::Socket& sock, block& seed)
+	{
+		if (party == 0)
+		{
+			seed = prng.get<block>();
+			co_await sock.send(coproto::copy(seed));
+		}
+		else
+			co_await sock.recv(seed);
+	}
+
 	// output a combined table that has the leftColumn
 	// concatenated with the rightColumn (doubling the
 	// number of rows). THe left column will have a
@@ -11,11 +22,11 @@ namespace secJoin
 	// a one appended.
 	BinMatrix OmJoin::loadKeys(
 		ColRef leftJoinCol,
-		ColRef rightJoinCol)
+		ColRef rightJoinCol, block codeSeed)
 	{
 		auto rows0 = leftJoinCol.mCol.mData.rows();
 		auto rows1 = rightJoinCol.mCol.mData.rows();
-		auto compressesSize = mStatSecParam + log2(rows0) + log2(rows1);
+		auto compressesSize = mStatSecParam + oc::log2ceil(rows0) + oc::log2ceil(rows1);
 		auto bits = leftJoinCol.mCol.getBitCount();
 
 		if (leftJoinCol.mCol.getBitCount() != rightJoinCol.mCol.getBitCount())
@@ -38,7 +49,7 @@ namespace secJoin
 		}
 		else
 		{
-			PRNG prng(oc::block(234234234, 564356345));
+			PRNG prng(codeSeed);
 			oc::LinearCode code;
 			code.random(prng, bits, compressesSize);
 
@@ -117,14 +128,12 @@ namespace secJoin
 		coproto::Socket& sock,
 		BinMatrix& out)
 	{
-		auto cir = oc::BetaCircuit{};
 		auto sKeys = BinMatrix{};
 		auto n = u64{};
 		auto keyByteSize = u64{};
 
 		n = data.numEntries();
 		keyByteSize = oc::divCeil(keyBitCount, 8);
-		cir = getControlBitsCircuit(keyBitCount);
 		sKeys.resize(data.rows() + 1, keyBitCount);
 		for (u64 i = 0; i < n; ++i)
 		{
@@ -153,6 +162,8 @@ namespace secJoin
 				continue;
 
 			auto n = cols[j]->rows();
+			if (!n)
+				continue;
 			assert(n <= dst.rows());
 			assert(offsets[j].mStart % 8 == 0);
 
@@ -365,7 +376,6 @@ namespace secJoin
 		coproto::Socket& sock)
 	{
 		auto temp = BinMatrix{};
-		auto offsets = std::vector<Offset>{};
 		auto offset = u64{};
 
 		assert(flagBitIndex % 8 == 0);
@@ -378,7 +388,6 @@ namespace secJoin
 		mUpdateActiveFlagGmw.setInput(0, choice);
 		mUpdateActiveFlagGmw.setInput(1, temp);
 
-		offsets.emplace_back(Offset{ 0,1 });
 
 		co_await mUpdateActiveFlagGmw.run(sock);
 
@@ -416,7 +425,7 @@ namespace secJoin
 
 		auto keySize = std::min<u64>(
 			schema.mKey.mBitCount,
-			mStatSecParam + log2(schema.mLeftSize) + log2(schema.mRightSize));
+			mStatSecParam + oc::log2ceil(schema.mLeftSize) + oc::log2ceil(schema.mRightSize));
 
 		mPartyIdx = ole.partyIdx();
 		mDataBitsPerEntry = 0;
@@ -445,7 +454,8 @@ namespace secJoin
 		mDataBitsPerEntry += 8;
 
 		mOffsets.emplace_back(Offset{ mDataBitsPerEntry, keySize, "key*" });
-		mDataBitsPerEntry += schema.mKey.getByteCount() * 8;
+		const u64 payloadBits = mDataBitsPerEntry;
+		mDataBitsPerEntry += oc::roundUpTo(keySize, 8);
 
 		//std::cout << "sort " << rows << " rows " << keySize << " bits " << std::endl;
 		mSort.init(mPartyIdx, rows, keySize, ole);
@@ -455,13 +465,13 @@ namespace secJoin
 		// backwards direction, we will unpermute the left table select
 		// columns. Therefore, in total we will permute:
 		u64 permForward = oc::divCeil(mDataBitsPerEntry, 8) + sizeof(u32);
-		u64 permBackward = oc::divCeil(mDataBitsPerEntry - 1 - keySize, 8);
+		u64 permBackward = payloadBits / 8;
 
 		mPerm.init(mPartyIdx, rows, permForward + permBackward, ole);
 
 		mControlBitGmw.init(rows, getControlBitsCircuit(keySize), ole);
 
-		mAggTree.init(rows, mDataBitsPerEntry, AggTreeType::Prefix, getDupCircuit(), ole);
+		mAggTree.init(rows, payloadBits, AggTreeType::Prefix, getDupCircuit(), ole);
 
 		auto cir = *oc::BetaLibrary{}.int_int_bitwiseAnd(1, 1, 1);
 		mUpdateActiveFlagGmw.init(rows, cir, ole);
@@ -501,7 +511,12 @@ namespace secJoin
 		setTimePoint("start");
 
 		// left keys kL followed by the right keys kR
-		keys = loadKeys(query.mLeftKey, query.mRightKey);
+		block codeSeed = oc::ZeroBlock;
+		if (query.mLeftKey.mCol.getBitCount() > mOffsets.back().mSize)
+		{
+			co_await sampleCompressionSeed(mPartyIdx, prng, sock, codeSeed);
+		}
+		keys = loadKeys(query.mLeftKey, query.mRightKey, codeSeed);
 		setTimePoint("load");
 
 		if (mInsecurePrint)
@@ -537,14 +552,10 @@ namespace secJoin
 
 		// Apply the sortin permutation. What you end up with are the keys
 		// in sorted order and the rows of L also in sorted order.
-		temp.resize(data.numEntries(), data.bitsPerEntry() + 8);
 		temp.resize(data.numEntries(), data.bitsPerEntry());
 
 		co_await mPerm.generate(sock, prng, data.rows(), perm);
 		setTimePoint("perm cor gen");
-
-		co_await perm.validate(sock);
-
 
 		co_await perm.derandomize(sPerm, sock);
 		setTimePoint("perm cor derand");

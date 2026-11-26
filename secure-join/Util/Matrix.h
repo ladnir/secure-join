@@ -264,7 +264,7 @@ namespace secJoin
                 dst.numEntries() != numEntries())
                 dst.resize(numEntries(), bitsPerEntry());
 
-            oc::transpose(mData, dst.mData);
+            oc::transpose({ mData.data(), mData.rows(), mData.cols() }, dst.mData);
         }
 
         BinMatrix transpose() const
@@ -281,7 +281,7 @@ namespace secJoin
             dst.numEntries() != numEntries())
             dst.resize(numEntries(), bitsPerEntry());
 
-        oc::transpose(mData, dst.mData);
+        oc::transpose({ mData.data(), mData.rows(), mData.cols() }, dst.mData);
     }
 
     inline void BinMatrix::transpose(oc::MatrixView<u8> dst) const
@@ -290,7 +290,7 @@ namespace secJoin
             dst.cols() < oc::divCeil(numEntries(), 8))
             throw RTE_LOC;
 
-        oc::transpose(mData, dst);
+        oc::transpose({ mData.data(), mData.rows(), mData.cols() }, dst);
     }
 
     inline TBinMatrix BinMatrix::transpose() const

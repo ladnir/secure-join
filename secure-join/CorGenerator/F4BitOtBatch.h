@@ -104,9 +104,9 @@ namespace secJoin
 
         void getCor(Cor* c, u64 begin, u64 size) override;
 
-        BaseRequest getBaseRequest() override;
+        BaseRequest getBaseRequest(StationaryWorker* worker) override;
 
-        void setBase(BaseCor& ) override;
+        void setBase(BaseCor& base, StationaryWorker* worker) override;
 
         // Get the task associated with this batch.
         macoro::task<> getTask(BatchThreadState&) override;
@@ -121,11 +121,7 @@ namespace secJoin
 
         void clear() override
         {
-            if (mSendRecv.index())
-                std::get<1>(mSendRecv).clear();
-            else
-                std::get<1>(mSendRecv).clear();
-            //mSendRecv = SendBatch{};
+            std::visit([](auto& side) { side.clear(); }, mSendRecv);
         }
     };
 

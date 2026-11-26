@@ -12,7 +12,7 @@ set(CMAKE_PREFIX_PATH "${SECUREJOIN_THIRDPARTY_DIR};${CMAKE_PREFIX_PATH}")
 
 macro(FIND_LIBOTE)
     set(ARGS ${ARGN})
-    set(COMPS)
+    set(COMPS spin)
     
     if(SECUREJOIN_ENABLE_ASAN)
         set(COMPS ${COMPS}  asan)

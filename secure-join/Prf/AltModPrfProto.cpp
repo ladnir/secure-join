@@ -117,6 +117,7 @@ namespace secJoin
 				throw std::runtime_error("do not have enough preprocessing. Call request(...) first. " LOCATION);
 		}
 
+		preprocess();
 		setTimePoint("DarkMatter.sender.begin");
 
 		mKeyMultRecver.mDebug = mDebug;
@@ -296,7 +297,7 @@ namespace secJoin
 			mMod2OleReq.start();
 
 		mKeyMultRecver.preprocess();
-		mKeyMultRecver.preprocess();
+		mKeyMultSender.preprocess();
 	}
 
 
@@ -327,6 +328,7 @@ namespace secJoin
 				throw std::runtime_error("do not have enough preprocessing. Call request(...) first. " LOCATION);
 		}
 
+		preprocess();
 		setTimePoint("DarkMatter.recver.begin");
 		if (mDebug)
 			mDebugInput = std::vector<block>(x.begin(), x.end());
@@ -1031,127 +1033,31 @@ namespace secJoin
 			std::terminate();
 		}
 
-		auto ots = std::vector<F4BitOtRecv>{};
-		ots.reserve(mMod2F4Req.batchCount());
+		if (u0.rows() != u1.rows() || u0.cols() != u1.cols() ||
+			out.rows() != u0.rows() || out.cols() != u0.cols())
+			throw RTE_LOC;
 
-		// the format of u is that it should have AltModWPrf::MidSize rows.
-		auto rows = u0.rows();
-
-		// cols should be the number of inputs.
-		auto cols = u0.cols();
-		auto remaining = rows * cols;
-
-		// we are performing mod 2. u0 is the lsb, u1 is the msb. these are packed into 128 bit blocks. 
-		// we then have a matrix of these with `rows` rows and `cols` columns. We mod requires
-		// 2 OLEs. So in total we need rows * cols * 128 * 2 OLEs.
-		assert(mMod2F4Req.size() == rows * cols * 128);
-
-		auto u0Iter = u0.data();
-		auto u1Iter = u1.data();
-		auto derand = (block*)nullptr;
-		auto derandEnd = (block*)nullptr;
-		auto lsbIter = (block*)nullptr;
-		auto msbIter = (block*)nullptr;
-		auto buff = oc::AlignedUnVector<block>{};
-		for (auto i = 0ull; i < rows; ++i)
+		F4BitOtRecv ots;
+		oc::AlignedUnVector<block> correction;
+		for (u64 offset = 0; offset < out.size();)
 		{
-			for (auto j = 0ull; j < cols;)
+			co_await mMod2F4Req.get(ots);
+			const u64 count = std::min<u64>(ots.mOts.size(), out.size() - offset);
+			correction.resize(2 * count);
+			for (u64 j = 0; j < count; ++j)
 			{
-				if (derandEnd == derand)
-				{
-					ots.emplace_back();
-					co_await(mMod2F4Req.get(ots.back()));
-					lsbIter = ots.back().mChoiceLsb.data();
-					msbIter = ots.back().mChoiceMsb.data();
-
-					buff.resize(std::min<u64>(ots.back().mChoiceLsb.size(), remaining) * 2);
-					remaining -= buff.size() / 2;
-					derand = buff.data();
-					derandEnd = derand + buff.size();
-				}
-
-				auto step = std::min<u64>(cols - j, (derandEnd - derand) / 2);
-				auto end = step + j;
-
-				for (; j < end; ++j)
-				{
-					assert(u0Iter == &u0(i, j));
-					assert(u1Iter == &u1(i, j));
-					derand[0] = *u0Iter++ ^ *lsbIter++;
-					derand[1] = *u1Iter++ ^ *msbIter++;
-
-					derand += 2;
-				}
-
-				if (derandEnd == derand)
-				{
-					co_await(sock.send(std::move(buff)));
-				}
+				correction[2 * j] = u0.data()[offset + j] ^ ots.mChoiceLsb[j];
+				correction[2 * j + 1] = u1.data()[offset + j] ^ ots.mChoiceMsb[j];
 			}
-		}
-
-		assert(buff.size() == 0);
-
-		auto tIter = ots.begin();
-		auto outIter = out.data();
-		auto otIter = (block*)nullptr;
-		u0Iter = u0.data();
-		u1Iter = u1.data();
-		derand = nullptr;
-		derandEnd = nullptr;
-		remaining = rows * cols;
-		for (auto i = 0ull; i < rows; ++i)
-		{
-			for (auto j = 0ull; j < cols; )
+			co_await sock.send(correction);
+			co_await sock.recv(correction);
+			for (u64 j = 0; j < count; ++j)
 			{
-
-				if (derand == derandEnd)
-				{
-					otIter = tIter->mOts.data();
-					buff.resize(std::min<u64>(tIter->mOts.size(), remaining) * 2);
-					remaining -= buff.size() / 2;
-					co_await(sock.recv(buff));
-
-					derand = buff.data();
-					derandEnd = derand + buff.size();
-					++tIter;
-				}
-
-				auto step = std::min<u64>(cols - j, (derandEnd - derand) / 2);
-				auto end = step + j;
-
-				for (; j < end; ++j)
-				{
-
-					assert((u0(i, j) & u1(i, j)) == oc::ZeroBlock);
-					assert(u0Iter == &u0(i, j));
-					assert(u1Iter == &u1(i, j));
-					assert(derand + 1 < derandEnd);
-					assert(outIter == &out(i, j));
-					assert(otIter < (tIter[-1].mOts.data() + tIter[-1].mOts.size()));
-
-					// if u = 0, w = hi0
-					// if u = 1, w = hi1 + t1
-					// if u = 2, w = m2 + t2
-					block w =
-						(*u0Iter++ & derand[0]) ^ // t1
-						(*u1Iter++ & derand[1]) ^ // t2
-						*otIter++;// m_u
-
-					//if (mDebug)// && i == mPrintI && (j == (mPrintJ / 128)))
-					//{
-					//    auto mPrintJ = 0;
-					//    auto bitIdx = mPrintJ % 128;
-					//    std::cout << j << " u " << bit(u1(i, j), bitIdx) << bit(u0(i, j), bitIdx) << std::endl;
-					//    std::cout << j << " t  _ " << bit(derand[0], bitIdx) << " " << bit(derand[1], bitIdx) << std::endl;
-					//    std::cout << j << " w  " << bit(w, bitIdx) << std::endl;
-					//}
-
-					*outIter++ = w;
-					derand += 2;
-
-				}
+				out.data()[offset + j] = ots.mOts[j] ^
+					(u0.data()[offset + j] & correction[2 * j]) ^
+					(u1.data()[offset + j] & correction[2 * j + 1]);
 			}
+			offset += count;
 		}
 	}
 }

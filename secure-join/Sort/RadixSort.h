@@ -53,7 +53,7 @@ namespace secJoin
         u64 mBitCount = 0;
 
         // The bit step size of the genBitPerm protocol.
-        u64 mL = 2;
+        u64 mL = 4;
 
         // A zero one flag denoting the party index.
         u64 mRole = -1;

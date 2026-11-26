@@ -23,7 +23,7 @@ namespace secJoin
 		g.resize(128, sizeof(block));
 		for (u64 i = 0; i < 128; ++i)
 			osuCrypto::copyBytes(g[i], AltModPrf::mB[i]);
-		oc::transpose(g, gt);
+		oc::transpose({ g.data(), g.rows(), g.cols() }, gt);
 		F2LinearCode r;
 		r.init(gt);
 		return r;

@@ -24,6 +24,8 @@ namespace secJoin
     // A coefficient context for GF4 used in the VOLE protocol.
     struct CoeffCtxGF4 : oc::CoeffCtxInteger
     {
+        static constexpr bool blockCopyIsTrivialAndAdditionIsXor = true;
+
         // the subfield as GF4
         using G = F4;
 
@@ -136,7 +138,7 @@ namespace secJoin
         // the protocol will perform binary decomposition
         // of F using this many bits
         template<typename F2>
-        u64 bitSize()
+        u64 bitSize() const
         {
             if (std::is_same<G, F2>::value)
                 return 2;

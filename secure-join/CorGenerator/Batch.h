@@ -10,6 +10,7 @@
 #include "macoro/manual_reset_event.h"
 
 #include "Correlations.h"
+#include "SpinWorker.h"
 
 namespace secJoin
 {
@@ -17,7 +18,13 @@ namespace secJoin
 
     struct BatchThreadState
     {
-        oc::AlignedUnVector<block> mA, mB, mEncodeTemp, mPprfTemp;
+        oc::AlignedUnVector<block> mA, mB;
+        oc::pprf::ExpandTreeBuffer mPprfTemp;
+        std::optional<oc::SpinCode> mSpin;
+        std::unique_ptr<StationaryWorker> mStationary;
+        BatchThreadState() = default;
+        BatchThreadState(const BatchThreadState&) = delete;
+        BatchThreadState(BatchThreadState&&) = default;
         macoro::eager_task<> mTask;
     };
 
@@ -60,9 +67,12 @@ namespace secJoin
         // decides who is first.
         std::atomic_bool mStarted = false;
 
-        virtual BaseRequest getBaseRequest() = 0;
+        std::exception_ptr mError;
+        macoro::task<> run(BatchThreadState& worker);
 
-        virtual void setBase(BaseCor& cor) = 0;
+        virtual BaseRequest getBaseRequest(StationaryWorker* worker) = 0;
+
+        virtual void setBase(BaseCor& cor, StationaryWorker* worker) = 0;
 
         // Get the task associated with this batch. If the task
         // has already been retrieved, this will be empty.

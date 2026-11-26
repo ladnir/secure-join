@@ -43,13 +43,13 @@ namespace secJoin
 	void GroupBy::loadKeys(
 		ColRef groupByCol,
 		std::vector<u8>& actFlagVec,
-		BinMatrix& compressKeys)
+		BinMatrix& compressKeys, block codeSeed)
 	{
-		auto grpByData = groupByCol.mCol.mData;
+		const auto& grpByData = groupByCol.mCol.mData;
 		auto rows = grpByData.rows();
 		auto grpByBits = grpByData.bitsPerEntry();
 		auto grpByBytes = grpByData.bytesPerEntry();
-		auto compressedSize = mStatSecParam + oc::log2ceil(rows);
+		auto compressedSize = mStatSecParam + 2 * oc::log2ceil(rows);
 
 		// Appending ActiveFlagBit to the key
 		BinMatrix keys(rows, grpByBits + 1);
@@ -63,14 +63,11 @@ namespace secJoin
 
 		if (keys.bitsPerEntry() <= compressedSize)
 		{
-			// Make a copy of keys into compressKeys
-			compressKeys.resize(keys.rows(), keys.bitsPerEntry());
-			std::swap(keys, compressKeys);
+			compressKeys = std::move(keys);
 		}
 		else
 		{
-			PRNG prng(oc::block(234234234, 564356345));
-			//            PRNG prng(oc::ZeroBlock);
+			PRNG prng(codeSeed);
 			oc::LinearCode code;
 			code.random(prng, keys.bitsPerEntry(), compressedSize);
 
@@ -254,7 +251,7 @@ namespace secJoin
 
 		u64 compressKeySize = std::min<u64>(
 			keySize,
-			mStatSecParam + oc::log2ceil(rows));
+			mStatSecParam + 2 * oc::log2ceil(rows));
 
 		mPartyIdx = ole.partyIdx();
 
@@ -351,7 +348,10 @@ namespace secJoin
 		auto perm = ComposedPerm{};
 		auto tempNum = u64{};
 
-		loadKeys(groupByCol, groupByCol.mTable.mIsActive, compressKeys);
+		block codeSeed = oc::ZeroBlock;
+		if (groupByCol.mCol.getBitCount() + 1 > mOffsets[mOffsets.size() - 2].mSize)
+			co_await sampleCompressionSeed(mPartyIdx, prng, sock, codeSeed);
+		loadKeys(groupByCol, groupByCol.mTable.mIsActive, compressKeys, codeSeed);
 
 		if (mInsecurePrint)
 		{

@@ -12,6 +12,7 @@
 #include <cryptoTools/Common/Timer.h>
 #include <libOTe/Tools/Tools.h>
 #include "libOTe/Tools/Pprf/RegularPprf.h"
+#include "libOTe/Tools/Pprf/StationaryPprf.h"
 #include <libOTe/TwoChooseOne/TcoOtDefines.h>
 #include <libOTe/TwoChooseOne/OTExtInterface.h>
 #include <libOTe/TwoChooseOne/SoftSpokenOT/SoftSpokenMalOtExt.h>
@@ -25,6 +26,7 @@
 #include <libOTe/Tools/TungstenCode/TungstenCode.h>
 #include "libOTe/Tools/ExConvCode/ExConvCode.h"
 #include "F4CoeffCtx.h"
+#include "F4VoleCode.h"
 
 namespace secJoin
 {
@@ -80,11 +82,26 @@ namespace secJoin
 
 		// The matrix multiplication type which compresses 
 		// the sparse vector.
-		oc::MultType mMultType = oc::DefaultMultType;
+		oc::MultType mMultType = oc::MultType::Spin;
+        std::optional<oc::SpinCode> mSpin;
 
 		// The multi-point punctured PRF for generating
 		// the sparse vectors.
-		oc::RegularPprfReceiver<F, G, Ctx> mGen;
+		oc::RegularPprfReceiver<F, Ctx> mGen;
+        std::unique_ptr<oc::StationaryPprfReceiver<F, Ctx>> mStationary;
+        block mCodeSeed = oc::ZeroBlock;
+
+        auto& gen() const {
+            using Base = oc::PprfReceiver<F, Ctx>;
+            return mStationary ? static_cast<const Base&>(*mStationary) : static_cast<const Base&>(mGen);
+        }
+        auto& gen() {
+            using Base = oc::PprfReceiver<F, Ctx>;
+            return mStationary ? static_cast<Base&>(*mStationary) : static_cast<Base&>(mGen);
+        }
+        auto format() const {
+            return mStationary ? oc::PprfOutputFormat::ByTreeIndex : oc::PprfOutputFormat::ByPhysicalIndex;
+        }
 
 		// The internal buffers for holding the expanded vectors.
 		// mA  = mB + mC * delta
@@ -129,7 +146,7 @@ namespace secJoin
 		//
 				// returns true if the silent base OTs are set.
 		bool hasSilentBaseOts() const {
-			return mGen.hasBaseOts();
+			return gen().hasBaseOts();
 		};
 		//
 		//        // Generate the IKNP base OTs
@@ -223,7 +240,11 @@ namespace secJoin
 					msg.resize(msg.size() - mOtExtSender->baseOtCount());
 					co_await nv.receive(noiseVals, baseAs, prng, *mOtExtSender, chl, mCtx);
 				}
-				else
+				else if (msg.empty())
+                {
+                    co_await nv.receive(noiseVals, baseAs, prng, *mOtExtSender, chl, mCtx);
+                }
+                else
 				{
 					chl2 = chl.fork();
 					prng2.SetSeed(prng.get());
@@ -271,7 +292,7 @@ namespace secJoin
 			u64 requestSize,
 			oc::SilentBaseType type = oc::SilentBaseType::BaseExtend,
 			u64 secParam = 128,
-			Ctx ctx = {})
+			Ctx ctx = {}, oc::SdNoiseDistribution noise = oc::SdNoiseDistribution::Regular)
 		{
 			mCtx = std::move(ctx);
 			mSecParam = secParam;
@@ -280,10 +301,21 @@ namespace secJoin
 			mBaseType = type;
 
 
-			syndromeDecodingConfigure(mNumPartitions, mSizePer, mNoiseVecSize, mSecParam, mRequestSize, mMultType);
+			const auto config = configureF4Code(mSecParam, mRequestSize, mMultType, noise);
+			mNumPartitions = config.mNumPartitions;
+			mSizePer = config.mSizePer;
+			mNoiseVecSize = config.mNoiseVectorSize;
 
 
-			mGen.configure(mSizePer, mNumPartitions);
+			if (noise == oc::SdNoiseDistribution::Stationary)
+            {
+                mCodeSeed = block(12528943721987127, 98743297823479812);
+                mSpin.reset();
+                mStationary = std::make_unique<oc::StationaryPprfReceiver<F, Ctx>>();
+            }
+            else
+                mStationary.reset();
+            gen().configure(mSizePer, mNumPartitions);
 		}
 
 		// return true if this instance has been configured.
@@ -296,7 +328,7 @@ namespace secJoin
 			if (isConfigured() == false)
 				throw std::runtime_error("configure must be called first");
 
-			return mGen.baseOtCount();
+			return gen().baseOtCount();
 
 		}
 
@@ -309,10 +341,20 @@ namespace secJoin
 			if (isConfigured() == false)
 				throw std::runtime_error("configure(...) must be called first");
 
-			auto choice = mGen.sampleChoiceBits(prng);
+			auto choice = gen().sampleChoiceBits(prng);
 
 			return choice;
 		}
+
+        void recordPoints()
+        {
+            mS.resize(mNumPartitions);
+            gen().getPoints(mS, format());
+            // Tree-index PPRF returns a local leaf for each contiguous tree.
+            if (mStationary)
+                for (u64 i = 0; i < mNumPartitions; ++i)
+                    mS[i] += i * mSizePer;
+        }
 
 		VecG sampleBaseVoleVals(PRNG& prng)
 		{
@@ -325,38 +367,14 @@ namespace secJoin
 
 			mCtx.resize(mBaseC, mNumPartitions + (mMalType == oc::SilentSecType::Malicious));
 
-			if (mCtx.template bitSize<G>() == 1)
+			// Regular noise is uniform on the three nonzero values. Stationary includes zero.
+			for (u64 i = 0; i < mNumPartitions; ++i)
 			{
-				mCtx.one(mBaseC.begin(), mBaseC.begin() + mNumPartitions);
-			}
-			else
-			{
-				VecG zero, one;
-				mCtx.resize(zero, 1);
-				mCtx.resize(one, 1);
-				mCtx.zero(zero.begin(), zero.end());
-				mCtx.one(one.begin(), one.end());
-				for (size_t i = 0; i < mNumPartitions; i++)
-				{
-					mCtx.fromBlock(mBaseC[i], prng.get<block>());
-
-					// must not be zero.
-					while (mCtx.eq(zero[0], mBaseC[i]))
-						mCtx.fromBlock(mBaseC[i], prng.get<block>());
-
-					// if we are not a field, then the noise should be odd.
-					if (mCtx.template isField<F>() == false)
-					{
-						u8 odd = mCtx.binaryDecomposition(mBaseC[i])[0];
-						if (odd)
-							mCtx.plus(mBaseC[i], mBaseC[i], one[0]);
-					}
-				}
+				do { mBaseC[i].mVal = prng.get<u8>() & 3; } while (!mStationary && !mBaseC[i].mVal);
 			}
 
-
-			mS.resize(mNumPartitions);
-			mGen.getPoints(mS, oc::PprfOutputFormat::Interleaved);
+			if (!mStationary || !mStationary->mExpanded)
+                recordPoints();
 
 			if (mMalType == oc::SilentSecType::Malicious)
 			{
@@ -395,13 +413,13 @@ namespace secJoin
 			if (static_cast<u64>(recvBaseOts.size()) != silentBaseOtCount())
 				throw std::runtime_error("wrong number of silent base OTs");
 
-			mGen.setBase(recvBaseOts);
+			if (baseA.size() != baseVoleCount())
+				throw std::invalid_argument("Wrong number of base GF(4) VOLEs");
+			gen().setBase(recvBaseOts);
 
-			mCtx.resize(mBaseA, baseA.size());
-			mCtx.copy(baseA.begin(), baseA.end(), mBaseA.begin());
-
-			for (u64 i = 0; i < mBaseA.size(); ++i)
-				mBaseA[i] &= (block(~0ull, ~0ull << 2));
+			mBaseA.resize(baseA.size());
+			for (u64 i = 0; i < baseA.size(); ++i)
+				mBaseA[i] = baseA[i] & block(~0ull, ~3ull);
 
 			mState = State::HasBase;
 		}
@@ -421,7 +439,8 @@ namespace secJoin
 
 			mCtx.copy(mA.begin(), mA.begin() + a.size(), a.begin());
 
-			clear();
+			if (!mStationary)
+			    clear();
 
 			} MACORO_CATCH(exPtr) {
 				if(!chl.closed()) co_await chl.close();
@@ -461,7 +480,8 @@ namespace secJoin
 
 			co_await chl.send(std::move(diff));
 
-			clear();
+			if (!mStationary)
+			    clear();
 
 			} MACORO_CATCH(exPtr) {
 				if (!chl.closed()) co_await chl.close();
@@ -492,7 +512,7 @@ namespace secJoin
 			if (mRequestSize < n)
 				throw std::invalid_argument("n does not match the requested number of OTs via configure(...). " LOCATION);
 
-			if (hasSilentBaseOts() == false)
+			if (!hasSilentBaseOts() || mBaseA.empty())
 			{
 				co_await genSilentBaseOts(prng, chl);
 			}
@@ -500,14 +520,13 @@ namespace secJoin
 			setTimePoint("SilentVoleReceiver.alloc");
 
 			// allocate mA
-			mCtx.resize(mA, 0);
-			mCtx.resize(mA, mNoiseVecSize);
+			mA.reserve(mNoiseVecSize);
 
 
 			setTimePoint("SilentVoleReceiver.alloc.zero");
 
 			if (mTimer)
-				mGen.setTimer(*mTimer);
+				gen().setTimer(*mTimer);
 
 			// As part of the setup, we have generated 
 			//  
@@ -527,7 +546,11 @@ namespace secJoin
 			// 
 			//    mA = mB + mS(mBaseC * mDelta)
 			//
-			co_await mGen.expand(chl, mA, oc::PprfOutputFormat::Interleaved, true, mNumThreads);
+			mA.resize(mNumPartitions * mSizePer);
+			co_await gen().expand(chl, mA, format(), true, mNumThreads, mCtx);
+			clearF4ChoiceBits(mA);
+			mA.resize(mNoiseVecSize);
+			std::fill(mA.begin() + mNumPartitions * mSizePer, mA.end(), oc::ZeroBlock);
 
 			setTimePoint("SilentVoleReceiver.expand.pprf_transpose");
 
@@ -574,6 +597,10 @@ namespace secJoin
 
 			switch (mMultType)
 			{
+			case oc::MultType::Spin:
+			    compressF4Spin(mSpin, mRequestSize, mA, mStationary ?
+                    oc::SdNoiseDistribution::Stationary : oc::SdNoiseDistribution::Regular, mCodeSeed);
+			    break;
 			case osuCrypto::MultType::ExConv7x24:
 			case osuCrypto::MultType::ExConv21x24:
 			{
@@ -612,7 +639,7 @@ namespace secJoin
 
 			// make the protocol as done and that
 			// mA,mC are ready to be consumed.
-			mState = State::Default;
+			mState = mStationary ? State::Configured : State::Default;
 
 			if (mDebug)
 			{
@@ -802,7 +829,8 @@ namespace secJoin
 			mS = {};
 			mA = {};
 			//mC = {};
-			mGen.clear();
+			gen().clear();
+            mState = State::Default;
 		}
 	};
 }

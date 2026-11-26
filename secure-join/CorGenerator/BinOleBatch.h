@@ -97,9 +97,9 @@ namespace secJoin
 
         void getCor(Cor* c, u64 begin, u64 size) override;
 
-        BaseRequest getBaseRequest() override;
+        BaseRequest getBaseRequest(StationaryWorker* worker) override;
 
-        void setBase(BaseCor& sMsg) override;
+        void setBase(BaseCor& sMsg, StationaryWorker* worker) override;
 
         // Get the task associated with this batch.
         macoro::task<> getTask(BatchThreadState&) override;

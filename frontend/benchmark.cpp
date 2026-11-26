@@ -6,7 +6,12 @@
 
 namespace secJoin
 {
-	void CorGen_benchmark(const oc::CLP& cmd)
+	static oc::SdNoiseDistribution benchmarkNoise(const oc::CLP& cmd)
+    {
+        return cmd.isSet("stationary") ? oc::SdNoiseDistribution::Stationary : oc::SdNoiseDistribution::Regular;
+    }
+
+    void CorGen_benchmark(const oc::CLP& cmd)
 	{
 		// request size
 		u64 n = cmd.getOr("n", 1ull << cmd.getOr("nn", 20));
@@ -35,28 +40,21 @@ namespace secJoin
 		macoro::thread_pool pool1;
 		auto e1 = pool1.make_work();
 		pool1.create_threads(nt);
-		auto sock = coproto::LocalAsyncSocket::makePair();
-		sock[0].setExecutor(pool0);
-		sock[1].setExecutor(pool1);
 
 		oc::Timer timer;
-
-
-		std::vector<oc::block> x(n);
-		std::vector<oc::block> y0(n), y1(n);
-
-
 		PRNG prng0(oc::ZeroBlock);
 		PRNG prng1(oc::OneBlock);
 
 		for (u64 trial = 0; trial < trials; ++trial)
 		{
-			//timer.setTimePoint("begin");
+			auto sock = coproto::LocalAsyncSocket::makePair();
+			sock[0].setExecutor(pool0);
+			sock[1].setExecutor(pool1);
 
 			CorGenerator g[2];
 			auto begin = timer.setTimePoint("begin trial ------------- ");
-			g[0].init(std::move(sock[0]), prng0, 0, nt, batch, false);
-			g[1].init(std::move(sock[1]), prng1, 1, nt, batch, false);
+			g[0].init(std::move(sock[0]), prng0, 0, nt, batch, false, benchmarkNoise(cmd));
+			g[1].init(std::move(sock[1]), prng1, 1, nt, batch, false, benchmarkNoise(cmd));
 
 			g[0].mGenState->mPool = &pool0;
 			g[1].mGenState->mPool = &pool1;
@@ -216,8 +214,8 @@ namespace secJoin
 		for (u64 t = 0; t < trials; ++t)
 		{
 
-			g[0].init(sock2[0].fork(), prng0, 0, nt, 1 << batch, mock);
-			g[1].init(sock2[1].fork(), prng1, 1, nt, 1 << batch, mock);
+			g[0].init(sock2[0].fork(), prng0, 0, nt, 1 << batch, mock, benchmarkNoise(cmd));
+			g[1].init(sock2[1].fork(), prng1, 1, nt, 1 << batch, mock, benchmarkNoise(cmd));
 			g[0].mGenState->mPool = &pool0;
 			g[1].mGenState->mPool = &pool1;
 
@@ -255,8 +253,6 @@ namespace secJoin
 
 		u64 nL = cmd.getOr("Ln", 1ull << cmd.getOr("Lnn", cmd.getOr("nn", 10)));
 		u64 nR = cmd.getOr("Rn", 1ull << cmd.getOr("Rnn", cmd.getOr("nn", 10)));
-		u64 dL = cmd.getOr("Ld", cmd.getOr("d", 10));
-		u64 dR = cmd.getOr("Rd", cmd.getOr("d", 10));
 
 		auto b = cmd.getOr("b", 16);
 		u64 keySize = cmd.getOr("m", 32);
@@ -273,6 +269,21 @@ namespace secJoin
 			{"R1", ColumnType::Int, keySize},
 			{"R2", ColumnType::Int, 7}
 		} });
+
+		if (!keySize || (keySize < 64 && nL > (u64(1) << keySize)))
+			throw std::invalid_argument("Join benchmark needs distinct left keys");
+		for (u64 i = 0; i < nL; ++i)
+		{
+			oc::copyBytesMin(L.mColumns[0].mData.mData[i], i);
+			oc::copyBytesMin(L.mColumns[1].mData.mData[i], i);
+		}
+		for (u64 i = 0; i < nR; ++i)
+		{
+			const u64 key = i / 2;
+			oc::copyBytesMin(R.mColumns[0].mData.mData[i], key);
+			R.mColumns[1].mData.mData(i, 0) = i & 127;
+		}
+		R.mColumns[0].mData.trim();
 
 		PRNG prng(oc::ZeroBlock);
 		std::array<Table, 2> Ls, Rs;
@@ -294,10 +305,11 @@ namespace secJoin
 		sock2[1].setExecutor(pool1);
 
 		OmJoin join0, join1;
+		join0.mSort.mL = join1.mSort.mL = cmd.getOr("radixBits", join0.mSort.mL);
 
 		CorGenerator ole0, ole1;
-		ole0.init(sock2[0].fork(), prng, 0, nt, 1 << b, mock);
-		ole1.init(sock2[1].fork(), prng, 1, nt, 1 << b, mock);
+		ole0.init(sock2[0].fork(), prng, 0, nt, 1 << b, mock, benchmarkNoise(cmd));
+		ole1.init(sock2[1].fork(), prng, 1, nt, 1 << b, mock, benchmarkNoise(cmd));
 		ole0.mGenState->mPool = &pool0;
 		ole1.mGenState->mPool = &pool1;
 
@@ -327,10 +339,22 @@ namespace secJoin
 		));
 		auto end = timer.setTimePoint("end");
 
-		std::cout << "OmJoin Ln:" << nL << ", Rn:" << nR << " m:" << keySize << "  Ld: " << dL << ", Rd:" << dR << "  ~ " <<
-			std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "ms " <<
-			sock[0].bytesSent() / double(nL + nR) << "+" << sock[0].bytesReceived() / double(nL + nR) << "=" <<
-			(sock[0].bytesSent() + sock[0].bytesReceived()) / double(nL + nR) << " bytes/elem " << std::endl;
+		std::apply([](auto&... task) { (task.result(), ...); }, r);
+		auto actual = reveal(out[0], out[1], true);
+		exp.extractActive();
+		exp.sort();
+		actual.sort();
+		if (actual != exp)
+			throw std::runtime_error("Secure join disagrees with the plaintext result");
+
+		const double rows = double(nL + nR);
+		const u64 online = sock[0].bytesSent() + sock[0].bytesReceived();
+		const u64 preprocessing = sock2[0].bytesSent() + sock2[0].bytesReceived();
+		std::cout << "OmJoin Ln:" << nL << ", Rn:" << nR << " m:" << keySize
+			<< " radix bits:" << join0.mSort.mL << "  ~ "
+			<< std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "ms "
+			<< online / rows << " online + " << preprocessing / rows << " preprocessing = "
+			<< (online + preprocessing) / rows << " bytes/elem" << std::endl;
 
 		if (cmd.isSet("timing"))
 			std::cout << timer << std::endl;
@@ -343,7 +367,7 @@ namespace secJoin
 
 		u64 n = cmd.getOr("n", 1ull << cmd.getOr("nn", 10));
 		u64 trials = cmd.getOr("trials", 1);
-		bool nt = cmd.getOr("nt", 1);
+		u64 nt = cmd.getOr("nt", 1);
 		auto useOle = cmd.isSet("ole");
 
 		oc::Timer timer;
@@ -384,8 +408,8 @@ namespace secJoin
 		//sender.setKey(kk);
 
 		CorGenerator ole0, ole1;
-		ole0.init(sock2[0].fork(), prng0, 0, nt, 1 << 18, cmd.getOr("mock", 1));
-		ole1.init(sock2[1].fork(), prng1, 1, nt, 1 << 18, cmd.getOr("mock", 1));
+		ole0.init(sock2[0].fork(), prng0, 0, nt, 1 << 18, cmd.getOr("mock", 1), benchmarkNoise(cmd));
+		ole1.init(sock2[1].fork(), prng1, 1, nt, 1 << 18, cmd.getOr("mock", 1), benchmarkNoise(cmd));
 
 
 		prng0.get(x.data(), x.size());
@@ -450,67 +474,73 @@ namespace secJoin
 	{
 #ifdef ENABLE_SILENTOT
 		using namespace oc;
-		try
+		SilentOtExtSender sender;
+		SilentOtExtReceiver recver;
+
+		u64 trials = cmd.getOr("t", 10);
+
+		u64 n = cmd.getOr("n", 1ull << cmd.getOr("nn", 20));
+		MultType multType = (MultType)cmd.getOr("m", (int)MultType::Spin);
+		std::cout << multType << std::endl;
+
+
+		PRNG prng0(ZeroBlock), prng1(ZeroBlock);
+		block delta = prng0.get();
+
+		auto sock = coproto::LocalAsyncSocket::makePair();
+
+		Timer sTimer;
+		Timer rTimer;
+		const auto noise = benchmarkNoise(cmd);
+        auto s = rTimer.setTimePoint("start");
+		sender.setTimer(rTimer);
+		recver.setTimer(rTimer);
+		for (u64 t = 0; t < trials; ++t)
 		{
+            if (t == 0 || (noise == SdNoiseDistribution::Regular && multType != MultType::Spin))
+            {
+                sender.configure(n, 2, 1, SilentSecType::SemiHonest, noise, multType);
+                recver.configure(n, 2, 1, SilentSecType::SemiHonest, noise, multType);
+                if (noise == SdNoiseDistribution::Regular && multType == MultType::Spin)
+                {
+                    prepareRegularSpin(sender.mSpin, n);
+                    prepareRegularSpin(recver.mSpin, n);
+                }
+            }
 
-			SilentOtExtSender sender;
-			SilentOtExtReceiver recver;
+			auto choice = recver.sampleBaseChoiceBits(prng0);
+			std::vector<std::array<block, 2>> sendBase(sender.baseCount().mBaseOtCount);
+			std::vector<block> recvBase(recver.baseCount().mBaseOtCount);
+			oc::BitVector c(sender.baseCount().mBaseVoleCount);
+            c.randomize(prng0);
+            std::vector<block> b(c.size(), ZeroBlock), a(c.size());
+            for (u64 i = 0; i < c.size(); ++i)
+                a[i] = c[i] ? delta : ZeroBlock;
+            sender.setBaseCors(sendBase, b, delta);
+            recver.setBaseCors(recvBase, choice, a, c);
 
-			u64 trials = cmd.getOr("t", 10);
+			auto p0 = sender.silentSendInplace(delta, n, prng0, sock[0]);
+			auto p1 = recver.silentReceiveInplace(n, prng1, sock[1], oc::ChoiceBitPacking::True);
 
-			u64 n = cmd.getOr("n", 1ull << cmd.getOr("nn", 20));
-			MultType multType = (MultType)cmd.getOr("m", (int)MultType::Tungsten);
-			std::cout << multType << std::endl;
+			rTimer.setTimePoint("r start");
+			auto results = coproto::sync_wait(macoro::when_all_ready(
+				std::move(p0), std::move(p1)));
+			std::get<0>(results).result();
+			std::get<1>(results).result();
+			rTimer.setTimePoint("r done");
 
-			recver.mMultType = multType;
-			sender.mMultType = multType;
-
-			PRNG prng0(ZeroBlock), prng1(ZeroBlock);
-			block delta = prng0.get();
-
-			auto sock = coproto::LocalAsyncSocket::makePair();
-
-			Timer sTimer;
-			Timer rTimer;
-			auto s = rTimer.setTimePoint("start");
-			sender.setTimer(rTimer);
-			recver.setTimer(rTimer);
-			for (u64 t = 0; t < trials; ++t)
-			{
-				sender.configure(n);
-				recver.configure(n);
-
-				auto choice = recver.sampleBaseChoiceBits(prng0);
-				std::vector<std::array<block, 2>> sendBase(sender.silentBaseOtCount());
-				std::vector<block> recvBase(recver.silentBaseOtCount());
-				sender.setSilentBaseOts(sendBase);
-				recver.setSilentBaseOts(recvBase);
-
-				auto p0 = sender.silentSendInplace(delta, n, prng0, sock[0]);
-				auto p1 = recver.silentReceiveInplace(n, prng1, sock[1], oc::ChoiceBitPacking::True);
-
-				rTimer.setTimePoint("r start");
-				coproto::sync_wait(macoro::when_all_ready(
-					std::move(p0), std::move(p1)));
-				rTimer.setTimePoint("r done");
-
-			}
-			auto e = rTimer.setTimePoint("end");
-
-			auto time = std::chrono::duration_cast<std::chrono::milliseconds>(e - s).count();
-			auto avgTime = time / double(trials);
-			auto timePer512 = avgTime / n * 512;
-			std::cout << "OT n:" << n << ", " <<
-				avgTime << "ms/batch, " << timePer512 << "ms/512ot" << std::endl;
-
-			std::cout << rTimer << std::endl;
-
-			std::cout << sock[0].bytesReceived() / trials << " " << sock[1].bytesReceived() / trials << " bytes per " << std::endl;
 		}
-		catch (std::exception& e)
-		{
-			std::cout << e.what() << std::endl;
-		}
+		auto e = rTimer.setTimePoint("end");
+
+		auto time = std::chrono::duration_cast<std::chrono::milliseconds>(e - s).count();
+		auto avgTime = time / double(trials);
+		auto timePer512 = avgTime / n * 512;
+		std::cout << "OT n:" << n << ", " <<
+			avgTime << "ms/batch, " << timePer512 << "ms/512ot" << std::endl;
+
+		std::cout << rTimer << std::endl;
+
+		std::cout << sock[0].bytesReceived() / trials << " " << sock[1].bytesReceived() / trials << " bytes per " << std::endl;
 #else
 		std::cout << "ENABLE_SILENTOT = false" << std::endl;
 #endif
@@ -521,82 +551,80 @@ namespace secJoin
 	{
 #ifdef ENABLE_SILENTOT
 		using namespace oc;
-		try
+		SilentF4VoleReceiver recver;
+		SilentF4VoleSender sender;
+
+		u64 trials = cmd.getOr("t", 10);
+
+		u64 n = cmd.getOr("n", 1ull << cmd.getOr("nn", 20));
+		MultType multType = (MultType)cmd.getOr("m", (int)MultType::Spin);
+		std::cout << multType << std::endl;
+
+		recver.mMultType = multType;
+		sender.mMultType = multType;
+
+		PRNG prng0(ZeroBlock), prng1(ZeroBlock);
+		block delta = prng0.get<block>() & block(~0ull, ~0ull << 2);
+
+		auto sock = coproto::LocalAsyncSocket::makePair();
+
+		Timer sTimer;
+		Timer rTimer;
+		const auto noise = benchmarkNoise(cmd);
+        auto s = rTimer.setTimePoint("start");
+		sender.setTimer(rTimer);
+		recver.setTimer(rTimer);
+		for (u64 t = 0; t < trials; ++t)
 		{
+			if (t == 0 || noise == SdNoiseDistribution::Regular)
+            {
+                sender.configure(n, SilentBaseType::BaseExtend, 128, {}, noise);
+                recver.configure(n, SilentBaseType::BaseExtend, 128, {}, noise);
+            }
 
-			SilentF4VoleReceiver recver;
-			SilentF4VoleSender sender;
+			auto choice = recver.sampleBaseChoiceBits(prng0);
+			auto cBase = recver.sampleBaseVoleVals(prng0);
 
-			u64 trials = cmd.getOr("t", 10);
+			std::vector<block> bBase(cBase.size()), aBase(cBase.size());
 
-			u64 n = cmd.getOr("n", 1ull << cmd.getOr("nn", 20));
-			MultType multType = (MultType)cmd.getOr("m", (int)MultType::Tungsten);
-			std::cout << multType << std::endl;
+			prng0.get(aBase.data(), aBase.size());
+			CoeffCtxGF4 ctx;
 
-			recver.mMultType = multType;
-			sender.mMultType = multType;
-
-			PRNG prng0(ZeroBlock), prng1(ZeroBlock);
-			block delta = prng0.get<block>() & block(~0ull, ~0ull << 2);
-
-			auto sock = coproto::LocalAsyncSocket::makePair();
-
-			Timer sTimer;
-			Timer rTimer;
-			auto s = rTimer.setTimePoint("start");
-			sender.setTimer(rTimer);
-			recver.setTimer(rTimer);
-			for (u64 t = 0; t < trials; ++t)
+			for (u64 i = 0; i < aBase.size(); ++i)
 			{
-				sender.configure(n);
-				recver.configure(n);
-
-				auto choice = recver.sampleBaseChoiceBits(prng0);
-				auto cBase = recver.sampleBaseVoleVals(prng0);
-
-				std::vector<block> bBase(cBase.size()), aBase(cBase.size());
-
-				prng0.get(aBase.data(), aBase.size());
-				CoeffCtxGF4 ctx;
-
-				for (u64 i = 0; i < aBase.size(); ++i)
-				{
-					aBase[i] &= block(~0ull, ~0ull << 2);
-					ctx.mul(bBase[i], delta, cBase[i]);
-					ctx.plus(bBase[i], bBase[i], aBase[i]);
-				}
-
-				std::vector<std::array<block, 2>> sendBase(sender.silentBaseOtCount());
-				std::vector<block> recvBase(recver.silentBaseOtCount());
-				sender.setSilentBaseOts(sendBase, bBase);
-				recver.setSilentBaseOts(recvBase, aBase);
-
-				auto p0 = sender.silentSendInplace(delta, n, prng0, sock[0]);
-				auto p1 = recver.silentReceiveInplace(n, prng1, sock[1]);
-
-				rTimer.setTimePoint("r start");
-				coproto::sync_wait(macoro::when_all_ready(
-					std::move(p0), std::move(p1)));
-				rTimer.setTimePoint("r done");
-
+				aBase[i] &= block(~0ull, ~0ull << 2);
+				ctx.mul(bBase[i], delta, cBase[i]);
+				ctx.plus(bBase[i], bBase[i], aBase[i]);
 			}
-			auto e = rTimer.setTimePoint("end");
 
-			auto time = std::chrono::duration_cast<std::chrono::milliseconds>(e - s).count();
-			auto avgTime = time / double(trials);
-			auto timePer512 = avgTime / n * 512;
-			std::cout << "F4 n:" << n << ", " <<
-				avgTime << "ms/batch, " << timePer512 << "ms/512ot" << std::endl;
+			std::vector<std::array<block, 2>> sendBase(sender.silentBaseOtCount());
+			std::vector<block> recvBase(recver.silentBaseOtCount());
+			sender.setSilentBaseOts(sendBase, bBase);
+			recver.setSilentBaseOts(recvBase, aBase);
 
-			if (cmd.isSet("verbose"))
-			{
-				std::cout << rTimer << std::endl;
-				std::cout << sock[0].bytesReceived() / trials << " " << sock[1].bytesReceived() / trials << " bytes per " << std::endl;
-			}
+			auto p0 = sender.silentSendInplace(delta, n, prng0, sock[0]);
+			auto p1 = recver.silentReceiveInplace(n, prng1, sock[1]);
+
+			rTimer.setTimePoint("r start");
+			auto results = coproto::sync_wait(macoro::when_all_ready(
+				std::move(p0), std::move(p1)));
+			std::get<0>(results).result();
+			std::get<1>(results).result();
+			rTimer.setTimePoint("r done");
+
 		}
-		catch (std::exception& e)
+		auto e = rTimer.setTimePoint("end");
+
+		auto time = std::chrono::duration_cast<std::chrono::milliseconds>(e - s).count();
+		auto avgTime = time / double(trials);
+		auto timePer512 = avgTime / n * 512;
+		std::cout << "F4 n:" << n << ", " <<
+			avgTime << "ms/batch, " << timePer512 << "ms/512ot" << std::endl;
+
+		if (cmd.isSet("verbose"))
 		{
-			std::cout << e.what() << std::endl;
+			std::cout << rTimer << std::endl;
+			std::cout << sock[0].bytesReceived() / trials << " " << sock[1].bytesReceived() / trials << " bytes per " << std::endl;
 		}
 #else
 		std::cout << "ENABLE_SILENTOT = false" << std::endl;
@@ -644,8 +672,8 @@ namespace secJoin
 		CorGenerator ole0, ole1;
 
 
-		ole0.init(std::move(sock2[0]), prng0, 0, nt, 1 << b, cmd.getOr("mock", 1));
-		ole1.init(std::move(sock2[1]), prng1, 1, nt, 1 << b, cmd.getOr("mock", 1));
+		ole0.init(std::move(sock2[0]), prng0, 0, nt, 1 << b, cmd.getOr("mock", 1), benchmarkNoise(cmd));
+		ole1.init(std::move(sock2[1]), prng1, 1, nt, 1 << b, cmd.getOr("mock", 1), benchmarkNoise(cmd));
 		ole0.mGenState->mPool = &pool0;
 		ole1.mGenState->mPool = &pool1;
 

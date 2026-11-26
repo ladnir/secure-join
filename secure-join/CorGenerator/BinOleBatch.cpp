@@ -1,7 +1,7 @@
 #include "BinOleBatch.h"
 #include "CorGenerator.h"
 #include "secure-join/Util/match.h"
-#include "secure-join/Util/Simd.h"
+#include "PackedOtHash.h"
 #include <cstring>
 
 namespace secJoin
@@ -28,39 +28,45 @@ namespace secJoin
         d.mMult = mMult.subspan(begin / 128, size / 128);
     }
 
-    BaseRequest OleBatch::getBaseRequest()
+    BaseRequest OleBatch::getBaseRequest(StationaryWorker* worker)
     {
         BaseRequest r;
 
         if (mGenState->mMock)
             return r;
 
+        if (worker)
+            return worker->requestOtBase(CorType::Ole, mSize, mSendRecv.index() == 0, mPrng);
+
         mSendRecv | match{
             [&](SendBatch& send) {
-                send.mSender.configure(mSize);
-                r.mSendSize = send.mSender.silentBaseOtCount();
+                configureBatchOt(send.mSender, mSize);
+                r.mSendSize = send.mSender.baseCount().mBaseOtCount;
             },
 
             [&](RecvBatch& recv) {
-                recv.mReceiver.configure(mSize);
+                configureBatchOt(recv.mReceiver, mSize);
                 r.mChoice = recv.mReceiver.sampleBaseChoiceBits(mPrng);
             }
         };
         return r;
     }
 
-    void OleBatch::setBase(BaseCor& sMsg)
+    void OleBatch::setBase(BaseCor& sMsg, StationaryWorker* worker)
     {
 
         if (mGenState->mMock)
             return;
 
+        if (worker)
+            return worker->setOtBase(CorType::Ole, mSize, mSendRecv.index() == 0, sMsg);
+
         mSendRecv | match{
             [&](SendBatch& send) {
-                send.mSender.setSilentBaseOts(sMsg.getSendOt(send.mSender.silentBaseOtCount()));
+                send.mSender.setBaseCors(sMsg.getSendOt(send.mSender.baseCount().mBaseOtCount), {}, mPrng.get<block>());
             },
             [&](RecvBatch& recv) {
-                recv.mReceiver.setSilentBaseOts(sMsg.getRecvOt(recv.mReceiver.silentBaseOtCount()));
+                sMsg.setOtBase(recv.mReceiver);
             }
         };
     }
@@ -175,18 +181,26 @@ namespace secJoin
         {
             mock(batchIdx, add, mult);
         }
+        else if (threadState.mStationary)
+        {
+            auto& worker = *threadState.mStationary;
+            auto& protocol = worker.begin(worker.recvOt, CorType::Ole, size, false);
+            co_await protocol.silentReceiveInplace(size, prng, sock, oc::ChoiceBitPacking::True);
+            compressRecver(protocol.mA, add, mult);
+            worker.finish(protocol);
+        }
         else
         {
 
             if (state->mDebug)
             {
-                baseSend.resize(mReceiver.silentBaseOtCount());
+                baseSend.resize(mReceiver.baseCount().mBaseOtCount);
                 co_await sock.recv(baseSend);
 
                 {
                     for (u64 i = 0; i < baseSend.size(); ++i)
                     {
-                        if (mReceiver.mGen.mBaseOTs(i) != baseSend[i][mReceiver.mGen.mBaseChoices(i)])
+                        if (std::get<0>(mReceiver.mGenVar).mBaseOTs(i) != baseSend[i][std::get<0>(mReceiver.mGenVar).mBaseChoices(i)])
                         {
                             std::cout << "OleBatch::getTask() base OTs do not match. " << LOCATION << std::endl;
                             std::terminate();
@@ -195,19 +209,18 @@ namespace secJoin
                 }
             }
 
-            assert(mReceiver.mGen.hasBaseOts());
-            mReceiver.mMultType = oc::MultType::Tungsten;
+            assert(mReceiver.hasBaseCors());
             mReceiver.mA = std::move(threadState.mA);
-            mReceiver.mEncodeTemp = std::move(threadState.mEncodeTemp);
-            mReceiver.mGen.mTempBuffer = std::move(threadState.mPprfTemp);
-            mReceiver.mGen.mEagerSend = false;
+            mReceiver.mSpin = std::move(threadState.mSpin);
+            std::get<0>(mReceiver.mGenVar).mTempBuffer = std::move(threadState.mPprfTemp);
+            std::get<0>(mReceiver.mGenVar).mEagerSend = false;
 
             co_await mReceiver.silentReceiveInplace(mReceiver.mRequestNumOts, prng, sock, oc::ChoiceBitPacking::True);
             compressRecver(mReceiver.mA, add, mult);
 
             threadState.mA = std::move(mReceiver.mA);
-            threadState.mEncodeTemp = std::move(mReceiver.mEncodeTemp);
-            threadState.mPprfTemp = std::move(mReceiver.mGen.mTempBuffer);
+            threadState.mSpin = std::move(mReceiver.mSpin);
+            threadState.mPprfTemp = std::move(std::get<0>(mReceiver.mGenVar).mTempBuffer);
 
         }
 
@@ -232,27 +245,34 @@ namespace secJoin
         {
             mock(batchIdx, add, mult);
         }
+        else if (threadState.mStationary)
+        {
+            auto& worker = *threadState.mStationary;
+            auto& protocol = worker.begin(worker.sendOt, CorType::Ole, size, true);
+            co_await protocol.silentSendInplace(protocol.mDelta, size, prng, sock);
+            compressSender(*protocol.mDelta, protocol.mB, add, mult);
+            worker.finish(protocol);
+        }
         else
         {
             if (state->mDebug)
             {
-                co_await sock.send(coproto::copy(mSender.mGen.mBaseOTs));
+                co_await sock.send(coproto::copy(std::get<0>(mSender.mGenVar).mBaseOTs));
             }
 
-            assert(mSender.mGen.hasBaseOts());
-            mSender.mMultType = oc::MultType::Tungsten;
+            assert(mSender.hasBaseCors());
             
             mSender.mB = std::move(threadState.mB);
-            mSender.mEncodeTemp = std::move(threadState.mEncodeTemp);
-            mSender.mGen.mTempBuffer = std::move(threadState.mPprfTemp);
-            mSender.mGen.mEagerSend = false;
+            mSender.mSpin = std::move(threadState.mSpin);
+            std::get<0>(mSender.mGenVar).mTempBuffer = std::move(threadState.mPprfTemp);
+            std::get<0>(mSender.mGenVar).mEagerSend = false;
 
-            co_await mSender.silentSendInplace(prng.get(), mSender.mRequestNumOts, prng, sock);
-            compressSender(mSender.mDelta, mSender.mB, add, mult);
+            co_await mSender.silentSendInplace(mSender.mDelta, mSender.mRequestNumOts, prng, sock);
+            compressSender(*mSender.mDelta, mSender.mB, add, mult);
 
             threadState.mB = std::move(mSender.mB);
-            threadState.mEncodeTemp = std::move(mSender.mEncodeTemp);
-            threadState.mPprfTemp = std::move(mSender.mGen.mTempBuffer);
+            threadState.mSpin = std::move(mSender.mSpin);
+            threadState.mPprfTemp = std::move(std::get<0>(mSender.mGenVar).mTempBuffer);
         }
 
         corReady.set();
@@ -265,128 +285,22 @@ namespace secJoin
         span<oc::block> add,
         span<oc::block> mult)
     {
-        auto aIter = reinterpret_cast<u8*>(add.data());
-        auto bIter8 = (u8*)mult.data();
-
-
-        if (add.size() * 128 != A.size())
-            throw RTE_LOC;
-        if (mult.size() * 128 != A.size())
+        if (A.size() % 128 || add.size() != A.size() / 128 || mult.size() != add.size())
             throw RTE_LOC;
 
-        auto shuffle = std::array<block, 16>{};
-        memset(shuffle.data(), 1 << 7, sizeof(*shuffle.data()) * shuffle.size());
-        for (u64 i = 0; i < 16; ++i)
-            shuffle[i].set<u8>(i, 0);
-
-        auto OneBlock = block(1);
-        auto AllOneBlock = block(~0ull, ~0ull);
-        block mask = OneBlock ^ AllOneBlock;
-
-        auto m = &A[0];
-
-        for (u64 i = 0; i < A.size(); i += 16)
+#if defined(ENABLE_SSE) && defined(__VAES__) && defined(__AVX2__) && !defined(__AVX512F__)
+        packedOt::compressReceiver256<1>(A, add, {&mult});
+#else
+        for (u64 i = 0; i < A.size(); i += packedOt::groupSize)
         {
-            for (u64 j = 0; j < 2; ++j)
-            {
-                // extract the choice bit from the LSB of m
-                u32 b0 = m[0].testc(OneBlock);
-                u32 b1 = m[1].testc(OneBlock);
-                u32 b2 = m[2].testc(OneBlock);
-                u32 b3 = m[3].testc(OneBlock);
-                u32 b4 = m[4].testc(OneBlock);
-                u32 b5 = m[5].testc(OneBlock);
-                u32 b6 = m[6].testc(OneBlock);
-                u32 b7 = m[7].testc(OneBlock);
-
-                // pack the choice bits.
-                *bIter8++ =
-                    b0 ^
-                    (b1 << 1) ^
-                    (b2 << 2) ^
-                    (b3 << 3) ^
-                    (b4 << 4) ^
-                    (b5 << 5) ^
-                    (b6 << 6) ^
-                    (b7 << 7);
-
-                // mask of the choice bit which is stored in the LSB
-                m[0] = m[0] & mask;
-                m[1] = m[1] & mask;
-                m[2] = m[2] & mask;
-                m[3] = m[3] & mask;
-                m[4] = m[4] & mask;
-                m[5] = m[5] & mask;
-                m[6] = m[6] & mask;
-                m[7] = m[7] & mask;
-
-                oc::mAesFixedKey.hashBlocks<8>(m, m);
-
-                m += 8;
-            }
-            m -= 16;
-
-            // _mm_shuffle_epi8(a, b): 
-            //     FOR j := 0 to 15
-            //         i: = j * 8
-            //         IF b[i + 7] == 1
-            //             dst[i + 7:i] : = 0
-            //         ELSE
-            //             index[3:0] : = b[i + 3:i]
-            //             dst[i + 7:i] : = a[index * 8 + 7:index * 8]
-            //         FI
-            //     ENDFOR
-
-            // _mm_sll_epi16 : shifts 16 bit works left
-            // _mm_movemask_epi8: packs together the MSG
-
-            block a00 = shuffle_epi8(m[0], shuffle[0]);
-            block a01 = shuffle_epi8(m[1], shuffle[1]);
-            block a02 = shuffle_epi8(m[2], shuffle[2]);
-            block a03 = shuffle_epi8(m[3], shuffle[3]);
-            block a04 = shuffle_epi8(m[4], shuffle[4]);
-            block a05 = shuffle_epi8(m[5], shuffle[5]);
-            block a06 = shuffle_epi8(m[6], shuffle[6]);
-            block a07 = shuffle_epi8(m[7], shuffle[7]);
-            block a08 = shuffle_epi8(m[8], shuffle[8]);
-            block a09 = shuffle_epi8(m[9], shuffle[9]);
-            block a10 = shuffle_epi8(m[10], shuffle[10]);
-            block a11 = shuffle_epi8(m[11], shuffle[11]);
-            block a12 = shuffle_epi8(m[12], shuffle[12]);
-            block a13 = shuffle_epi8(m[13], shuffle[13]);
-            block a14 = shuffle_epi8(m[14], shuffle[14]);
-            block a15 = shuffle_epi8(m[15], shuffle[15]);
-
-            a00 = a00 ^ a08;
-            a01 = a01 ^ a09;
-            a02 = a02 ^ a10;
-            a03 = a03 ^ a11;
-            a04 = a04 ^ a12;
-            a05 = a05 ^ a13;
-            a06 = a06 ^ a14;
-            a07 = a07 ^ a15;
-
-            a00 = a00 ^ a04;
-            a01 = a01 ^ a05;
-            a02 = a02 ^ a06;
-            a03 = a03 ^ a07;
-
-            a00 = a00 ^ a02;
-            a01 = a01 ^ a03;
-
-            a00 = a00 ^ a01;
-
-            a00 = slli_epi16<7>(a00);
-
-            u16 ap = movemask_epi8(a00);
-
-            std::memcpy(aIter, &ap, sizeof(ap));
-            aIter += sizeof(ap);
-            m += 16;
-
+            const packedOt::Group group(A.data() + i);
+            const auto choices = group.choices<0>();
+            const auto bits = group.hashes<1>();
+            packedOt::store(mult.data(), i, choices);
+            packedOt::store(add.data(), i, bits);
         }
+#endif
     }
-
 
     void OleBatch::SendBatch::compressSender(
         block delta,
@@ -394,157 +308,54 @@ namespace secJoin
         span<oc::block> add,
         span<oc::block> mult)
     {
-
-        auto bIter = reinterpret_cast<u8*>(add.data());
-        auto aIter = reinterpret_cast<u8*>(mult.data());
-
-        if (add.size() * 128 != B.size())
+        if (B.size() % 128 || add.size() != B.size() / 128 || mult.size() != add.size())
             throw RTE_LOC;
-        if (mult.size() * 128 != B.size())
-            throw RTE_LOC;
-        using block = oc::block;
 
-        auto shuffle = std::array<block, 16>{};
-        memset(shuffle.data(), 1 << 7, sizeof(*shuffle.data()) * shuffle.size());
-        for (u64 i = 0; i < 16; ++i)
-            shuffle[i].set<u8>(i, 0);
+#if defined(ENABLE_SSE) && defined(__VAES__) && defined(__AVX2__) && !defined(__AVX512F__)
+        const auto& keys = oc::mAesFixedKey.mRoundKey;
+        const block mask(~0ull, ~1ull);
+        const auto messageMask = _mm256_broadcastsi128_si256(mask.mData);
+        const auto firstZero = _mm256_broadcastsi128_si256(keys[0].mData);
+        const auto firstOne = _mm256_broadcastsi128_si256((keys[0] ^ (delta & mask)).mData);
+        __m256i roundKeys[10];
+        for (unsigned r = 0; r < 10; ++r)
+            roundKeys[r] = _mm256_broadcastsi128_si256(keys[r + 1].mData);
 
-        std::array<block, 16> sendMsg;
-        auto m = B.data();
-
-        auto OneBlock = block(1);
-        auto AllOneBlock = block(~0ull, ~0ull);
-        block mask = OneBlock ^ AllOneBlock;
-        delta = delta & mask;
-
-        for (u64 i = 0; i < B.size(); i += 16)
+        for (u64 i = 0; i < B.size(); i += 8)
         {
-            auto s = sendMsg.data();
-
-            for (u64 j = 0; j < 2; ++j)
+            // Four pairs of input blocks, with both choices in flight.
+            __m256i state[8];
+            for (unsigned j = 0; j < 4; ++j)
             {
-                m[0] = m[0] & mask;
-                m[1] = m[1] & mask;
-                m[2] = m[2] & mask;
-                m[3] = m[3] & mask;
-                m[4] = m[4] & mask;
-                m[5] = m[5] & mask;
-                m[6] = m[6] & mask;
-                m[7] = m[7] & mask;
-
-                oc::mAesFixedKey.hashBlocks<8>(m, s);
-
-                s += 8;
-                m += 8;
+                const auto x = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(B.data() + i + 2 * j));
+                const auto masked = _mm256_and_si256(x, messageMask);
+                state[j] = _mm256_xor_si256(masked, firstZero);
+                state[j + 4] = _mm256_xor_si256(masked, firstOne);
             }
+#pragma GCC unroll 9
+            for (unsigned r = 0; r < 9; ++r)
+                for (auto& v : state)
+                    v = _mm256_aesenc_epi128(v, roundKeys[r]);
+            for (auto& v : state)
+                v = _mm256_aesenclast_epi128(v, roundKeys[9]);
 
-
-            block a00 = shuffle_epi8(sendMsg[0], shuffle[0]);
-            block a01 = shuffle_epi8(sendMsg[1], shuffle[1]);
-            block a02 = shuffle_epi8(sendMsg[2], shuffle[2]);
-            block a03 = shuffle_epi8(sendMsg[3], shuffle[3]);
-            block a04 = shuffle_epi8(sendMsg[4], shuffle[4]);
-            block a05 = shuffle_epi8(sendMsg[5], shuffle[5]);
-            block a06 = shuffle_epi8(sendMsg[6], shuffle[6]);
-            block a07 = shuffle_epi8(sendMsg[7], shuffle[7]);
-            block a08 = shuffle_epi8(sendMsg[8], shuffle[8]);
-            block a09 = shuffle_epi8(sendMsg[9], shuffle[9]);
-            block a10 = shuffle_epi8(sendMsg[10], shuffle[10]);
-            block a11 = shuffle_epi8(sendMsg[11], shuffle[11]);
-            block a12 = shuffle_epi8(sendMsg[12], shuffle[12]);
-            block a13 = shuffle_epi8(sendMsg[13], shuffle[13]);
-            block a14 = shuffle_epi8(sendMsg[14], shuffle[14]);
-            block a15 = shuffle_epi8(sendMsg[15], shuffle[15]);
-
-            s = sendMsg.data();
-            m -= 16;
-            for (u64 j = 0; j < 2; ++j)
-            {
-                s[0] = m[0] ^ delta;
-                s[1] = m[1] ^ delta;
-                s[2] = m[2] ^ delta;
-                s[3] = m[3] ^ delta;
-                s[4] = m[4] ^ delta;
-                s[5] = m[5] ^ delta;
-                s[6] = m[6] ^ delta;
-                s[7] = m[7] ^ delta;
-
-                oc::mAesFixedKey.hashBlocks<8>(s, s);
-
-                s += 8;
-                m += 8;
-            }
-
-            block b00 = shuffle_epi8(sendMsg[0], shuffle[0]);
-            block b01 = shuffle_epi8(sendMsg[1], shuffle[1]);
-            block b02 = shuffle_epi8(sendMsg[2], shuffle[2]);
-            block b03 = shuffle_epi8(sendMsg[3], shuffle[3]);
-            block b04 = shuffle_epi8(sendMsg[4], shuffle[4]);
-            block b05 = shuffle_epi8(sendMsg[5], shuffle[5]);
-            block b06 = shuffle_epi8(sendMsg[6], shuffle[6]);
-            block b07 = shuffle_epi8(sendMsg[7], shuffle[7]);
-            block b08 = shuffle_epi8(sendMsg[8], shuffle[8]);
-            block b09 = shuffle_epi8(sendMsg[9], shuffle[9]);
-            block b10 = shuffle_epi8(sendMsg[10], shuffle[10]);
-            block b11 = shuffle_epi8(sendMsg[11], shuffle[11]);
-            block b12 = shuffle_epi8(sendMsg[12], shuffle[12]);
-            block b13 = shuffle_epi8(sendMsg[13], shuffle[13]);
-            block b14 = shuffle_epi8(sendMsg[14], shuffle[14]);
-            block b15 = shuffle_epi8(sendMsg[15], shuffle[15]);
-
-            a00 = a00 ^ a08;
-            a01 = a01 ^ a09;
-            a02 = a02 ^ a10;
-            a03 = a03 ^ a11;
-            a04 = a04 ^ a12;
-            a05 = a05 ^ a13;
-            a06 = a06 ^ a14;
-            a07 = a07 ^ a15;
-
-            b00 = b00 ^ b08;
-            b01 = b01 ^ b09;
-            b02 = b02 ^ b10;
-            b03 = b03 ^ b11;
-            b04 = b04 ^ b12;
-            b05 = b05 ^ b13;
-            b06 = b06 ^ b14;
-            b07 = b07 ^ b15;
-
-            a00 = a00 ^ a04;
-            a01 = a01 ^ a05;
-            a02 = a02 ^ a06;
-            a03 = a03 ^ a07;
-
-            b00 = b00 ^ b04;
-            b01 = b01 ^ b05;
-            b02 = b02 ^ b06;
-            b03 = b03 ^ b07;
-
-            a00 = a00 ^ a02;
-            a01 = a01 ^ a03;
-
-            b00 = b00 ^ b02;
-            b01 = b01 ^ b03;
-
-            a00 = a00 ^ a01;
-            b00 = b00 ^ b01;
-
-            a00 = slli_epi16<7>(a00);
-            b00 = slli_epi16<7>(b00);
-
-            u16 ap = movemask_epi8(a00);
-            u16 bp = movemask_epi8(b00);
-
-            assert(aIter + sizeof(u16) <= reinterpret_cast<u8*>(mult.data() + mult.size()));
-            assert(bIter + sizeof(u16) <= reinterpret_cast<u8*>(add.data() + add.size()));
-
-            u16 mixed = ap ^ bp;
-            std::memcpy(aIter, &mixed, sizeof(mixed));
-            aIter += sizeof(mixed);
-            std::memcpy(bIter, &ap, sizeof(ap));
-            bIter += sizeof(ap);
+            // Both hash inputs have bit zero cleared, so AES supplies the output bit.
+            const auto zero = packedOt::lowWords(state[0], state[1], state[2], state[3]);
+            const auto one = packedOt::lowWords(state[4], state[5], state[6], state[7]);
+            const auto z = packedOt::packBit<0>(packedOt::inInputOrder(zero));
+            const auto o = packedOt::packBit<0>(packedOt::inInputOrder(one));
+            reinterpret_cast<u8*>(add.data())[i / 8] = z;
+            reinterpret_cast<u8*>(mult.data())[i / 8] = z ^ o;
         }
+#else
+        for (u64 i = 0; i < B.size(); i += packedOt::groupSize)
+        {
+            const packedOt::Group group(B.data() + i);
+            const auto zero = group.hashes<1>();
+            const auto one = group.hashes<1>(delta);
+            packedOt::store(add.data(), i, zero);
+            packedOt::store(mult.data(), i, zero ^ one);
+        }
+#endif
     }
-
-
 }

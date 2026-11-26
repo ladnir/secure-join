@@ -14,6 +14,7 @@ set(SRCS
     "CorGenerator/CorGenerator.cpp"
     "CorGenerator/Request.cpp"
     "CorGenerator/Batch.cpp"
+    "CorGenerator/SpinWorker.cpp"
     "CorGenerator/OtBatch.cpp"
     "CorGenerator/BinOleBatch.cpp"
     "CorGenerator/TritOtBatch.cpp"

@@ -32,6 +32,24 @@ namespace secJoin
     }
 
 
+    macoro::task<> Batch::run(BatchThreadState& worker)
+    {
+        try
+        {
+            co_await getTask(worker);
+            co_return;
+        }
+        catch (...)
+        {
+            mError = std::current_exception();
+        }
+        mGenState->abort();
+        mCorReady.set();
+        if (!mSock.closed())
+            co_await mSock.close();
+        std::rethrow_exception(mError);
+    }
+
     void Batch::start()
     {
         if (mStarted.exchange(true) == false)

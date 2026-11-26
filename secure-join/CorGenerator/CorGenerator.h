@@ -99,6 +99,8 @@ namespace secJoin
 
 		// true if we should just fake the correlation generation
 		bool mMock = false;
+        oc::SdNoiseDistribution mNoise = oc::SdNoiseDistribution::Regular;
+        std::shared_ptr<SpinBankPool> mBanks;
 
 		// used to determine which party should go first when its ambiguous.
 		u64 mPartyIdx = -1;
@@ -158,6 +160,7 @@ namespace secJoin
 		std::shared_ptr<GenState> mGenState;
 
 		std::vector<std::weak_ptr<GenState>> mStarted;
+        std::shared_ptr<SpinBankPool> mBanks;
 
 		void init(
 			coproto::Socket&& sock,
@@ -165,7 +168,8 @@ namespace secJoin
 			u64 partyIdx,
 			u64 numConcurrent,
 			u64 batchSize,
-			bool mock);
+			bool mock,
+            oc::SdNoiseDistribution noise = oc::SdNoiseDistribution::Regular);
 
 
 		template<typename T>

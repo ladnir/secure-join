@@ -50,41 +50,45 @@ namespace secJoin
 		};
 	}
 
-	BaseRequest TritOtBatch::getBaseRequest()
+	BaseRequest TritOtBatch::getBaseRequest(StationaryWorker* worker)
 	{
 		BaseRequest r;
 
 		if (mGenState->mMock)
 			return r;
 
+		if (worker)
+			return worker->requestOtBase(CorType::TritOt, mSize, mSendRecv.index() == 0, mPrng);
+
 		mSendRecv | match{
 			[&](SendBatch& send) {
-				send.mSender.configure(mSize);
-				r.mSendSize = send.mSender.silentBaseOtCount();
+				configureBatchOt(send.mSender, mSize);
+				r.mSendSize = send.mSender.baseCount().mBaseOtCount;
 			},
 
 			[&](RecvBatch& recv) {
-				recv.mReceiver.configure(mSize);
+				configureBatchOt(recv.mReceiver, mSize);
 				r.mChoice = recv.mReceiver.sampleBaseChoiceBits(mPrng);
 			}
 		};
 		return r;
 	}
 
-	void TritOtBatch::setBase(BaseCor& base)
+	void TritOtBatch::setBase(BaseCor& base, StationaryWorker* worker)
 	{
 
 		if (mGenState->mMock)
 			return;
 
+		if (worker)
+			return worker->setOtBase(CorType::TritOt, mSize, mSendRecv.index() == 0, base);
+
 		mSendRecv | match{
 			[&](SendBatch& send) {
-				send.mSender.setSilentBaseOts(
-					base.getSendOt(send.mSender.silentBaseOtCount()));
+				send.mSender.setBaseCors(base.getSendOt(send.mSender.baseCount().mBaseOtCount), {}, mPrng.get<block>());
 			},
 			[&](RecvBatch& recv) {
-				recv.mReceiver.setSilentBaseOts(
-					base.getRecvOt(recv.mReceiver.silentBaseOtCount()));
+				base.setOtBase(recv.mReceiver);
 			}
 		};
 	}
@@ -288,18 +292,26 @@ namespace secJoin
 		{
 			mock(batchIdx, size);
 		}
-		else
+		else if (threadState.mStationary)
+        {
+            auto& worker = *threadState.mStationary;
+            auto& protocol = worker.begin(worker.recvOt, CorType::TritOt, size, false);
+            co_await protocol.silentReceiveInplace(size, prng, sock, oc::ChoiceBitPacking::True);
+            compressRecver(protocol.mA);
+            worker.finish(protocol);
+        }
+        else
 		{
 
 			if (state->mDebug)
 			{
-				baseSend.resize(mReceiver.silentBaseOtCount());
+				baseSend.resize(mReceiver.baseCount().mBaseOtCount);
 				co_await sock.recv(baseSend);
 
 				{
 					for (u64 i = 0; i < baseSend.size(); ++i)
 					{
-						if (mReceiver.mGen.mBaseOTs(i) != baseSend[i][mReceiver.mGen.mBaseChoices(i)])
+						if (std::get<0>(mReceiver.mGenVar).mBaseOTs(i) != baseSend[i][std::get<0>(mReceiver.mGenVar).mBaseChoices(i)])
 						{
 							std::cout << "F4RecvOleBatch::getTask() base OTs do not match. " << LOCATION << std::endl;
 							std::terminate();
@@ -308,12 +320,11 @@ namespace secJoin
 				}
 			}
 
-			assert(mReceiver.mGen.hasBaseOts());
-			mReceiver.mMultType = oc::MultType::Tungsten;
+			assert(mReceiver.hasBaseCors());
 			mReceiver.mA = std::move(threadState.mA);
-			mReceiver.mEncodeTemp = std::move(threadState.mEncodeTemp);
-			mReceiver.mGen.mTempBuffer = std::move(threadState.mPprfTemp);
-			mReceiver.mGen.mEagerSend = false;
+			mReceiver.mSpin = std::move(threadState.mSpin);
+			std::get<0>(mReceiver.mGenVar).mTempBuffer = std::move(threadState.mPprfTemp);
+			std::get<0>(mReceiver.mGenVar).mEagerSend = false;
 
 			mReceiver.mDebug = state->mDebug;
 
@@ -323,8 +334,8 @@ namespace secJoin
 			compressRecver(mReceiver.mA);
 
 			threadState.mA = std::move(mReceiver.mA);
-			threadState.mEncodeTemp = std::move(mReceiver.mEncodeTemp);
-			threadState.mPprfTemp = std::move(mReceiver.mGen.mTempBuffer);
+			threadState.mSpin = std::move(mReceiver.mSpin);
+			threadState.mPprfTemp = std::move(std::get<0>(mReceiver.mGenVar).mTempBuffer);
 
 		}
 
@@ -347,34 +358,41 @@ namespace secJoin
 		{
 			mock(batchIdx, size);
 		}
-		else
+		else if (threadState.mStationary)
+        {
+            auto& worker = *threadState.mStationary;
+            auto& protocol = worker.begin(worker.sendOt, CorType::TritOt, size, true);
+            co_await protocol.silentSendInplace(protocol.mDelta, size, prng, sock);
+            compressSender(*protocol.mDelta, protocol.mB);
+            worker.finish(protocol);
+        }
+        else
 		{
 
 			if (state->mDebug)
 			{
-				co_await sock.send(coproto::copy(mSender.mGen.mBaseOTs));
+				co_await sock.send(coproto::copy(std::get<0>(mSender.mGenVar).mBaseOTs));
 			}
 
-			assert(mSender.mGen.hasBaseOts());
-			mSender.mMultType = oc::MultType::Tungsten;
+			assert(mSender.hasBaseCors());
 
 
 			mSender.mB = std::move(threadState.mB);
-			mSender.mEncodeTemp = std::move(threadState.mEncodeTemp);
-			mSender.mGen.mTempBuffer = std::move(threadState.mPprfTemp);
-			mSender.mGen.mEagerSend = false;
+			mSender.mSpin = std::move(threadState.mSpin);
+			std::get<0>(mSender.mGenVar).mTempBuffer = std::move(threadState.mPprfTemp);
+			std::get<0>(mSender.mGenVar).mEagerSend = false;
 
 			mSender.mDebug = state->mDebug;
 
 
-			co_await mSender.silentSendInplace(prng.get(), mSender.mRequestNumOts, prng, sock);
+			co_await mSender.silentSendInplace(mSender.mDelta, mSender.mRequestNumOts, prng, sock);
 
 
-			compressSender(mSender.mDelta, mSender.mB);
+			compressSender(*mSender.mDelta, mSender.mB);
 
 			threadState.mB = std::move(mSender.mB);
-			threadState.mEncodeTemp = std::move(mSender.mEncodeTemp);
-			threadState.mPprfTemp = std::move(mSender.mGen.mTempBuffer);
+			threadState.mSpin = std::move(mSender.mSpin);
+			threadState.mPprfTemp = std::move(std::get<0>(mSender.mGenVar).mTempBuffer);
 		}
 
 

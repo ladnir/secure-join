@@ -662,12 +662,9 @@ namespace secJoin
                 assert(srcStart + size <= src.bytesPerRow());
                 for (u64 k = 0; k < bitsPerEntry; ++k)
                 {
-                    for (u64 j = 0; j < 2; ++j)
-                    {
-                        auto ss0 = src[k].subspan(srcStart, size);
-                        auto dd0 = dst[k].subspan(dstStart, size);
-                        osuCrypto::copyBytes(dd0, ss0);
-                    }
+                    auto ss = src[k].subspan(srcStart, size);
+                    auto dd = dst[k].subspan(dstStart, size);
+                    osuCrypto::copyBytes(dd, ss);
                 }
             };
 
