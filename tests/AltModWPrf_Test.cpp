@@ -621,7 +621,7 @@ void AltModWPrf_keyMult_test(const oc::CLP& cmd)
 
 		std::vector<std::array<block, 2>> sendOTSender(AltModPrf::KeySize);
 		std::vector<block> recvOTRecver(AltModPrf::KeySize);
-		AltModPrf::KeyType sendKey, recvKey, key;
+		AltModPrf::BinaryKey sendKey, recvKey, key;
 		prng.get(sendOTSender.data(), sendOTSender.size());
 		sendKey = prng.get();
 		recvKey = prng.get();
@@ -728,7 +728,7 @@ void AltModWPrf_keyMultF3_test(const oc::CLP& cmd)
 
 		std::vector<std::array<block, 2>> sendOTSender(AltModPrf::KeySize);
 		std::vector<block> recvOTRecver(AltModPrf::KeySize);
-		AltModPrf::KeyType sendKey, recvKey, key;
+		AltModPrf::BinaryKey sendKey, recvKey, key;
 		prng.get(sendOTSender.data(), sendOTSender.size());
 		sendKey = prng.get();
 		recvKey = prng.get();
@@ -1204,10 +1204,10 @@ void AltModWPrf_plain_test()
 	u64 m = 256;
 	u64 t = 128;
 	PRNG prng(oc::ZeroBlock);
-	AltModPrf::KeyType kk = prng.get();
+	auto kk = AltModPrf::KeyType::sample(prng);
 	oc::block xx = prng.get();
 
-	AltModPrf::KeyType x;
+	AltModPrf::BinaryKey x;
 	AltModPrf::expandInput(xx, x);
 	//if (x.size() > 1) {
 
@@ -1230,7 +1230,7 @@ void AltModWPrf_plain_test()
 	for (u64 i = 0; i < n; ++i)
 	{
 		X[i] = *oc::BitIterator((u8*)&x, i);
-		K[i] = *oc::BitIterator((u8*)&prf.mExpandedKey, i);
+		K[i] = *oc::BitIterator((u8*)&kk.binary, i);
 		H[i] = X[i] & K[i];
 
 		//if (i < 20)
@@ -1252,7 +1252,7 @@ void AltModWPrf_plain_test()
 
 	for (u64 i = 0; i < m; ++i)
 	{
-		W[i] = (U[i] % 3) % 2;
+		W[i] = ((U[i] + kk.offset[i]) % 3) % 2;
 	}
 	for (u64 i = 0; i < t; ++i)
 	{
@@ -1266,6 +1266,45 @@ void AltModWPrf_plain_test()
 			throw RTE_LOC;
 		}
 	}
+
+	// Independent raw inputs, including a partially filled SIMD column.
+	constexpr u64 count = 129;
+	oc::Matrix<block> raw(n, 2);
+	prng.get(raw.data(), raw.size());
+	std::vector<block> result(count);
+	for (bool zeroOffset : { false, true })
+	{
+		auto key = kk;
+		if (zeroOffset)
+			key.offset.fill(0);
+		prf.setKey(key);
+		prf.evalExpanded(raw, result);
+		for (u64 lane = 0; lane < count; ++lane)
+		{
+			for (u64 i = 0; i < n; ++i)
+				H[i] = bit(raw.data(i), lane) & K[i];
+			AltModPrf::mACode.encode<u64>(H, U);
+			for (u64 j = 0; j < m; ++j)
+				W[j] = zeroOffset ? U[j] % 2 : ((U[j] + key.offset[j]) % 3) % 2;
+			for (u64 i = 0; i < t; ++i)
+			{
+				u64 expected = 0;
+				for (u64 j = 0; j < m; ++j)
+					expected ^= B(i, j) & W[j];
+				if (bit(result[lane], i) != expected)
+					throw RTE_LOC;
+			}
+		}
+	}
+	auto invalid = kk;
+	invalid.offset.back() = 3;
+	try
+	{
+		prf.setKey(invalid);
+		throw RTE_LOC;
+	}
+	catch (const std::invalid_argument&) {}
+	prf.setKey(kk);
 
 	{
 		std::vector<block> x(len), y(len);
@@ -1283,7 +1322,7 @@ void AltModWPrf_plain_test()
 
 			for (u64 i = 0; i < len; ++i)
 			{
-				AltModPrf::KeyType exp;
+				AltModPrf::BinaryKey exp;
 				prf.expandInput(x[i], exp);
 				for (u64 j = 0; j < 4; ++j)
 					if (ext[i][j] != exp[j])
@@ -1332,15 +1371,15 @@ void AltModProtoCheck(AltModWPrfSender& sender, AltModWPrfReceiver& recver)
 	auto key = sender.getKey();
 	if (recver.getKey())
 	{
-		key = key ^ *recver.getKey();
+		key = AltModPrf::KeyType::combineShares(key, *recver.getKey());
 	}
 
 	for (u64 ii = 0; ii < n; ++ii)
 	{
 
 		std::array<u16, AltModPrf::KeySize> h;
-		AltModPrf::KeyType X;
-		std::array< AltModPrf::KeyType, 2> XShares;
+		AltModPrf::BinaryKey X;
+		std::array< AltModPrf::BinaryKey, 2> XShares;
 		AltModPrf::expandInput(x[ii], X);
 		if (sender.mDebugInput.size())
 		{
@@ -1378,7 +1417,7 @@ void AltModProtoCheck(AltModWPrfSender& sender, AltModWPrfReceiver& recver)
 		//				throw RTE_LOC;
 
 		//			u8 xi = bit(XShares[j], i);
-		//			u8 ki = bit(key, i);
+		//			u8 ki = bit(key.binary, i);
 		//			h[i] = ki & xi;
 
 		//			assert(rkx0.cols() == oc::divCeil(x.size(), 128));
@@ -1407,7 +1446,7 @@ void AltModProtoCheck(AltModWPrfSender& sender, AltModWPrfReceiver& recver)
 				throw RTE_LOC;
 
 			u8 xi = bit(X, i);
-			u8 ki = bit(key, i);
+			u8 ki = bit(key.binary, i);
 			h[i] = ki & xi;
 
 			assert(recver.mDebugEk0.cols() == oc::divCeil(x.size(), 128));
@@ -1440,6 +1479,8 @@ void AltModProtoCheck(AltModWPrfSender& sender, AltModWPrfReceiver& recver)
 			for (u64 i = 0; i < AltModPrf::KeySize; ++i)
 				out[i] = h[i];
 			AltModPrf::mACode.encode<u8>(out, u.mData);
+			for (u64 i = 0; i < u.mData.size(); ++i)
+				u.mData[i] = (u.mData[i] + key.offset[i]) % 3;
 		}
 		//AltModPrf::mtxMultA(h, u);
 
@@ -1518,7 +1559,7 @@ void AltModWPrf_proto_test(const oc::CLP& cmd)
 	PRNG prng0(oc::ZeroBlock);
 	PRNG prng1(oc::OneBlock);
 
-	AltModPrf dm(prng0.get());
+	AltModPrf dm(AltModPrf::KeyType::sample(prng0));
 
 	CorGenerator ole0, ole1;
 	ole0.init(sock[0].fork(), prng0, 0, 1, 1 << 18, cmd.getOr("mock", 1));
@@ -1535,7 +1576,7 @@ void AltModWPrf_proto_test(const oc::CLP& cmd)
 		{
 			sk[i][0] = oc::block(i, 0);
 			sk[i][1] = oc::block(i, 1);
-			rk[i] = oc::block(i, *oc::BitIterator((u8*)&dm.mExpandedKey, i));
+			rk[i] = oc::block(i, *oc::BitIterator((u8*)&dm.mKey.binary, i));
 		}
 		sender.init(n, ole0, AltModPrfKeyMode::SenderOnly, AltModPrfInputMode::ReceiverOnly, dm.getKey(), rk);
 		recver.init(n, ole1, AltModPrfKeyMode::SenderOnly, AltModPrfInputMode::ReceiverOnly, {}, sk);
@@ -1572,12 +1613,10 @@ void AltModWPrf_proto_test(const oc::CLP& cmd)
 	AltModPrf prf(sender.getKey());
 	std::vector<block> y(x.size());
 	prf.eval(x, y);
+	if (debug)
+		AltModProtoCheck(sender, recver);
 	for (u64 ii = 0; ii < n; ++ii)
 	{
-		if (debug)
-		{
-			AltModProtoCheck(sender, recver);
-		}
 
 		auto yy = (y0[ii] ^ y1[ii]);
 		if (yy != y[ii])
@@ -1616,10 +1655,9 @@ void AltModWPrf_sharedKey_test(const oc::CLP& cmd)
 	PRNG prng0(oc::ZeroBlock);
 	PRNG prng1(oc::OneBlock);
 
-	AltModPrf dm_(prng0.get());
-	AltModPrf::KeyType k = dm_.mExpandedKey;
-	AltModPrf::KeyType k1 = prng0.get();
-	AltModPrf::KeyType k0 = k1 ^ k;
+	auto k0 = AltModPrf::KeyType::sample(prng0);
+	auto k1 = AltModPrf::KeyType::sample(prng0);
+	AltModPrf dm_(AltModPrf::KeyType::combineShares(k0, k1));
 
 	CorGenerator ole0, ole1;
 	ole0.init(sock[0].fork(), prng0, 0, 1, 1 << 18, cmd.getOr("mock", 1));
@@ -1636,15 +1674,15 @@ void AltModWPrf_sharedKey_test(const oc::CLP& cmd)
 		{
 			sk[i][0] = oc::block(i, 0);
 			sk[i][1] = oc::block(i, 1);
-			rk[i] = oc::block(i, *oc::BitIterator((u8*)&k1, i));
+			rk[i] = oc::block(i, *oc::BitIterator((u8*)&k1.binary, i));
 		}
 		sender.init(n, ole0, AltModPrfKeyMode::Shared, AltModPrfInputMode::ReceiverOnly, k1, rk);
 		recver.init(n, ole1, AltModPrfKeyMode::Shared, AltModPrfInputMode::ReceiverOnly, k0, sk);
 	}
 	else
 	{
-		sender.init(n, ole0, AltModPrfKeyMode::Shared, AltModPrfInputMode::ReceiverOnly, k1);
-		recver.init(n, ole1, AltModPrfKeyMode::Shared, AltModPrfInputMode::ReceiverOnly, k0);
+		sender.init(n, ole0, AltModPrfKeyMode::Shared, AltModPrfInputMode::ReceiverOnly);
+		recver.init(n, ole1, AltModPrfKeyMode::Shared, AltModPrfInputMode::ReceiverOnly);
 	}
 
 	auto r = coproto::sync_wait(coproto::when_all_ready(
@@ -1675,6 +1713,8 @@ void AltModWPrf_sharedKey_test(const oc::CLP& cmd)
 	}
 
 	std::vector<block> y(x.size());
+	if (cmd.isSet("doKeyGen"))
+		dm_.setKey(AltModPrf::KeyType::combineShares(sender.getKey(), *recver.getKey()));
 	dm_.eval(x, y);
 	for (u64 ii = 0; ii < n; ++ii)
 	{
@@ -1710,7 +1750,7 @@ void mod3Add(block& zMsb, block& zLsb, block& xMsb, block& xLsb, block& yMsb, bl
 		span<block>(&yMsb, 1),
 		span<block>(&yLsb, 1));
 }
-void AltModWPrf_shared_test(const oc::CLP& cmd)
+static void checkSharedPrf(const oc::CLP& cmd, bool raw, bool generateKey)
 {
 	oc::Timer timer;
 	timer.setTimePoint("param");
@@ -1736,10 +1776,9 @@ void AltModWPrf_shared_test(const oc::CLP& cmd)
 	auto sock = coproto::LocalAsyncSocket::makePair();
 	auto sock2 = coproto::LocalAsyncSocket::makePair();
 
-	AltModPrf dm_(prng0.get());
-	AltModPrf::KeyType k = dm_.mExpandedKey;
-	AltModPrf::KeyType k1 = prng0.get();
-	AltModPrf::KeyType k0 = k1 ^ k;
+	auto k0 = AltModPrf::KeyType::sample(prng0);
+	auto k1 = AltModPrf::KeyType::sample(prng0);
+	AltModPrf dm_(AltModPrf::KeyType::combineShares(k0, k1));
 
 	oc::AlignedUnVector<block> x0(n), x1(n);
 	CorGenerator ole0, ole1;
@@ -1776,7 +1815,7 @@ void AltModWPrf_shared_test(const oc::CLP& cmd)
 	}
 	timer.setTimePoint("pre");
 
-	if (cmd.isSet("doKeyGen") == false)
+	if (!generateKey)
 	{
 		std::vector<oc::block> rk0(AltModPrf::KeySize), rk1(AltModPrf::KeySize);
 		std::vector<std::array<oc::block, 2>> sk0(AltModPrf::KeySize), sk1(AltModPrf::KeySize);
@@ -1784,10 +1823,10 @@ void AltModWPrf_shared_test(const oc::CLP& cmd)
 		{
 			sk1[i][0] = oc::block(i, 0);
 			sk1[i][1] = oc::block(i, 1);
-			rk1[i] = oc::block(i, *oc::BitIterator((u8*)&k1, i));
+			rk1[i] = oc::block(i, *oc::BitIterator((u8*)&k1.binary, i));
 			sk0[i][0] = oc::block(i, 0);
 			sk0[i][1] = oc::block(i, 1);
-			rk0[i] = oc::block(i, *oc::BitIterator((u8*)&k0, i));
+			rk0[i] = oc::block(i, *oc::BitIterator((u8*)&k0.binary, i));
 		}
 		timer.setTimePoint("in0");
 
@@ -1797,14 +1836,22 @@ void AltModWPrf_shared_test(const oc::CLP& cmd)
 	}
 	else
 	{
-		sender.init(n, ole0, AltModPrfKeyMode::Shared, AltModPrfInputMode::Shared, k1);
-		recver.init(n, ole1, AltModPrfKeyMode::Shared, AltModPrfInputMode::Shared, k0);
+		sender.init(n, ole0, AltModPrfKeyMode::Shared, AltModPrfInputMode::Shared);
+		recver.init(n, ole1, AltModPrfKeyMode::Shared, AltModPrfInputMode::Shared);
 	}
 	timer.setTimePoint("init");
 
+	oc::Matrix<block> raw0, raw1;
+	if (raw)
+	{
+		raw0.resize(AltModPrf::KeySize, oc::divCeil(n, 128));
+		raw1.resize(raw0.rows(), raw0.cols());
+		prng0.get(raw0.data(), raw0.size());
+		prng1.get(raw1.data(), raw1.size());
+	}
 	auto r = coproto::sync_wait(coproto::when_all_ready(
-		sender.evaluate(x0, y0, sock[0], prng0),
-		recver.evaluate(x1, y1, sock[1], prng1),
+		raw ? sender.evaluateExpanded(raw0, y0, sock[0]) : sender.evaluate(x0, y0, sock[0], prng0),
+		raw ? recver.evaluateExpanded(raw1, y1, sock[1]) : recver.evaluate(x1, y1, sock[1], prng1),
 		ole0.start(),
 		ole1.start()
 	));
@@ -1825,13 +1872,22 @@ void AltModWPrf_shared_test(const oc::CLP& cmd)
 	if (noCheck)
 		return;
 
-	if (debug)
+	if (debug && !raw)
 	{
 		AltModProtoCheck(sender, recver);
 	}
 
 	std::vector<block> y(x.size());
-	dm_.eval(x, y);
+	if (generateKey)
+		dm_.setKey(AltModPrf::KeyType::combineShares(sender.getKey(), *recver.getKey()));
+	if (raw)
+	{
+		for (u64 i = 0; i < raw0.size(); ++i)
+			raw0.data()[i] ^= raw1.data()[i];
+		dm_.evalExpanded(raw0, y);
+	}
+	else
+		dm_.eval(x, y);
 	for (u64 ii = 0; ii < n; ++ii)
 	{
 		auto yy = (y0[ii] ^ y1[ii]);
@@ -1845,4 +1901,13 @@ void AltModWPrf_shared_test(const oc::CLP& cmd)
 	}
 
 
+}
+
+void AltModWPrf_shared_test(const oc::CLP& cmd)
+{
+	const bool raw = cmd.isSet("raw");
+	const bool generateKey = cmd.isSet("doKeyGen");
+	checkSharedPrf(cmd, raw, generateKey);
+	if (!raw && !generateKey)
+		checkSharedPrf(cmd, true, true);
 }

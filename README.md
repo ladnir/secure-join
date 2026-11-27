@@ -29,6 +29,13 @@ To override the batch size, pass `batchSize, mock, noise` after `workers`. Both 
 
 Run `secJoinfrontend -bench -join -nn 12 -nt 2 -mock 0` for the stationary default. Add `-regular` for the regular default. In either mode, `-b k` sets the batch size to 2^k correlations.
 
+### Alternating-moduli PRF
+
+For a 512-bit input $X$, the two-key construction computes $B\rho(A(X \mathbin{\&} k) + k')$.
+The binary mask $k$ has 512 bits. The independent offset $k'$ has 256 uniform trits and stays fixed across evaluations with that key. Addition is over $\mathbb F_3$, $\rho$ maps $(0,1,2)$ to $(0,1,0)$ coordinatewise, and $B$ acts over $\mathbb F_2$.
+
+Use `AltModPrf::KeyType::sample(prng)` to generate both components. An existing binary mask with an all-zero offset reproduces the v1.1 function. The 128-bit join interface expands its input first. The clear `evalExpanded` and two-party `evaluateExpanded` interfaces take 512-bit inputs directly in bit-sliced form. In shared-key mode the parties XOR-share $k$ and additively share $k'$ modulo three. Each party adds its offset share locally before the modulus switch, with no additional OTs or messages.
+
 ### Installing
 
 The library and any fetched dependancies can be installed. 

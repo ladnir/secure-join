@@ -77,7 +77,16 @@ namespace secJoin
             oc::MatrixView<block> outMsb, oc::MatrixView<block> outLsb,
             u64 batchSize = 1ull << 10) const
         {
-            ;
+            encode(msb, lsb, outMsb, outLsb, {}, batchSize);
+        }
+
+        void encode(
+            oc::MatrixView<block> msb, oc::MatrixView<block> lsb,
+            oc::MatrixView<block> outMsb, oc::MatrixView<block> outLsb,
+            span<const u8> offset, u64 batchSize = 1ull << 10) const
+        {
+            if (offset.size() && offset.size() != mN)
+                throw RTE_LOC;
             auto len = lsb.cols();
             if (lsb.rows() != mK)
                 throw RTE_LOC;
@@ -129,15 +138,20 @@ namespace secJoin
 
                 for (u64 i = 0; i < mN; ++i)
                 {
-                    static_assert(is_container<oc::span<block>&>::value);
                     auto pi = mPerms.back()[i];
-                    osuCrypto::copyBytes(
-                        outLsb[i].subspan(begin, s), 
-                        lsb[pi].subspan(begin, s));
-
-                    osuCrypto::copyBytes(
-                        outMsb[i].subspan(begin, s),
-                        msb[pi].subspan(begin, s));
+                    if (offset.empty())
+                    {
+                        osuCrypto::copyBytes(outLsb[i].subspan(begin, s), lsb[pi].subspan(begin, s));
+                        osuCrypto::copyBytes(outMsb[i].subspan(begin, s), msb[pi].subspan(begin, s));
+                    }
+                    else
+                    {
+                        // Add this row's key trit while writing the final permutation.
+                        const auto lo = block::allSame<u64>(0ull - (offset[i] & 1));
+                        const auto hi = block::allSame<u64>(0ull - (offset[i] >> 1));
+                        for (u64 j = begin; j < begin + s; ++j)
+                            mod3Add(outMsb(i, j), outLsb(i, j), msb(pi, j), lsb(pi, j), hi, lo);
+                    }
                 }
             }
         }

@@ -36,16 +36,10 @@ namespace secJoin
         Linear
     };
 
-    // The strong Alteranting moduli PRF of Alamati et al.
-    //
-    // F(k, x):
-    //   e = G * x        mod 2
-    //   v = A * (e . k)  mod 3
-    //   w = B * v        mod 2
-    //   return w
-    //
-    // It can also be instanted as the "weak PRF" where
-    // e is defined as AES.hash(x) and otherwise the same. 
+    // The two-key alternating-moduli construction on a 512-bit input X.
+    // First compute u = A * (X & binary) + offset over F3. Map each
+    // canonical trit to its low bit and apply B over F2. The 128-bit
+    // convenience interface expands its input before invoking this function.
     class AltModPrf
     {
     public:
@@ -82,18 +76,32 @@ namespace secJoin
         // the bit count of output layer, i.e. w
         static constexpr auto OutSize = 128;
 
-        struct KeyType : std::array<oc::block, KeySize / 128>
+        struct BinaryKey : std::array<oc::block, KeySize / 128>
         {
-            KeyType operator^(const KeyType& o) const
+            BinaryKey operator^(const BinaryKey& o) const
             {
-                KeyType r;
+                BinaryKey r;
                 for (u64 i = 0;i < size(); ++i)
                     r[i] = (*this)[i] ^ o[i];
                 return r;
             }
         };
 
-        KeyType mExpandedKey;
+        using Offset = std::array<u8, MidSize>;
+
+        struct KeyType
+        {
+            BinaryKey binary;
+            Offset offset;
+
+            static KeyType sample(PRNG& prng);
+            static KeyType combineShares(const KeyType& left, const KeyType& right);
+        };
+
+        static Offset sampleOffset(PRNG& prng);
+        static void validateOffset(const Offset& offset);
+
+        KeyType mKey{};
 
         AltModPrf() = default;
         AltModPrf(const AltModPrf&) = default;
@@ -106,17 +114,20 @@ namespace secJoin
         // set the key
         void setKey(KeyType k);
 
-        KeyType getKey() const { return mExpandedKey; }
+        KeyType getKey() const { return mKey; }
 
         // compute y = F(k,x)
         void eval(span<oc::block> x, span<oc::block> y);
+
+        // Weak PRF on raw 512-bit inputs, bit-sliced in the same layout as expandInput.
+        void evalExpanded(oc::MatrixView<const block> inputs, span<block> outputs);
 
         // compute y = F(k,x)
         oc::block eval(oc::block x);
 
         // expands a single 128 bit input either using AES 
         // or a random linear code depending on the mode.
-        static void expandInput(block x, KeyType& expanded, AltModPrfExpansionMode mode = AltModPrfExpansionMode::Linear)
+        static void expandInput(block x, BinaryKey& expanded, AltModPrfExpansionMode mode = AltModPrfExpansionMode::Linear)
         {
             if(mode == AltModPrfExpansionMode::Linear)
                 expandInputLinear(x, expanded);
@@ -134,24 +145,21 @@ namespace secJoin
                 expandInputAes(x, expanded);
         }
 
-        // take as input a single 128 bit input and expand it into 512 bit 
-        // "random" value. This 512 bit value will be used as the "weak" PRF input.
-        // Concretely, expanded = (x, AES.hash(x + 1), AES.hash(x + 2), AES.hash(x + 3)).
-        // Assuming x is random, then so is expanded.
-        static void expandInputAes(block x, KeyType& expanded);
+        // Preserve x in the first block and hash three public tweaks for the rest.
+        static void expandInputAes(block x, BinaryKey& expanded);
 
-        // see expandInputAes(block x, KeyType& expanded); This version applies 
+        // see expandInputAes(block x, BinaryKey& expanded); This version applies
         // the input expansion to each element, expanbded[i] = expandInputAes(x[i]).
         // However, the expanded input will be in transposed format, i.e.
         // expanded.rows() == 512, && expanded.cols() == divCeil(x.size(), 128)
         static void expandInputAes(span<const block> x, oc::MatrixView<block> expanded);
 
         // take as input a single 128 bit input and expand it into 512 bit 
-        // value with large hamming distance. This version is MPC friendly and corresponds to the strong PRF.
+        // value with large hamming distance. This linear expansion can be applied locally to XOR shares.
         // Concretely, expanded = G * x where G is a random linear code.
-        static void expandInputLinear(block x, KeyType& expanded);
+        static void expandInputLinear(block x, BinaryKey& expanded);
 
-        // see expandInputLinear(block x, KeyType& expanded); This version applies 
+        // see expandInputLinear(block x, BinaryKey& expanded); This version applies
         // the input expansion to each element, expanbded[i] = expandInputLinear(x[i]).
         // However, the expanded input will be in transposed format, i.e.
         // expanded.rows() == 512, && expanded.cols() == divCeil(x.size(), 128)
@@ -169,7 +177,7 @@ namespace secJoin
 
     };
 
-    inline std::ostream& operator<< (std::ostream& o, AltModPrf::KeyType k)
+    inline std::ostream& operator<< (std::ostream& o, AltModPrf::BinaryKey k)
     {
         o << k[3]
             << "." << k[2]

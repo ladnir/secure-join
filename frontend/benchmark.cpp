@@ -417,28 +417,12 @@ namespace secJoin
 		PRNG prng0(oc::ZeroBlock);
 		PRNG prng1(oc::OneBlock);
 
-		AltModPrf dm;
-		AltModPrf::KeyType kk;
-		kk = prng0.get();
-		dm.setKey(kk);
-		//sender.setKey(kk);
-
 		CorGenerator ole0, ole1;
 		ole0.init(sock2[0].fork(), prng0, 0, nt, batch, cmd.getOr("mock", 1), noise);
 		ole1.init(sock2[1].fork(), prng1, 1, nt, batch, cmd.getOr("mock", 1), noise);
 
 
 		prng0.get(x.data(), x.size());
-		std::vector<oc::block> rk(AltModPrf::KeySize);
-		std::vector<std::array<oc::block, 2>> sk(AltModPrf::KeySize);
-		for (u64 i = 0; i < AltModPrf::KeySize; ++i)
-		{
-			sk[i][0] = oc::block(i, 0);
-			sk[i][1] = oc::block(i, 1);
-			rk[i] = oc::block(i, *oc::BitIterator((u8*)&sender.mKeyMultRecver.mKey, i));
-		}
-		sender.setKeyOts(kk, rk);
-		recver.setKeyOts(sk);
 		u64 numOle = 0;
 		u64 numF4BitOt = 0;
 		u64 numOt = 0;

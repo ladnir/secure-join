@@ -118,9 +118,46 @@ namespace secJoin
 		}
 	}
 
+	AltModPrf::Offset AltModPrf::sampleOffset(PRNG& prng)
+	{
+		Offset offset;
+		prng.get(offset.data(), offset.size());
+		for (auto& digit : offset)
+		{
+			// Each residue has 85 representatives in [0, 255).
+			while (digit == 255)
+				digit = prng.get<u8>();
+			digit %= 3;
+		}
+		return offset;
+	}
+
+	void AltModPrf::validateOffset(const Offset& offset)
+	{
+		for (auto digit : offset)
+			if (digit >= 3)
+				throw std::invalid_argument("Invalid ternary PRF key digit");
+	}
+
+	AltModPrf::KeyType AltModPrf::KeyType::sample(PRNG& prng)
+	{
+		return { prng.get<BinaryKey>(), sampleOffset(prng) };
+	}
+
+	AltModPrf::KeyType AltModPrf::KeyType::combineShares(const KeyType& left, const KeyType& right)
+	{
+		validateOffset(left.offset);
+		validateOffset(right.offset);
+		KeyType key{ left.binary ^ right.binary, {} };
+		for (u64 i = 0; i < MidSize; ++i)
+			key.offset[i] = (left.offset[i] + right.offset[i]) % 3;
+		return key;
+	}
+
 	void  AltModPrf::setKey(AltModPrf::KeyType k)
 	{
-		mExpandedKey = k;
+		validateOffset(k.offset);
+		mKey = k;
 	}
 
 	void AltModPrf::expandInputAes(span<const block> x, oc::MatrixView<block> xt)
@@ -173,10 +210,10 @@ namespace secJoin
 		}
 	}
 
-	void AltModPrf::expandInputLinear(block x, KeyType& X)
+	void AltModPrf::expandInputLinear(block x, BinaryKey& X)
 	{
 		X[0] = x;
-		constexpr const auto rem = KeyType{}.size() - 1;
+		constexpr const auto rem = BinaryKey{}.size() - 1;
 		for (auto i = 0ull; i < rem; ++i)
 			mGCode[i].encode(x, X[i + 1]);
 	}
@@ -250,13 +287,13 @@ namespace secJoin
 		}
 	}
 
-	void AltModPrf::expandInputAes(block x, KeyType& X)
+	void AltModPrf::expandInputAes(block x, BinaryKey& X)
 	{
 		X[0] = x;
 		for (u64 i = 1; i < X.size(); ++i)
 			X[i] = x ^ block(i, i);
 
-		constexpr const auto rem = KeyType{}.size() - 1;
+		constexpr const auto rem = BinaryKey{}.size() - 1;
 		if (rem)
 			oc::mAesFixedKey.hashBlocks<rem>(X.data() + 1, X.data() + 1);
 	}
@@ -267,30 +304,6 @@ namespace secJoin
 		eval({ &x,1 }, { &y,1 });
 		return y;
 
-		// TODO, optimize single evaluation
-		//std::array<u16, KeySize> h;
-		//AltModPrf::KeyType X;
-
-		//expandInput(x, X);
-
-		//auto kIter = oc::BitIterator((u8*)mExpandedKey.data());
-		//auto xIter = oc::BitIterator((u8*)X.data());
-		//for (u64 i = 0; i < KeySize; ++i)
-		//{
-		//	h[i] = *kIter & *xIter;
-		//	++kIter;
-		//	++xIter;
-		//}
-
-		//block256m3 u;
-		//mtxMultA(h, u);
-
-		//block256 w;
-		//for (u64 i = 0; i < u.mData.size(); ++i)
-		//{
-		//	*oc::BitIterator((u8*)&w, i) = u.mData[i] % 2;
-		//}
-		//return compress(w);
 	}
 
 	void AltModPrf::eval(span<block> x, span<block> y)
@@ -298,20 +311,29 @@ namespace secJoin
 		if(x.size() != y.size()) 
 			throw RTE_LOC;
 
-		oc::Matrix<block> xt, xk0, xk1, u0, u1;
+		oc::Matrix<block> xt;
 
 		// we need x in a transformed format so that we can do SIMD operations.
 		// xt = G * x  or xt = AES.hash(x) mod 2
 		xt.resize(AltModPrf::KeySize, oc::divCeil(y.size(), 128));
 		AltModPrf::expandInput(x, xt, mInputExpansionMode);
 
+		evalExpanded(xt, y);
+	}
+
+	void AltModPrf::evalExpanded(oc::MatrixView<const block> xt, span<block> y)
+	{
+		if (xt.rows() != KeySize || xt.cols() != oc::divCeil(y.size(), 128))
+			throw RTE_LOC;
+		oc::Matrix<block> xk0, xk1, u0, u1;
+
 		// xk = (x . k) mod 3
-		xk0.resize(AltModPrf::KeySize, oc::divCeil(x.size(), 128), oc::AllocType::Uninitialized);
-		xk1.resize(AltModPrf::KeySize, oc::divCeil(x.size(), 128), oc::AllocType::Uninitialized);
+		xk0.resize(AltModPrf::KeySize, xt.cols(), oc::AllocType::Uninitialized);
+		xk1.resize(AltModPrf::KeySize, xt.cols(), oc::AllocType::Uninitialized);
 		for (u64 i = 0; i < KeySize; ++i)
 		{
 			// TODO, make this branch free.
-			if (bit(mExpandedKey, i))
+			if (bit(mKey.binary, i))
 			{
 				osuCrypto::copyBytes(xk0[i], xt[i]);
 			}
@@ -321,10 +343,10 @@ namespace secJoin
 			osuCrypto::setBytes(xk1[i], 0);
 		}
 
-		// u = A * xk mod 3
-		u0.resize(AltModPrf::MidSize, oc::divCeil(x.size(), 128), oc::AllocType::Uninitialized);
-		u1.resize(AltModPrf::MidSize, oc::divCeil(x.size(), 128), oc::AllocType::Uninitialized);
-		AltModPrf::mACode.encode(xk1, xk0, u1, u0);
+		// u = A * xk + offset over F3
+		u0.resize(AltModPrf::MidSize, xt.cols(), oc::AllocType::Uninitialized);
+		u1.resize(AltModPrf::MidSize, xt.cols(), oc::AllocType::Uninitialized);
+		AltModPrf::mACode.encode(xk1, xk0, u1, u0, mKey.offset);
 
 		// y = B * u mod 2
 		compressB(u0, y);

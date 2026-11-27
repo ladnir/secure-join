@@ -51,6 +51,8 @@ namespace secJoin
         //  The key OTs, if in fully secret shared mode, we need to multiply our input with their key.
         AltModKeyMultSender mKeyMultSender;
 
+        AltModPrf::Offset mOffset{};
+
         // The number of input we will have.
         u64 mInputSize = 0;
 
@@ -107,7 +109,12 @@ namespace secJoin
             span<const std::array<block, 2>> sendOts = {});
 
         // return the key that is currently set.
-        AltModPrf::KeyType getKey() const { return mKeyMultRecver.mKey; }
+        AltModPrf::KeyType getKey() const
+        {
+            if (mKeyMultRecver.mRecvKeyReq.size() || mKeyMultRecver.mKeyRecvOTs.empty())
+                throw std::logic_error("PRF key is unavailable before key generation");
+            return { mKeyMultRecver.mKey, mOffset };
+        }
 
         // Run the prf protocol and write the result to y. Requires that correlated 
         // randomness has already been requested using the request() function.
@@ -117,6 +124,16 @@ namespace secJoin
             span<oc::block> y,
             coproto::Socket& sock,
             PRNG& _);
+
+        // Evaluate already bit-sliced 512-bit inputs. Input and output storage
+        // must remain alive until the task completes.
+        coproto::task<> evaluateExpanded(oc::MatrixView<const block> x, span<block> y, coproto::Socket& sock);
+
+    private:
+        coproto::task<> evaluateImpl(span<const block> x, oc::MatrixView<const block> expanded,
+            span<block> y, coproto::Socket& sock);
+
+    public:
 
 
         // the mod 2 subprotocol based on OLE. 
@@ -166,6 +183,8 @@ namespace secJoin
 
         // When the key is shared, this will hold the OTs with one for each bit of our key.
         AltModKeyMultReceiver mKeyMultRecver;
+
+        AltModPrf::Offset mOffset{};
 
         // The number of input we will have.
         u64 mInputSize = 0;
@@ -226,6 +245,16 @@ namespace secJoin
             coproto::Socket& sock,
             PRNG&);
 
+        // Evaluate already bit-sliced 512-bit inputs. Input and output storage
+        // must remain alive until the task completes.
+        coproto::task<> evaluateExpanded(oc::MatrixView<const block> x, span<block> y, coproto::Socket& sock);
+
+    private:
+        coproto::task<> evaluateImpl(span<const block> x, oc::MatrixView<const block> expanded,
+            span<block> y, coproto::Socket& sock);
+
+    public:
+
         // the mod 2 subprotocol based on ole.
         macoro::task<> mod2Ole(
             oc::MatrixView<const oc::block> u0,
@@ -249,7 +278,9 @@ namespace secJoin
         // return the key that is currently set.
         std::optional<AltModPrf::KeyType> getKey() const
         {
-            return mKeyMultSender.mOptionalKeyShare;
+            if (mKeyMode == AltModPrfKeyMode::SenderOnly || !mKeyMultSender.mOptionalKeyShare)
+                return {};
+            return AltModPrf::KeyType{ *mKeyMultSender.mOptionalKeyShare, mOffset };
         }
 
     };

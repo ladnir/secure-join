@@ -30,7 +30,7 @@ namespace secJoin
 
         // a share of the key. This can be disengaged if the other party 
         // knows the key in full.
-        std::optional<AltModPrf::KeyType> mOptionalKeyShare;
+        std::optional<AltModPrf::BinaryKey> mOptionalKeyShare;
 
         // The base ot request that will be used for the key
         OtSendRequest mSendKeyReq;
@@ -46,13 +46,14 @@ namespace secJoin
         // other party's key. Additionally, if they key is shared
         // then the local key share is provided.
         void init(CorGenerator& ole,
-            std::optional<AltModPrf::KeyType> keyShare = {},
+            std::optional<AltModPrf::BinaryKey> keyShare = {},
             span<const std::array<block, 2>> keyOts = {})
         {
             if (keyOts.size() == 0)
             {
                 if (keyShare.has_value())
                     throw RTE_LOC;
+                mOptionalKeyShare.reset();
                 mSendKeyReq = ole.sendOtRequest(AltModPrf::KeySize);
             }
             else
@@ -77,7 +78,7 @@ namespace secJoin
         // other party's key. Additionally, if they key is shared
         // then the local key share is provided.
         void setKeyOts(
-            std::optional<AltModPrf::KeyType> keyShared,
+            std::optional<AltModPrf::BinaryKey> keyShared,
             span<const std::array<block, 2>> ots)
         {
             if (ots.size() != AltModPrf::KeySize)
@@ -130,10 +131,12 @@ namespace secJoin
 
         // the key that is used to multiply with. This should
         // also be the choice bits of mKeyRecvOTs.
-        AltModPrf::KeyType mKey;
+        AltModPrf::BinaryKey mKey;
 
         // The base ot request that will be used for the key
         OtRecvRequest mRecvKeyReq;
+
+        macoro::task<> receiveKey();
 
         // performs additional debugging if true. Insecure.
         bool mDebug = false;
@@ -145,7 +148,7 @@ namespace secJoin
         // if required. This function allows setting the OTs corresponding to the
         // other party's key. If OTs are not provided, they key is sampled randomly.
         void init(CorGenerator& ole,
-            std::optional<AltModPrf::KeyType> key,
+            std::optional<AltModPrf::BinaryKey> key,
             span<const block> keyOts)
         {
             if (key.has_value() ^ bool(keyOts.size()))
@@ -174,7 +177,7 @@ namespace secJoin
         // sets the key to be used and the OTs corresponding to it.
         // the choice bits of `ots` must be `k`.
         void setKeyOts(
-            AltModPrf::KeyType k,
+            AltModPrf::BinaryKey k,
             span<const block> ots)
         {
             if (ots.size() != AltModPrf::KeySize)

@@ -9,6 +9,17 @@
 namespace secJoin
 {
 
+	// Only the binary factor participates in key multiplication and its OTs.
+	static std::optional<AltModPrf::BinaryKey> binaryPart(const std::optional<AltModPrf::KeyType>& key)
+	{
+		if (key)
+		{
+			AltModPrf::validateOffset(key->offset);
+			return key->binary;
+		}
+		return {};
+	}
+
 	// initialize the protocol to perform inputSize prf evals.
 	// correlations will be obtained from ole.
 	// The caller can specify the key [share] and optionally
@@ -23,6 +34,8 @@ namespace secJoin
 		span<const block> keyRecvOts,
 		span<const std::array<block, 2>> keySendOts)
 	{
+		if (!ole.initialized())
+			throw RTE_LOC;
 		mInputSize = inputSize;
 		mKeyMode = keyMode;
 		mInputMode = inputMode;
@@ -30,13 +43,15 @@ namespace secJoin
 		if (key.has_value() ^ (AltModPrf::KeySize == keyRecvOts.size()))
 			throw RTE_LOC;
 
-		mKeyMultRecver.init(ole, key, keyRecvOts);
+		auto binary = binaryPart(key);
+		mOffset = key ? key->offset : AltModPrf::sampleOffset(ole.mGenState->mPrng);
+		mKeyMultRecver.init(ole, binary, keyRecvOts);
 		auto n128 = oc::roundUpTo(mInputSize, 128);
 
 		if (mKeyMode == AltModPrfKeyMode::Shared &&
 			mInputMode == AltModPrfInputMode::Shared)
 		{
-			mKeyMultSender.init(ole, key, keySendOts);
+			mKeyMultSender.init(ole, binary, keySendOts);
 			mConvToF3.init(n128 * AltModPrf::KeySize, ole);
 		}
 
@@ -57,6 +72,7 @@ namespace secJoin
 	{
 		mMod2F4Req.clear();
 		mMod2OleReq.clear();
+		mOffset = {};
 		mKeyMultRecver.clear();
 		mKeyMultSender.clear();
 		mInputSize = 0;
@@ -80,12 +96,14 @@ namespace secJoin
 		span<const block> ots,
 		span<const std::array<block, 2>> sendOts)
 	{
-		mKeyMultRecver.setKeyOts(k, ots);
+		AltModPrf::validateOffset(k.offset);
+		mOffset = k.offset;
+		mKeyMultRecver.setKeyOts(k.binary, ots);
 
 		if (mKeyMode == AltModPrfKeyMode::Shared &&
 			mInputMode == AltModPrfInputMode::Shared)
 		{
-			mKeyMultSender.setKeyOts(k, sendOts);
+			mKeyMultSender.setKeyOts(k.binary, sendOts);
 		}
 		else
 		{
@@ -98,11 +116,30 @@ namespace secJoin
 		span<const block> x,
 		span<block> y,
 		coproto::Socket& sock,
-		PRNG& prng)
+		PRNG&)
 	{
 		if (x.size() != mInputSize * bool(mInputMode == AltModPrfInputMode::Shared))
-			throw std::runtime_error("input length does not match. " LOCATION);
+			throw std::invalid_argument("Invalid PRF input length");
+		return evaluateImpl(x, {}, y, sock);
+	}
 
+	coproto::task<> AltModWPrfSender::evaluateExpanded(
+		oc::MatrixView<const block> expanded, span<block> y, coproto::Socket& sock)
+	{
+		if (mInputMode == AltModPrfInputMode::ReceiverOnly)
+		{
+			if (expanded.rows() || expanded.cols())
+				throw std::invalid_argument("Sender has no input in receiver-only mode");
+			return evaluateImpl({}, {}, y, sock);
+		}
+		if (expanded.rows() != AltModPrf::KeySize || expanded.cols() != oc::divCeil(y.size(), 128))
+			throw std::invalid_argument("Invalid bit-sliced PRF input dimensions");
+		return evaluateImpl({}, expanded, y, sock);
+	}
+
+	coproto::task<> AltModWPrfSender::evaluateImpl(
+		span<const block> x, oc::MatrixView<const block> e, span<block> y, coproto::Socket& sock)
+	{
 		if (y.size() != mInputSize)
 			throw std::runtime_error("output length does not match. " LOCATION);
 
@@ -135,19 +172,27 @@ namespace secJoin
 		else
 		{
 			// plaintext key and shared input is not implemented.
-			if (mKeyMode != AltModPrfKeyMode::Shared &&
+			if (mKeyMode != AltModPrfKeyMode::Shared ||
 				mInputMode != AltModPrfInputMode::Shared)
 				throw std::runtime_error("unsupported mode combination. " LOCATION);
 
+			if (mKeyMultRecver.mRecvKeyReq.size())
+			{
+				co_await mKeyMultRecver.receiveKey();
+				mKeyMultSender.mOptionalKeyShare = mKeyMultRecver.mKey;
+			}
 			if (mKeyMultSender.mOptionalKeyShare.has_value() == false)
 				throw RTE_LOC;
 			if (mKeyMultRecver.mKey != *mKeyMultSender.mOptionalKeyShare)
 				throw RTE_LOC;
 
-			// we need x in a transformed format so that we can do SIMD operations.
-			// we compute e = G * x.
-			oc::Matrix<block> e(AltModPrf::KeySize, oc::divCeil(x.size(), 128));
-			AltModPrf::expandInput(x, e);
+			oc::Matrix<block> storage;
+			if (!e.rows())
+			{
+				storage.resize(AltModPrf::KeySize, oc::divCeil(mInputSize, 128), oc::AllocType::Uninitialized);
+				AltModPrf::expandInput(x, storage);
+				e = storage;
+			}
 			if (mDebug)
 				mDebugInput = std::vector<block>(x.begin(), x.end());
 
@@ -162,7 +207,7 @@ namespace secJoin
 
 			// concurrently, multiply these shares by the the individual key shares.
 			co_await macoro::when_all_ready(
-				mKeyMultRecver.mult(x.size(), ek0, ek1, sock),
+				mKeyMultRecver.mult(mInputSize, ek0, ek1, sock),
 				mKeyMultSender.mult(eLsb, eMsb, ekaLsb, ekaMsb, sb)
 			);
 
@@ -177,11 +222,11 @@ namespace secJoin
 			mDebugEk1 = ek1;
 		}
 
-		// Compute u = (A * ek) mod 3
+		// Add our ternary key share before switching to binary.
 		auto buffer = oc::AlignedUnVector<u8>{};
 		auto u0 = oc::Matrix<block>{ AltModPrf::MidSize, oc::divCeil(y.size(), 128), oc::AllocType::Uninitialized };
 		auto u1 = oc::Matrix<block>{ AltModPrf::MidSize, oc::divCeil(y.size(), 128), oc::AllocType::Uninitialized };
-		AltModPrf::mACode.encode(ek1, ek0, u1, u0);
+		AltModPrf::mACode.encode(ek1, ek0, u1, u0, mOffset);
 		ek0 = {};
 		ek1 = {};
 
@@ -213,7 +258,11 @@ namespace secJoin
 		std::optional<AltModPrf::KeyType> keyShare,
 		span<const block> recvOts)
 	{
-		mKeyMultSender.setKeyOts(keyShare, ots);
+		auto binary = binaryPart(keyShare);
+		if (keyShare.has_value() != (mKeyMode == AltModPrfKeyMode::Shared))
+			throw std::invalid_argument("Unexpected receiver key share mode");
+		mOffset = keyShare ? keyShare->offset : AltModPrf::Offset{};
+		mKeyMultSender.setKeyOts(binary, ots);
 
 		if (mKeyMode == AltModPrfKeyMode::Shared &&
 			mInputMode == AltModPrfInputMode::Shared)
@@ -221,7 +270,7 @@ namespace secJoin
 			if (!keyShare.has_value())
 				throw RTE_LOC;
 
-			mKeyMultRecver.setKeyOts(*keyShare, recvOts);
+			mKeyMultRecver.setKeyOts(*binary, recvOts);
 		}
 		else
 		{
@@ -236,6 +285,7 @@ namespace secJoin
 	{
 		mMod2F4Req.clear();
 		mMod2OleReq.clear();
+		mOffset = {};
 		mKeyMultRecver.clear();
 		mKeyMultSender.clear();
 		mInputSize = 0;
@@ -257,7 +307,7 @@ namespace secJoin
 	{
 		if (keyOts.size() != AltModPrf::KeySize && keyOts.size() != 0)
 			throw RTE_LOC;
-		if (!size)
+		if (!ole.initialized() || !size)
 			throw RTE_LOC;
 		if (mInputSize)
 			throw RTE_LOC;
@@ -267,12 +317,20 @@ namespace secJoin
 		mInputMode = inputMode;
 		auto n128 = oc::roundUpTo(mInputSize, 128);
 
-		mKeyMultSender.init(ole, keyShare, keyOts);
+		auto binary = binaryPart(keyShare);
+		if (keyMode == AltModPrfKeyMode::SenderOnly && keyShare)
+			throw std::invalid_argument("Unexpected receiver key share");
+		mOffset = keyShare ? keyShare->offset : AltModPrf::Offset{};
+		if (keyMode == AltModPrfKeyMode::Shared && !keyShare)
+			mOffset = AltModPrf::sampleOffset(ole.mGenState->mPrng);
+		mKeyMultSender.init(ole, binary, keyOts);
+		if (!keyShare && keyMode == AltModPrfKeyMode::Shared && inputMode == AltModPrfInputMode::ReceiverOnly)
+			mKeyMultSender.mOptionalKeyShare = ole.mGenState->mPrng.get<AltModPrf::BinaryKey>();
 
 		if (mKeyMode == AltModPrfKeyMode::Shared &&
 			mInputMode == AltModPrfInputMode::Shared)
 		{
-			mKeyMultRecver.init(ole, keyShare, keyRecvOts);
+			mKeyMultRecver.init(ole, binary, keyRecvOts);
 			mConvToF3.init(n128 * AltModPrf::KeySize, ole);
 		}
 
@@ -305,14 +363,27 @@ namespace secJoin
 		span<const block> x,
 		span<block> y,
 		coproto::Socket& sock,
-		PRNG& prng)
+		PRNG&)
+	{
+		if (x.size() != mInputSize)
+			throw std::invalid_argument("Invalid PRF input length");
+		return evaluateImpl(x, {}, y, sock);
+	}
+
+	coproto::task<> AltModWPrfReceiver::evaluateExpanded(
+		oc::MatrixView<const block> expanded, span<block> y, coproto::Socket& sock)
+	{
+		if (expanded.rows() != AltModPrf::KeySize || expanded.cols() != oc::divCeil(y.size(), 128))
+			throw std::invalid_argument("Invalid bit-sliced PRF input dimensions");
+		return evaluateImpl({}, expanded, y, sock);
+	}
+
+	coproto::task<> AltModWPrfReceiver::evaluateImpl(
+		span<const block> x, oc::MatrixView<const block> e, span<block> y, coproto::Socket& sock)
 	{
 
 		if (mInputSize == 0)
 			throw std::runtime_error("input lengths 0. " LOCATION);
-
-		if (x.size() != mInputSize)
-			throw std::runtime_error("input lengths do not match. " LOCATION);
 
 		if (y.size() != mInputSize)
 			throw std::runtime_error("output lengths do not match. " LOCATION);
@@ -333,10 +404,13 @@ namespace secJoin
 		if (mDebug)
 			mDebugInput = std::vector<block>(x.begin(), x.end());
 
-		// we need x in a transformed format so that we can do SIMD operations.
-		// compute e = G * x
-		oc::Matrix<block> e(AltModPrf::KeySize, oc::divCeil(x.size(), 128), oc::AllocType::Uninitialized);
-		AltModPrf::expandInput(x, e);
+		oc::Matrix<block> storage;
+		if (!e.rows())
+		{
+			storage.resize(AltModPrf::KeySize, oc::divCeil(mInputSize, 128), oc::AllocType::Uninitialized);
+			AltModPrf::expandInput(x, storage);
+			e = storage;
+		}
 
 		mKeyMultRecver.mDebug = mDebug;
 		mKeyMultSender.mDebug = mDebug;
@@ -352,10 +426,15 @@ namespace secJoin
 		else
 		{
 			// SenderOnly key and shared input is not implemented.
-			if (mKeyMode != AltModPrfKeyMode::Shared &&
+			if (mKeyMode != AltModPrfKeyMode::Shared ||
 				mInputMode != AltModPrfInputMode::Shared)
 				throw std::runtime_error("unsupported mode combination. SenderOnly key and secret shared input is not implemented. " LOCATION);
 
+			if (mKeyMultRecver.mRecvKeyReq.size())
+			{
+				co_await mKeyMultRecver.receiveKey();
+				mKeyMultSender.mOptionalKeyShare = mKeyMultRecver.mKey;
+			}
 			if (mKeyMultSender.mOptionalKeyShare.has_value() == false)
 				throw RTE_LOC;
 
@@ -374,7 +453,7 @@ namespace secJoin
 			// multiply the F3 sharing of e by the key shares
 			co_await macoro::when_all_ready(
 				mKeyMultSender.mult(eLsb, eMsb, ek0a, ek1a, sock),
-				mKeyMultRecver.mult(x.size(), ek0, ek1, sb)
+				mKeyMultRecver.mult(mInputSize, ek0, ek1, sb)
 			);
 
 			ek1.resize(ek1a.rows(), ek1a.cols());
@@ -394,10 +473,13 @@ namespace secJoin
 		}
 
 
-		// Compute u = A * ek
-		oc::Matrix<block>u0(AltModPrf::MidSize, oc::divCeil(x.size(), 128), oc::AllocType::Uninitialized);
-		oc::Matrix<block>u1(AltModPrf::MidSize, oc::divCeil(x.size(), 128), oc::AllocType::Uninitialized);
-		AltModPrf::mACode.encode(ek1, ek0, u1, u0);
+		// Add the receiver offset only in shared-key mode.
+		oc::Matrix<block>u0(AltModPrf::MidSize, oc::divCeil(mInputSize, 128), oc::AllocType::Uninitialized);
+		oc::Matrix<block>u1(AltModPrf::MidSize, oc::divCeil(mInputSize, 128), oc::AllocType::Uninitialized);
+		if (mKeyMode == AltModPrfKeyMode::Shared)
+			AltModPrf::mACode.encode(ek1, ek0, u1, u0, mOffset);
+		else
+			AltModPrf::mACode.encode(ek1, ek0, u1, u0);
 		ek0 = {};
 		ek1 = {};
 

@@ -6,26 +6,26 @@ namespace secJoin
 {
 
 
+	macoro::task<> AltModKeyMultReceiver::receiveKey()
+	{
+		OtRecv ots;
+		co_await mRecvKeyReq.get(ots);
+		if (ots.mChoice.size() != AltModPrf::KeySize)
+			throw RTE_LOC;
+		AltModPrf::BinaryKey key;
+		osuCrypto::copyBytes(key, ots.mChoice.getSpan<u8>());
+		setKeyOts(key, ots.mMsg);
+		mRecvKeyReq.clear();
+	}
+
 	macoro::task<> AltModKeyMultReceiver::mult(
 		u64 n,
 		oc::Matrix<block>& xk0,
 		oc::Matrix<block>& xk1,
 		coproto::Socket& sock)
 	{
-
-
-		// if we are doing the key gen, get the results.
 		if (mRecvKeyReq.size())
-		{
-			auto otRecv = OtRecv{ };
-			co_await mRecvKeyReq.get(otRecv);
-
-			if (oc::divCeil(otRecv.mChoice.size(), 8) != sizeof(AltModPrf::KeyType))
-				throw RTE_LOC;
-
-			auto k = otRecv.mChoice.getSpan<AltModPrf::KeyType>()[0];
-			setKeyOts(k, otRecv.mMsg);
-		}
+			co_await receiveKey();
 
 		// make sure we have a key.
 		if (mKeyRecvOTs.size() != AltModPrf::KeySize)
@@ -100,7 +100,7 @@ namespace secJoin
 				xk1_(xk0.rows(), xk0.cols()),
 				xLsb(xk0.rows(), xk0.cols()),
 				xMsb(xk0.rows(), xk0.cols());
-			AltModPrf::KeyType k2;
+			AltModPrf::BinaryKey k2;
 
 			co_await sock.recv(xk0b);
 			co_await sock.recv(xk1b);
@@ -115,7 +115,7 @@ namespace secJoin
 			//std::cout << "k " << k << std::endl;
 			//for (u64 j = 0; j < 10; ++j)
 			//{
-			//	AltModPrf::KeyType xx;
+			//	AltModPrf::BinaryKey xx;
 			//	for (u64 i = 0; i < AltModPrf::KeySize; ++i)
 			//	{
 			//		*oc::BitIterator((u8*)&xx, i) = bit(x.data(i), j);
@@ -164,7 +164,7 @@ namespace secJoin
 		{
 			auto otSend = OtSend{ };
 			co_await(mSendKeyReq.get(otSend));
-			setKeyOts({}, otSend.mMsg);
+			setKeyOts(mOptionalKeyShare, otSend.mMsg);
 			mSendKeyReq.clear();
 		}
 
@@ -309,7 +309,7 @@ namespace secJoin
 				co_await sock.send(*mOptionalKeyShare);
 			else
 			{
-				AltModPrf::KeyType k;
+				AltModPrf::BinaryKey k;
 				osuCrypto::setBytes(k, 0);
 				co_await sock.send(k);
 			}
